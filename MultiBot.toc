@@ -1,0 +1,110 @@
+## Interface: 30300
+## Version: 3.0.0
+## Title: MultiBot
+## Notes: User Interface for Playerbot
+## Author: Nico Löbbert
+## SavedVariablesPerCharacter: MultiBotSave, MultiBotDB, MultiBotSaved
+## SavedVariables: MultiBotGlobalSave
+## X-Maintainer: Wishmaster117 aka TheWarlock
+## X-Contributors: Wishmaster117 aka TheWarlock
+## X-Contact: plexalexdcnh@gmail.com
+## X-ProjectURL: https://www.azerothdevs.com
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\AceAddon-3.0\AceAddon-3.0.lua
+Libs\AceEvent-3.0\AceEvent-3.0.lua
+Libs\AceConsole-3.0\AceConsole-3.0.lua
+Libs\AceDB-3.0\AceDB-3.0.lua
+Libs\AceLocale-3.0\AceLocale-3.0.lua
+Libs\AceTimer-3.0\AceTimer-3.0.lua
+Libs\AceGUI-3.0\AceGUI-3.0.xml
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Libs\libdatabroker-1-1\LibDataBroker-1.1.lua
+Libs\LibDropdown-1.0\LibDropdown-1.0.lua
+
+
+Core\MultiBot.lua
+Core\MultiBotStore.lua
+Core\MultiBotConfig.lua
+Core\MultiBotLocale.lua
+Core\MultiBotDebug.lua
+UI\MultiBotOptions.lua
+Core\MultiBotThrottle.lua
+Core\MultiBotAsync.lua
+Core\MultiBotComm.lua
+
+Locales\MultiBotAceLocale.lua
+Locales\MultiBotAceLocale-enUS.lua
+Locales\MultiBotAceLocale-frFR.lua
+Locales\MultiBotAceLocale-esES.lua
+Locales\MultiBotAceLocale-deDE.lua
+Locales\MultiBotAceLocale-enGB.lua
+Locales\MultiBotAceLocale-ruRU.lua
+Locales\MultiBotAceLocale-zhCN.lua
+Locales\MultiBotAceLocale-koKR.lua
+Data\HunterPetFamily.lua
+Data\HunterPetList_1.lua
+Data\HunterPetList_2.lua
+Data\HunterPetList_3.lua
+Data\HunterPetList_4.lua
+Core\MultiBotEngine.lua
+Core\MultiBotHandler.lua
+Strategies\MultiBotDeathKnight.lua
+Strategies\MultiBotDruid.lua
+Strategies\MultiBotHunter.lua
+Strategies\MultiBotMage.lua
+Strategies\MultiBotPaladin.lua
+Strategies\MultiBotPriest.lua
+Strategies\MultiBotRogue.lua
+Strategies\MultiBotShaman.lua
+Strategies\MultiBotWarlock.lua
+Strategies\MultiBotWarrior.lua
+Core\MultiBotEvery.lua
+UI\MultiBotStats.lua
+UI\MultiBotSpell.lua
+UI\MultiBotSpellBookFrame.lua
+UI\MultiBotRewardFrame.lua
+UI\MultiBotOutfitUI.lua
+UI\MultiBotInventoryFrame.lua
+UI\MultiBotInventoryItem.lua
+UI\MultiBotInspectUI.lua
+UI\MultiBotItemusFrame.lua
+UI\MultiBotIconosFrame.lua
+UI\MultiBotItem.lua
+UI\MultiBotTalentFrame.lua
+UI\MultiBotHunterQuickFrame.lua
+UI\MultiBotShamanQuickFrame.lua
+UI\MultiBotAceUI.lua
+UI\MultiBotQuestUIShared.lua
+UI\MultiBotPromptDialog.lua
+UI\MultiBotQuestLogFrame.lua
+UI\MultiBotQuestIncompleteFrame.lua
+UI\MultiBotQuestCompletedFrame.lua
+UI\MultiBotQuestAllFrame.lua
+UI\MultiBotGameObjectCopyFrame.lua
+UI\MultiBotGameObjectResultsFrame.lua
+UI\MultiBotQuestsMenu.lua
+UI\MultiBotMinimap.lua
+UI\MultiBotGroupActionsUI.lua
+UI\MultiBotAttackUI.lua
+UI\MultiBotLeftCoreUI.lua
+UI\MultiBotFormationUI.lua
+UI\MultiBotFleeUI.lua
+UI\MultiBotUnitsFilterUI.lua
+UI\MultiBotUnitsRosterUI.lua
+UI\MultiBotUnitsRootUI.lua
+UI\MultiBotBeastUI.lua
+UI\MultiBotCreatorUI.lua
+UI\MultiBotMainUI.lua
+UI\MultiBotGmUI.lua
+UI\MultiBotRTSCUI.lua
+Core\MultiBotInit.lua
+Data\MultiBotIconos.lua
+Data\MultiBotItemus.lua
+UI\MultiBotSpecUI.lua
+UI\MultiBotTalent.lua
+UI\MultiBotPVPUI.lua
+Features\MultiBotReward.lua
+Features\MultiBotNecronet.lua
+Features\MultiBotRaidus.lua
