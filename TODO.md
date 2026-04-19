@@ -1,83 +1,151 @@
-TODO
-* faire en sorte que la croix de fermeture de quickshamant et quickhunter reste à la même place quand on clique dessus pour les fermer
-* Uniformiser le template des frame quetes comme celle de Itemus
-* Uniformiser le template de la frame reward comme celle de itemus
-* Raidus doit se rafraichir à l'ouverture et fermeture
-* dans la liste des quêtes des fois c'est l'ID de la queête qui apparait et pas le tritre
-* Mettre une option pour choisir la tailles des icones de la main barre et des quickhunter/shaman
-* Voir si il y'a pas d'autres option que l'on peut ajouter à la frame options de multibot
-* creer le multilangue pour le tooltip: setTooltip(self, "Show / Hide / Move Quick Shaman") des fichiers quickshaman et quickhunter
-* Finir les options de déplacement des boutons
-* faire en sorte que les menus déroulants de la main barre se ferment quand on on ouvre un autre
-* revoir le fichiers UI/MultiBotTalent, la partie des glyphes et des talents car il y'a eu des modifications dans le fichiers .conf de multibot
-* pourquoi les glyphes sont longues a afficher?
-* implémenter RTI
-* trouver un moyen de charger tous les skins des pets hunter
-* tester nouvelle commande /mbdebug : "[MB] Usage: /mbdebug list | /mbdebug on <subsystem> | /mbdebug off <subsystem> | /mbdebug toggle <subsystem> | /mbdebug all on|off | /mbdebug counters [reset]"
+Où on en est
 
-Comment tester en jeu (plan concret)
-1) Préparer une baseline (debug OFF)
-Recharge l’UI (/reload).
+On a déjà sorti une première grosse brique du retour chat :
 
-Vérifie que tout est OFF:
+Déjà passé sur le bridge
+handshake addon ↔ serveur : HELLO / HELLO_ACK / PING / PONG
+roster temps réel des bots actifs : ROSTER
+états combat / normal pour les everybars : STATE / STATES
 
-/mbdebug list → perf=off attendu.
+En pratique, ça veut dire que le bridge est maintenant capable de porter l’état live des bots déjà connectés, sans parser les whispers de retour pour ça.
 
-Joue 2-3 minutes normalement (ouvrir/fermer UI, inviter bots, quelques whispers bots).
+Ce qui reste encore dépendant du chat
 
-2) Activer la collecte perf
-Active seulement la perf:
+Il reste un point critique, qu’on vient justement de remettre en route :
 
-/mbdebug on perf
+1) La reconnexion/restauration au login
 
-Remets les compteurs à zéro:
+Aujourd’hui, elle dépend encore de :
 
-/mbdebug counters reset
+.playerbot bot list
+la ligne système Bot roster: ...
+puis les .playerbot bot add ...
 
-3) Exécuter les scénarios ciblés M12-2
-Cycle événementiel/roster
+Donc :
 
-Ouvre MultiBot, fais un refresh de roster, invite/retire 2-3 bots.
+bridge = voit les bots déjà actifs
+chat = permet encore de retrouver/reloguer ceux qui ne sont pas encore actifs
 
-Whisper flow
+C’est la dépendance principale qui reste pour le bootstrap.
 
-Déclenche des commandes whisper classiques (stats, co ?, etc.) via flux normal addon.
+2) Une partie des données “riches”
 
-Scheduler
+Suivant les panneaux MultiBot, il reste encore du parsing chat pour récupérer par exemple :
 
-Ouvre/ferme des écrans qui déclenchent des TimerAfter/NextTick (inventory/reward/spellbook selon ton flow habituel).
+stats détaillées,
+inventaire / sacs / durabilité,
+spellbook / talents / spé,
+certains retours de commandes,
+éventuellement d’autres vues métier du module.
 
-Throttle
+Autrement dit :
+l’état live minimal est en bridge,
+mais beaucoup de données d’inspection restent encore en mode “commande → retour chat parsé”.
 
-Lance plusieurs commandes successives pour remplir la queue (ex: actions groupées sur bots).
+Ce qu’on a validé techniquement
 
-4) Lire les compteurs
-/mbdebug counters
+On a prouvé trois choses importantes :
 
-Tu dois voir évoluer des clés de ce type:
+A. Le bridge n’était pas une fausse piste
 
-events.total, events.chat_msg_whisper
+Le transport fonctionne.
 
-handler.onupdate.calls, handler.onupdate.elapsed
+B. Le bridge seul ne suffit pas encore pour remplacer tout le bootstrap
 
-scheduler.timerafter.calls, scheduler.nexttick.calls
+Parce que son ROSTER actuel ne remonte que les bots déjà présents dans le PlayerbotMgr.
 
-throttle.enqueued, throttle.sent, throttle.onupdate.calls
+C. Le bon modèle n’est pas “bridge OU chat”
 
-5) Vérifs de non-régression
-Désactive perf:
+Le bon modèle transitoire est :
 
-/mbdebug off perf
+bridge prioritaire pour le live
+chat en fallback uniquement là où le bridge ne sait pas encore répondre
 
-Rejoue rapidement les mêmes actions.
+C’est exactement ce qu’on vient de remettre proprement.
 
-Vérifie:
+Ce qu’il manque pour rendre MultiBot réellement non dépendant du retour chat
 
-pas de spam chat supplémentaire,
+À ce stade, le prochain vrai palier, c’est d’ajouter côté bridge des opcodes qui remplacent les flux historiques les plus structurants.
 
-pas de comportement différent côté gameplay/UI,
+Priorité 1 : remplacer .playerbot bot list
 
-pas de latence perceptible nouvelle.
+Il faut un opcode du genre :
 
-6) Reset pour itération suivante
-/mbdebug counters reset
+KNOWN_BOTS
+ou
+BOT_LIST
+
+qui renvoie non seulement les bots actifs, mais aussi :
+
+bots connus,
+online/offline,
+groupés / non groupés,
+éventuellement owner/master,
+classe / niveau si utile.
+
+Tant qu’on n’a pas ça, la reconnexion automatique gardera une dépendance au chat.
+
+Priorité 2 : remplacer .playerbot bot add ...
+
+Il faut des actions bridge du genre :
+
+CONNECT_BOT~Nom
+CONNECT_BOTS~Nom1;Nom2;Nom3
+voire RESTORE_GROUP
+
+Là, on casserait la dépendance aux commandes texte pour loguer les bots.
+
+Priorité 3 : batch de stats structuré
+
+Pour le roster et les cadres, il faudrait une réponse structurée du type :
+
+STATS
+STATS_BATCH
+
+avec directement :
+
+hp / hpMax
+mana / manaMax / rage / énergie / focus / runes si utile
+niveau
+classe
+rôle / spé
+map / zone si nécessaire
+dead / afk / combat / distance éventuellement
+
+À partir de là, plus besoin de déclencher des retours chat juste pour nourrir l’UI principale.
+
+En résumé franc
+Ce qui est déjà “déchatifié”
+transport addon
+heartbeat
+roster live des bots connectés
+états combat/normal
+Ce qui ne l’est pas encore
+découverte complète des bots au login
+reconnexion automatique des bots offline
+une partie des données détaillées d’UI
+Le vrai état du projet
+
+Je dirais qu’on est à peu près ici :
+
+le noyau temps réel est engagé vers le bridge, mais le bootstrap et l’inspection détaillée dépendent encore du chat.
+
+Donc on n’est plus au stade “tout parser dans le chat”,
+mais on n’est pas encore au stade “MultiBot totalement piloté par une API serveur structurée”.
+
+Le prochain cap logique
+
+Le prochain chantier le plus rentable est très clair :
+
+1. KNOWN_BOTS
+2. CONNECT_BOT(S)
+3. STATS_BATCH
+
+Avec ça, on enlève l’essentiel de la dépendance au retour chat pour :
+
+login auto,
+roster,
+everybars,
+vue principale.
+
+Après, le reste pourra être migré panneau par panneau.
