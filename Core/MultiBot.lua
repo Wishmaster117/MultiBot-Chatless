@@ -1399,7 +1399,40 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
     MultiBot.UpdateFavoritesIndex()
   end
 
+  if MultiBot.ApplyAllBridgeStates then
+    MultiBot.ApplyAllBridgeStates()
+  end
+
   return true
+end
+
+function MultiBot.GetCachedBridgeState(name)
+  if type(name) ~= "string" or name == "" then
+    return nil
+  end
+
+  if not (MultiBot and MultiBot.bridge and MultiBot.bridge.states) then
+    return nil
+  end
+
+  return MultiBot.bridge.states[string.lower(name)]
+end
+
+function MultiBot.ApplyAllBridgeStates()
+  if not (MultiBot and MultiBot.bridge and MultiBot.bridge.states) then
+    return 0
+  end
+
+  local applied = 0
+  for _, entry in pairs(MultiBot.bridge.states) do
+    if type(entry) == "table" and entry.name and MultiBot.ApplyBridgeBotState then
+      if MultiBot.ApplyBridgeBotState(entry.name, entry.combat or "", entry.normal or "") then
+        applied = applied + 1
+      end
+    end
+  end
+
+  return applied
 end
 
 local function InsertBridgeNameUnique(list, name)

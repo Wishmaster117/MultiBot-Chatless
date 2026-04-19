@@ -2132,10 +2132,17 @@ MultiBot.addFriend = function(pClass, pLevel, pName)
 end
 
 MultiBot.addActive = function(pClass, pLevel, pName)
-	if(MultiBot.frames["MultiBar"].frames["Units"].buttons[pName] ~= nil) then return MultiBot.frames["MultiBar"].frames["Units"].buttons[pName] end
 	local tClass = MultiBot.toClass(pClass)
 	local tTexture = "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tClass) .. ".blp"
-	local tButton = MultiBot.frames["MultiBar"].frames["Units"].addButton(pName, 0, 0, tTexture, MultiBot.toTip(tClass, pLevel, pName))
+	local tUnits = MultiBot.frames["MultiBar"].frames["Units"]
+	local tButton = tUnits.buttons[pName]
+
+	if(tButton == nil) then
+		tButton = tUnits.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tClass, pLevel, pName))
+	elseif(tButton.setButton ~= nil) then
+		tButton.setButton(tTexture, MultiBot.toTip(tClass, pLevel, pName))
+	end
+
 	tButton.roster = "actives"
 	tButton.class = tClass
 	tButton.name = pName

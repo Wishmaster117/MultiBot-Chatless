@@ -20,6 +20,23 @@ local function perfDuration(counterName, elapsed)
 	debugApi.AddDuration(counterName, elapsed)
 end
 
+local function BridgeBootOwnsState()
+	local bridge = MultiBot and MultiBot.bridge
+	if type(bridge) ~= "table" then
+		return false
+	end
+
+	if bridge.connected or bridge.bootstrapPending or bridge.rosterPending then
+		return true
+	end
+
+	if type(bridge.statePending) == "table" and next(bridge.statePending) ~= nil then
+		return true
+	end
+
+	return false
+end
+
 function MultiBot.HandleOnUpdate(pElapsed)
 	perfCount("handler.onupdate.calls")
 	perfDuration("handler.onupdate.elapsed", tonumber(pElapsed) or 0)
@@ -1310,31 +1327,41 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 	-- PLAYER:ENTERING --
 
 	if(event == "PLAYER_ENTERING_WORLD") then
-	MultiBot.dprint("EVT", "PLAYER_ENTERING_WORLD") -- DEBUG
+        MultiBot.dprint("EVT", "PLAYER_ENTERING_WORLD") -- DEBUG
+    
+        if MultiBot.Comm and MultiBot.Comm.OnPlayerEnteringWorld then
+            MultiBot.Comm.OnPlayerEnteringWorld()
+        end
+    
         SendChatMessage(".account", "SAY")
+    
         if(MultiBot.init == nil) then
             MultiBot.init = true
+            MultiBot.TimerAfter(6.0, function()
+                local bridge = MultiBot.bridge
+                local playersSize = 0
 
-            local function BootRosterTry(attempt)
-                if MultiBot.bridge and MultiBot.Comm and MultiBot.Comm.RequestRoster then
-                    if MultiBot.bridge.connected then
-                        MultiBot.dprint("ADDON:TX", "BOOT GET ROSTER")
-                        MultiBot.Comm.RequestRoster()
-                        return
-                    end
-
-                    if attempt < 10 then
-                        MultiBot.TimerAfter(0.5, function() BootRosterTry(attempt + 1) end)
-                        return
-                    end
+                if MultiBot and MultiBot.index and MultiBot.index.players then
+                    playersSize = table.getn(MultiBot.index.players)
                 end
 
-				MultiBot.dprint("SEND", ".playerbot bot list"); SendChatMessage(".playerbot bot list", "SAY")--Debug
-            end
+                local bridgeRosterSize = 0
+                if bridge and bridge.roster then
+                    bridgeRosterSize = table.getn(bridge.roster)
+                end
 
-            MultiBot.TimerAfter(1.0, function() BootRosterTry(1) end)
-            return
+                if playersSize > 1 then
+                    return
+                end
+
+                if bridge and bridge.connected and bridgeRosterSize > 0 then
+                    return
+                end
+
+                SendChatMessage(".playerbot bot list", "SAY")
+            end)
         end
+    
         return
     end
 
@@ -1344,11 +1371,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 		end
 	end
 
-	if (event == "PLAYER_ENTERING_WORLD") then
-		if MultiBot.Comm and MultiBot.Comm.OnPlayerEnteringWorld then
-			MultiBot.Comm.OnPlayerEnteringWorld()
-		end
-	end
 
 	-- CHAT:SYSTEM --
 	if(event == "CHAT_MSG_SYSTEM") then
@@ -1582,11 +1604,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                -- Le flux normal via le WHISPER "Hello" s'en chargera.
                tButton.waitFor = "CO"
                tButton.setEnable()
-
-               if(MultiBot.bridge and MultiBot.bridge.connected and MultiBot.Comm and MultiBot.Comm.RequestState) then
-                  tButton.waitFor = "BRIDGE_STATE"
-                  MultiBot.Comm.RequestState(tName)
-               end			   
                return
             end
 
@@ -1854,7 +1871,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 		end
 
 		if(MultiBot.isInside(arg1, "Hello", "你好")) then
-			if(MultiBot.bridge and MultiBot.bridge.connected and MultiBot.Comm and MultiBot.Comm.RequestState) then
+			if(BridgeBootOwnsState() and MultiBot.Comm and MultiBot.Comm.RequestState) then
 				tButton.waitFor = "BRIDGE_STATE"
 				MultiBot.Comm.RequestState(arg2)
 				return

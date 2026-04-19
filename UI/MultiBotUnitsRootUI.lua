@@ -210,6 +210,22 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
                 end
             elseif MultiBot.Comm and MultiBot.Comm.RequestRoster then
                 MultiBot.Comm.RequestRoster()
+
+                if MultiBot.TimerAfter then
+                    MultiBot.TimerAfter(0.75, function()
+                        local bridge = MultiBot.bridge
+                        local bridgeRosterSize = 0
+                        local currentPlayers = MultiBot.index and MultiBot.index.players or {}
+
+                        if bridge and bridge.roster then
+                            bridgeRosterSize = table.getn(bridge.roster)
+                        end
+
+                        if bridge and bridge.connected and bridgeRosterSize == 0 and table.getn(currentPlayers) <= 0 then
+                            SendChatMessage(".playerbot bot list", "SAY")
+                        end
+                    end)
+                end				
             end
         end
 
@@ -399,7 +415,39 @@ local function rebuildGuildAndFriendIndexes(button)
 end
 
 refreshStrategiesForActiveBots = function()
-    local requestIndex = 0
+    if MultiBot.bridge and MultiBot.Comm and MultiBot.Comm.RequestStates then
+        if not MultiBot.bridge.connected then
+            return
+        end
+
+        local function markBridgeStateWait(name)
+            if not name or name == UnitName("player") then
+                return
+            end
+
+            local unitsFrame = MultiBot.frames
+                and MultiBot.frames["MultiBar"]
+                and MultiBot.frames["MultiBar"].frames
+                and MultiBot.frames["MultiBar"].frames[UNITS_FRAME_NAME]
+            local button = unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]
+            if button then
+                button.waitFor = "BRIDGE_STATE"
+            end
+        end
+
+        if IsInRaid() then
+            for index = 1, GetNumGroupMembers() do
+                markBridgeStateWait(UnitName("raid" .. index))
+            end
+        elseif IsInGroup() then
+            for index = 1, GetNumSubgroupMembers() do
+                markBridgeStateWait(UnitName("party" .. index))
+            end
+        end
+
+        MultiBot.Comm.RequestStates()
+        return
+    end
 
     local function refreshStrategiesFor(name)
         if not name or name == UnitName("player") then
@@ -433,27 +481,6 @@ refreshStrategiesForActiveBots = function()
             and MultiBot.frames["MultiBar"].frames
             and MultiBot.frames["MultiBar"].frames[UNITS_FRAME_NAME]
         local button = unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]
-
-        if MultiBot.bridge and MultiBot.Comm and MultiBot.Comm.RequestState then
-            if not MultiBot.bridge.connected then
-                return
-            end
-
-            requestIndex = requestIndex + 1
-            local function requestState()
-                if button then
-                    button.waitFor = "BRIDGE_STATE"
-                end
-                MultiBot.Comm.RequestState(name)
-            end
-
-            if MultiBot.TimerAfter then
-                MultiBot.TimerAfter(requestIndex * 0.05, requestState)
-            else
-                requestState()
-            end
-            return
-        end
 
         if button then
             button.waitFor = "CO"

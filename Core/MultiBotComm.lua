@@ -19,6 +19,19 @@ local function safeNow()
   return 0
 end
 
+local function safeDelay(delaySeconds, callback)
+  if type(callback) ~= "function" then
+    return
+  end
+
+  if MultiBot and type(MultiBot.TimerAfter) == "function" then
+    MultiBot.TimerAfter(delaySeconds or 0, callback)
+    return
+  end
+
+  callback()
+end
+
 local function trim(value)
   if type(value) ~= "string" then
     return ""
@@ -66,6 +79,8 @@ local function ensureBridgeState()
   state.lastError = state.lastError or nil
   state.roster = state.roster or {}
   state.states = state.states or {}
+  state.bootstrapPending = state.bootstrapPending or false
+  state.bootstrapDeadline = state.bootstrapDeadline or 0
   return state
 end
 
@@ -136,6 +151,10 @@ function Comm.RequestState(name)
   return Comm.Send("GET", "STATE~" .. name)
 end
 
+function Comm.RequestStates()
+  return Comm.Send("GET", "STATES")
+end
+
 function Comm.MarkDisconnected(reason)
   local state = ensureBridgeState()
   state.connected = false
@@ -161,29 +180,6 @@ local function parseRosterEntry(entry)
   }
 end
 
-local function PrefetchRosterStates(roster)
-  if not Comm.RequestState then
-    return
-  end
-
-  local sent = 0
-  for _, entry in ipairs(roster or {}) do
-    local name = entry and entry.name or nil
-    if type(name) == "string" and name ~= "" then
-      sent = sent + 1
-      if MultiBot.TimerAfter then
-        MultiBot.TimerAfter(1.10 + (sent * 0.05), function()
-          if MultiBot.bridge and MultiBot.bridge.connected then
-            Comm.RequestState(name)
-          end
-        end)
-      else
-        Comm.RequestState(name)
-      end
-    end
-  end
-end
-
 function Comm.ApplyRosterPayload(payload)
   local state = ensureBridgeState()
   local roster = {}
@@ -199,8 +195,6 @@ function Comm.ApplyRosterPayload(payload)
   if MultiBot.SyncBridgeRosterToPlayers then
     MultiBot.SyncBridgeRosterToPlayers(roster)
   end
-
-  PrefetchRosterStates(roster)
 
   debugPrint("ADDON:RX", "ROSTER", tostring(#roster))
   return roster
@@ -223,7 +217,7 @@ function Comm.ApplyStatePayload(payload)
     lastUpdateAt = safeNow(),
   }
 
-  state.states[name] = entry
+  state.states[string.lower(name)] = entry
 
   if MultiBot.ApplyBridgeBotState then
     MultiBot.ApplyBridgeBotState(name, entry.combat, entry.normal)
@@ -231,6 +225,21 @@ function Comm.ApplyStatePayload(payload)
 
   debugPrint("ADDON:RX", "STATE", name, entry.combat, entry.normal)
   return entry
+end
+
+function Comm.ApplyStatesPayload(payload)
+  local applied = 0
+
+  if type(payload) == "string" and payload ~= "" then
+    for entryPayload in string.gmatch(payload, "([^;]+)") do
+      if Comm.ApplyStatePayload(entryPayload) then
+        applied = applied + 1
+      end
+    end
+  end
+
+  debugPrint("ADDON:RX", "STATES", tostring(applied))
+  return applied
 end
 
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
@@ -244,11 +253,32 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
 
   if opcode == "HELLO_ACK" then
     local protocol, serverName = splitOnce(payload, "~")
+    local wasConnected = state.connected == true
+
     state.connected = true
     state.protocol = protocol ~= "" and protocol or nil
     state.server = serverName ~= "" and serverName or nil
     state.lastError = nil
     debugPrint("ADDON:RX", "HELLO_ACK", payload or "")
+
+    if (not wasConnected or state.bootstrapPending) and state.protocol then
+      safeDelay(0.10, function()
+        if MultiBot and MultiBot.bridge and MultiBot.bridge.connected then
+          state.bootstrapPending = false
+          state.bootstrapDeadline = 0
+          if Comm.RequestRoster then
+            Comm.RequestRoster()
+          end
+          if Comm.RequestStates then
+            Comm.RequestStates()
+          end
+        end
+      end)
+    else
+      state.bootstrapPending = false
+      state.bootstrapDeadline = 0
+    end
+
     return true
   end
 
@@ -256,6 +286,8 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastPongAt = safeNow()
     state.lastError = nil
+    state.bootstrapPending = false
+    state.bootstrapDeadline = 0
     debugPrint("ADDON:RX", "PONG", payload or "")
     return true
   end
@@ -274,6 +306,13 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "STATES" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyStatesPayload(payload)
+    return true
+  end
+
   if opcode == "ERR" then
     state.lastError = payload
     debugPrint("ADDON:RX", "ERR", payload or "")
@@ -288,11 +327,25 @@ function Comm.OnPlayerEnteringWorld()
   local state = ensureBridgeState()
   state.states = {}
   Comm.MarkDisconnected(nil)
+  state.bootstrapPending = true
+  state.bootstrapDeadline = safeNow() + 4.0
+
+  local function expireBootstrap()
+    local bridge = ensureBridgeState()
+    if not bridge.connected and bridge.bootstrapPending and bridge.bootstrapDeadline > 0 and safeNow() >= bridge.bootstrapDeadline then
+      bridge.bootstrapPending = false
+      bridge.bootstrapDeadline = 0
+    end
+  end
 
   if not MultiBot.TimerAfter then
     Comm.SendHello()
     Comm.SendPing()
     Comm.RequestRoster()
+    if Comm.RequestStates then
+      Comm.RequestStates()
+    end
+    expireBootstrap()
     return
   end
 
@@ -300,7 +353,12 @@ function Comm.OnPlayerEnteringWorld()
     Comm.SendHello()
     Comm.SendPing()
     Comm.RequestRoster()
+    if Comm.RequestStates then
+      Comm.RequestStates()
+    end
   end)
+
+  MultiBot.TimerAfter(4.1, expireBootstrap)
 end
 
 ensureBridgeState()
