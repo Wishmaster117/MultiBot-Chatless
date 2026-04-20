@@ -323,6 +323,15 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   return true
 end
 
+local function dispatchBootstrapRequests()
+  Comm.SendHello()
+  Comm.SendPing()
+  Comm.RequestRoster()
+  if Comm.RequestStates then
+    Comm.RequestStates()
+  end
+end
+
 function Comm.OnPlayerEnteringWorld()
   local state = ensureBridgeState()
   state.states = {}
@@ -339,23 +348,15 @@ function Comm.OnPlayerEnteringWorld()
   end
 
   if not MultiBot.TimerAfter then
-    Comm.SendHello()
-    Comm.SendPing()
-    Comm.RequestRoster()
-    if Comm.RequestStates then
-      Comm.RequestStates()
-    end
+    dispatchBootstrapRequests()
     expireBootstrap()
     return
   end
 
+  dispatchBootstrapRequests()
+
   MultiBot.TimerAfter(1.0, function()
-    Comm.SendHello()
-    Comm.SendPing()
-    Comm.RequestRoster()
-    if Comm.RequestStates then
-      Comm.RequestStates()
-    end
+    dispatchBootstrapRequests()
   end)
 
   MultiBot.TimerAfter(4.1, expireBootstrap)

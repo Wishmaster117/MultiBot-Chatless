@@ -220,10 +220,6 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
                         if bridge and bridge.roster then
                             bridgeRosterSize = table.getn(bridge.roster)
                         end
-
-                        if bridge and bridge.connected and bridgeRosterSize == 0 and table.getn(currentPlayers) <= 0 then
-                            SendChatMessage(".playerbot bot list", "SAY")
-                        end
                     end)
                 end				
             end
@@ -241,13 +237,9 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
                         MultiBot.TimerAfter(0.5, function()
                             if MultiBot.bridge and MultiBot.bridge.connected and MultiBot.Comm and MultiBot.Comm.RequestRoster then
                                 MultiBot.Comm.RequestRoster()
-                            elseif not (MultiBot.index.players and #MultiBot.index.players > 0) then
-                                SendChatMessage(".playerbot bot list", "SAY")
                             end
                         end)
                     end
-                else
-                    SendChatMessage(".playerbot bot list", "SAY")
                 end
             end
         end
@@ -331,15 +323,23 @@ local function rebuildGuildAndFriendIndexes(button)
     end
 
     local needGuildRetry = false
+
+    local inGuild = false
+    if type(IsInGuild) == "function" then
+        inGuild = IsInGuild()
+    elseif type(GetGuildInfo) == "function" then
+        inGuild = GetGuildInfo("player") ~= nil
+    end
+	
     local previousShowOffline = nil
-    if type(GetGuildRosterShowOffline) == "function" and type(SetGuildRosterShowOffline) == "function" then
+    if inGuild and type(GetGuildRosterShowOffline) == "function" and type(SetGuildRosterShowOffline) == "function" then
         previousShowOffline = GetGuildRosterShowOffline()
         if previousShowOffline == false then
             SetGuildRosterShowOffline(true)
         end
     end
 
-    if type(GuildRoster) == "function" then
+    if inGuild and type(GuildRoster) == "function" then
         GuildRoster()
     end
     if type(ShowFriends) == "function" then
@@ -350,13 +350,6 @@ local function rebuildGuildAndFriendIndexes(button)
     MultiBot.index.classes.members = {}
     MultiBot.index.friends = {}
     MultiBot.index.classes.friends = {}
-
-    local inGuild = false
-    if type(IsInGuild) == "function" then
-        inGuild = IsInGuild()
-    elseif type(GetGuildInfo) == "function" then
-        inGuild = GetGuildInfo("player") ~= nil
-    end
 
     local maxMembers = 0
     if type(GetNumGuildMembers) == "function" then
@@ -503,6 +496,46 @@ refreshStrategiesForActiveBots = function()
     end
 end
 
+local function requestRosterBootstrap(button)
+    if MultiBot.Comm then
+        if MultiBot.Comm.SendHello then
+            MultiBot.Comm.SendHello()
+        end
+        if MultiBot.Comm.SendPing then
+            MultiBot.Comm.SendPing()
+        end
+        if MultiBot.Comm.RequestRoster then
+            MultiBot.Comm.RequestRoster()
+        end
+        if MultiBot.Comm.RequestStates then
+            MultiBot.Comm.RequestStates()
+        end
+     end
+
+    local function fallbackToSystemRoster()
+        local bridge = MultiBot.bridge
+        local bridgeRosterSize = 0
+
+        if bridge and bridge.roster then
+            bridgeRosterSize = table.getn(bridge.roster)
+        end
+
+        if bridge and bridge.connected then
+            if bridgeRosterSize > 0 then
+                if MultiBot.SyncBridgeRosterToPlayers then
+                    MultiBot.SyncBridgeRosterToPlayers(bridge.roster)
+                end
+            end
+        end
+    end
+
+    if MultiBot.TimerAfter then
+        MultiBot.TimerAfter(0.75, fallbackToSystemRoster)
+    else
+        fallbackToSystemRoster()
+    end
+end
+
 local function requestRosterRefreshIfNeeded(button, isGuildRetry)
     if isGuildRetry then
         return
@@ -510,21 +543,7 @@ local function requestRosterRefreshIfNeeded(button, isGuildRetry)
 
     local roster = button.roster or "players"
     if roster == "players" or roster == "actives" or roster == "favorites" then
-        if MultiBot.bridge and MultiBot.Comm and MultiBot.Comm.RequestRoster then
-            if MultiBot.bridge.connected then
-                MultiBot.Comm.RequestRoster()
-            else
-                MultiBot.TimerAfter(0.5, function()
-                    if MultiBot.bridge and MultiBot.bridge.connected and MultiBot.Comm and MultiBot.Comm.RequestRoster then
-                        MultiBot.Comm.RequestRoster()
-                    else
-                        SendChatMessage(".playerbot bot list", "SAY")
-                    end
-                end)
-            end
-        else
-            SendChatMessage(".playerbot bot list", "SAY")
-        end
+        requestRosterBootstrap(button)		
         if roster == "favorites" and MultiBot.UpdateFavoritesIndex ~= nil then
             MultiBot.UpdateFavoritesIndex()
         end
@@ -760,6 +779,15 @@ function MultiBot.InitializeUnitsRootUI(tMultiBar)
     createAllBotsCommands(controlFrame)
     createInviteControls(controlFrame)
     createBrowseButton(controlFrame)
+
+    if MultiBot.bridge and MultiBot.bridge.roster and table.getn(MultiBot.bridge.roster) > 0 then
+        if MultiBot.SyncBridgeRosterToPlayers then
+            MultiBot.SyncBridgeRosterToPlayers(MultiBot.bridge.roster)
+        end
+        if MultiBot.ApplyAllBridgeStates then
+            MultiBot.ApplyAllBridgeStates()
+        end
+    end
 
     return {
         mainButton = unitsButton,
