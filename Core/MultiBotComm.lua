@@ -53,6 +53,16 @@ local function splitOnce(value, separator)
   return string.sub(value, 1, startIndex - 1), string.sub(value, endIndex + 1)
 end
 
+local function urlDecodeField(value)
+  if type(value) ~= "string" or value == "" then
+    return ""
+  end
+
+  return (value:gsub("%%(%x%x)", function(hex)
+    return string.char(tonumber(hex, 16) or 0)
+  end))
+end
+
 local function getPlayerName()
   if type(UnitName) ~= "function" then
     return nil
@@ -81,6 +91,8 @@ local function ensureBridgeState()
   state.states = state.states or {}
   state.bootstrapPending = state.bootstrapPending or false
   state.bootstrapDeadline = state.bootstrapDeadline or 0
+  state.inventorySeq = state.inventorySeq or 0
+  state.inventoryActive = state.inventoryActive or nil  
   return state
 end
 
@@ -155,12 +167,37 @@ function Comm.RequestStates()
   return Comm.Send("GET", "STATES")
 end
 
+function Comm.RequestInventory(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.inventorySeq = (tonumber(state.inventorySeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.inventorySeq)
+  state.inventoryActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("GET", "INVENTORY~" .. name .. "~" .. token) then
+    state.inventoryActive = nil
+    return false
+  end
+
+  return true
+end
+
 function Comm.MarkDisconnected(reason)
   local state = ensureBridgeState()
   state.connected = false
   state.server = nil
   state.protocol = nil
   state.lastError = reason or nil
+  state.inventoryActive = nil
 end
 
 local function parseRosterEntry(entry)
@@ -242,6 +279,35 @@ function Comm.ApplyStatesPayload(payload)
   return applied
 end
 
+local function getActiveInventoryRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.inventoryActive
+  if not active then
+    return nil
+  end
+
+  if trim(token) ~= trim(active.token) then
+    return nil
+  end
+
+  if string.lower(trim(botName)) ~= tostring(active.botNameKey or "") then
+    return nil
+  end
+
+  return active
+end
+
+local function clearActiveInventoryRequest(botName, token)
+  local state = ensureBridgeState()
+  if getActiveInventoryRequest(botName, token) then
+    state.inventoryActive = nil
+  end
+end
+
+local function getInventoryFrame()
+  return MultiBot and MultiBot.inventory or nil
+end
+
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   if prefix ~= Comm.prefix then
     return false
@@ -313,6 +379,91 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "INV_BEGIN" then
+    local botName, token = splitOnce(payload or "", "~")
+    state.connected = true
+    state.lastError = nil
+
+    if getActiveInventoryRequest(botName, token) then
+      local inventory = getInventoryFrame()
+      if inventory and inventory.beginPayload then
+        inventory:beginPayload(trim(botName))
+      end
+    end
+
+    return true
+  end
+
+  if opcode == "INV_SUMMARY" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, rest2 = splitOnce(rest or "", "~")
+    local gold, rest3 = splitOnce(rest2 or "", "~")
+    local silver, rest4 = splitOnce(rest3 or "", "~")
+    local copper, rest5 = splitOnce(rest4 or "", "~")
+    local bagUsed, bagTotal = splitOnce(rest5 or "", "~")
+
+    state.connected = true
+    state.lastError = nil
+
+    if getActiveInventoryRequest(botName, token) then
+      local inventory = getInventoryFrame()
+      if inventory and inventory.applySummaryData then
+        inventory:applySummaryData({
+          gold = tonumber(gold or "0") or 0,
+          silver = tonumber(silver or "0") or 0,
+          copper = tonumber(copper or "0") or 0,
+          bagUsed = tonumber(bagUsed or "0") or 0,
+          bagTotal = tonumber(bagTotal or "0") or 0,
+        })
+      end
+    end
+
+    return true
+  end
+
+  if opcode == "INV_ITEM" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, encodedLine = splitOnce(rest or "", "~")
+
+    state.connected = true
+    state.lastError = nil
+
+    if getActiveInventoryRequest(botName, token) then
+      local inventory = getInventoryFrame()
+      local itemsFrame = inventory and inventory.frames and inventory.frames.Items or nil
+      if itemsFrame and itemsFrame.addChatItem then
+        itemsFrame:addChatItem(urlDecodeField(encodedLine))
+        if itemsFrame.updateCanvas then
+          itemsFrame:updateCanvas()
+        end
+      end
+    end
+
+    return true
+  end
+
+  if opcode == "INV_END" then
+    local botName, token = splitOnce(payload or "", "~")
+    state.connected = true
+    state.lastError = nil
+
+    if getActiveInventoryRequest(botName, token) then
+      local inventory = getInventoryFrame()
+      local itemsFrame = inventory and inventory.frames and inventory.frames.Items or nil
+      if itemsFrame then
+        if itemsFrame.updateCanvas then
+          itemsFrame:updateCanvas()
+        end
+        if itemsFrame.updateLayout then
+          itemsFrame:updateLayout()
+        end
+      end
+    end
+
+    clearActiveInventoryRequest(botName, token)
+    return true
+  end
+
   if opcode == "ERR" then
     state.lastError = payload
     debugPrint("ADDON:RX", "ERR", payload or "")
@@ -335,6 +486,7 @@ end
 function Comm.OnPlayerEnteringWorld()
   local state = ensureBridgeState()
   state.states = {}
+  state.inventoryActive = nil  
   Comm.MarkDisconnected(nil)
   state.bootstrapPending = true
   state.bootstrapDeadline = safeNow() + 4.0

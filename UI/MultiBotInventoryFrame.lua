@@ -657,6 +657,13 @@ local function resetInventoryViewState()
 end
 
 local function requestInventoryForBot(botName)
+    local bridge = MultiBot and MultiBot.bridge or nil
+    local comm = MultiBot and MultiBot.Comm or nil
+
+    if botName and botName ~= "" and bridge and bridge.connected and comm and comm.RequestInventory and comm.RequestInventory(botName) then
+        return true
+    end
+
     local waitButton = getInventoryWaitButton(botName)
     if waitButton then
         waitButton.waitFor = "INVENTORY"
@@ -664,7 +671,10 @@ local function requestInventoryForBot(botName)
 
     if botName and botName ~= "" then
         SendChatMessage("items", "WHISPER", nil, botName)
+        return true
     end
+
+    return false
 end
 
 MultiBot.RequestBotInventory = function(botName)
@@ -710,6 +720,12 @@ local function prepareInventoryForBot(botName)
 
     disableOtherInventoryButtons(botName)
     setInventoryBotName(botName)
+    openInventoryWindow()
+
+    local inventory = MultiBot and MultiBot.inventory or nil
+    if inventory and inventory.beginPayload then
+        inventory:beginPayload(botName)
+    end
 
     local sourceButton = getInventorySourceButton(botName)
     if sourceButton and sourceButton.setEnable then
@@ -1221,6 +1237,21 @@ function MultiBot.InitializeInventoryFrame()
         self.summary.gold = parsed.gold or 0
         self.summary.silver = parsed.silver or 0
         self.summary.copper = parsed.copper or 0
+        updateInventorySummaryLabels(self)
+        return true
+    end
+
+    function inventory:applySummaryData(summaryData)
+        if type(summaryData) ~= "table" then
+            return false
+        end
+
+        self.summary = self.summary or {}
+        self.summary.bagUsed = tonumber(summaryData.bagUsed or self.summary.bagUsed or 0) or 0
+        self.summary.bagTotal = tonumber(summaryData.bagTotal or self.summary.bagTotal or 0) or 0
+        self.summary.gold = tonumber(summaryData.gold or self.summary.gold or 0) or 0
+        self.summary.silver = tonumber(summaryData.silver or self.summary.silver or 0) or 0
+        self.summary.copper = tonumber(summaryData.copper or self.summary.copper or 0) or 0
         updateInventorySummaryLabels(self)
         return true
     end
