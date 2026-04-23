@@ -1,0 +1,123 @@
+name: "🧩 Issue – Bug / Improvement / Question"
+description: "Thanks for filling this out. Please make sure to complete all required fields (including the Title above)."
+title: "[Issue] "
+labels:
+  - needs triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for using this form. Fields marked with * are required.
+        👉 Please set a **clear title** at the top before submitting.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Issue type *
+      options:
+        - Bug
+        - Improvement
+        - Question
+    validations:
+      required: true
+
+  - type: input
+    id: addon_version
+    attributes:
+      label: Addon version
+      placeholder: "e.g., v1.2.3"
+    validations:
+      required: false
+
+  - type: input
+    id: wow_version
+    attributes:
+      label: WoW client version
+      placeholder: "e.g., 3.3.5"
+    validations:
+      required: false
+
+  - type: input
+    id: server_version
+    attributes:
+      label: Server/AzerothCore version
+      placeholder: "e.g., git hash, tag, or build"
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description *
+      description: "What is happening, or what would you like to see?"
+      placeholder: "Context, what you were doing, any error messages, etc."
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: "Provide a clear path to reproduce the issue."
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Observe '...'
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior *
+      placeholder: "What should have happened instead?"
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / Errors
+      description: "Paste error messages/stack traces/logs (you can drag & drop files)."
+      placeholder: "Logs, console output, screenshots…"
+    validations:
+      required: false
+
+  - type: input
+    id: log_link
+    attributes:
+      label: Crashlog / Gist link (optional)
+      placeholder: "https://gist.github.com/…"
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: "Drag & drop images here if helpful."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checklist *
+      options:
+        - label: I searched for existing issues that match mine.
+          required: true
+        - label: I tested with the minimum set of addons/changes.
+          required: false
+        - label: I provided reproduction steps and/or relevant logs.
+          required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      placeholder: "Environment details, configuration, ideas for a fix, etc."
+    validations:
+      required: false

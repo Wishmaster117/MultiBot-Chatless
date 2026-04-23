@@ -1,0 +1,26 @@
+name: Lua Format
+
+on: [push, pull_request]
+
+jobs:
+  stylua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Stylua
+        run: cargo install stylua --locked
+        
+      - name: Run Stylua format file by file
+        run: |
+          find Core Data Features UI Locales Strategies -type f -name "*.lua" -print0 |
+          while IFS= read -r -d '' file; do
+            echo "➡️ Formating $file"
+            stylua "$file"
+          done
