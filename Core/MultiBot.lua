@@ -1402,6 +1402,10 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
   if MultiBot.ApplyAllBridgeStates then
     MultiBot.ApplyAllBridgeStates()
   end
+ 
+   if MultiBot.RelayoutUnitsDisplay then
+     MultiBot.RelayoutUnitsDisplay()
+   end
 
   return true
 end

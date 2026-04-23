@@ -177,11 +177,8 @@ local function layoutVisibleUnits(unitsButton, unitsFrame, display, fromIndex, t
     unitsButton._visibleNames = newVisible
 end
 
-local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter)
-    MultiBot.dprint("Units.doLeft", "roster=", requestedRoster or unitsButton.roster, "filter=", requestedFilter or unitsButton.filter)
-
-    local _, unitsFrame = getUnitsRootObjects(unitsButton)
-    if not unitsFrame then
+local function relayoutUnitsDisplay(unitsButton, unitsFrame)
+    if not unitsButton or not unitsFrame then
         return
     end
 
@@ -191,8 +188,56 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
     for _, value in pairs(unitsFrame.frames) do
         value:Hide()
     end
-    unitsFrame.frames["Alliance"]:Show()
-    unitsFrame.frames["Control"]:Show()
+
+    if unitsFrame.frames["Alliance"] then
+        unitsFrame.frames["Alliance"]:Show()
+    end
+    if unitsFrame.frames["Control"] then
+        unitsFrame.frames["Control"]:Show()
+    end
+
+    local sourceTable = getUnitsSourceTable(unitsButton)
+    local display = getDisplayableUnits(unitsFrame, sourceTable)
+
+    unitsButton.limit = #display
+    if unitsButton.limit <= 0 then
+        unitsButton.from = 1
+        unitsButton.to = 0
+        hideTrackedVisibleUnits(unitsButton, unitsFrame)
+        unitsFrame.frames.Control.setPoint(-2, 0)
+        if unitsFrame.frames.Control.buttons["Browse"] then
+            unitsFrame.frames.Control.buttons["Browse"]:Hide()
+        end
+        return
+    end
+
+    local fromIndex = tonumber(unitsButton.from) or 1
+    if fromIndex < 1 then
+        fromIndex = 1
+    end
+    if fromIndex > unitsButton.limit then
+        fromIndex = math.max(1, unitsButton.limit - UNITS_PAGE_SIZE + 1)
+    end
+
+    local toIndex = math.min(unitsButton.limit, fromIndex + UNITS_PAGE_SIZE - 1)
+
+    hideTrackedVisibleUnits(unitsButton, unitsFrame)
+    layoutVisibleUnits(unitsButton, unitsFrame, display, fromIndex, toIndex)
+
+    if unitsButton.limit < UNITS_PAGE_SIZE + 1 then
+        unitsFrame.frames.Control.buttons["Browse"]:Hide()
+    else
+        unitsFrame.frames.Control.buttons["Browse"]:Show()
+    end
+end
+
+local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter)
+    MultiBot.dprint("Units.doLeft", "roster=", requestedRoster or unitsButton.roster, "filter=", requestedFilter or unitsButton.filter)
+
+    local _, unitsFrame = getUnitsRootObjects(unitsButton)
+    if not unitsFrame then
+        return
+    end
 
     if requestedRoster == nil and requestedFilter == nil then
         MultiBot.ShowHideSwitch(unitsFrame)
@@ -209,19 +254,7 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
                     MultiBot.SyncBridgeRosterToPlayers(MultiBot.bridge.roster)
                 end
             elseif MultiBot.Comm and MultiBot.Comm.RequestRoster then
-                MultiBot.Comm.RequestRoster()
-
-                if MultiBot.TimerAfter then
-                    MultiBot.TimerAfter(0.75, function()
-                        local bridge = MultiBot.bridge
-                        local bridgeRosterSize = 0
-                        local currentPlayers = MultiBot.index and MultiBot.index.players or {}
-
-                        if bridge and bridge.roster then
-                            bridgeRosterSize = table.getn(bridge.roster)
-                        end
-                    end)
-                end				
+                MultiBot.Comm.RequestRoster()				
             end
         end
 
@@ -248,24 +281,32 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
     local sourceTable = getUnitsSourceTable(unitsButton)
     MultiBot.dprint("Units.tTable.size", sourceTable and #sourceTable or 0)
 
-    local display = getDisplayableUnits(unitsFrame, sourceTable)
-    unitsButton.limit = #display
-    unitsButton.from = 1
-    unitsButton.to = UNITS_PAGE_SIZE
-
-    local toIndex = math.min(unitsButton.limit, UNITS_PAGE_SIZE)
-    hideTrackedVisibleUnits(unitsButton, unitsFrame)
-    layoutVisibleUnits(unitsButton, unitsFrame, display, 1, toIndex)
-
-    if unitsButton.limit < UNITS_PAGE_SIZE + 1 then
-        unitsFrame.frames.Control.buttons["Browse"]:Hide()
-    else
-        unitsFrame.frames.Control.buttons["Browse"]:Show()
+    if requestedRoster ~= nil or requestedFilter ~= nil then
+        unitsButton.from = 1
+        unitsButton.to = UNITS_PAGE_SIZE
+    elseif (tonumber(unitsButton.from) or 0) < 1 then
+        unitsButton.from = 1
+        unitsButton.to = UNITS_PAGE_SIZE
     end
+
+    relayoutUnitsDisplay(unitsButton, unitsFrame)
 
     if refreshStrategiesForActiveBots then
         refreshStrategiesForActiveBots()
     end
+end
+
+function MultiBot.RelayoutUnitsDisplay()
+    local multiBar = MultiBot.frames and MultiBot.frames["MultiBar"]
+    local unitsButton = multiBar and multiBar.buttons and multiBar.buttons[UNITS_BUTTON_NAME]
+    local unitsFrame = multiBar and multiBar.frames and multiBar.frames[UNITS_FRAME_NAME]
+
+    if not unitsButton or not unitsFrame or not unitsFrame:IsVisible() then
+        return false
+    end
+
+    relayoutUnitsDisplay(unitsButton, unitsFrame)
+    return true
 end
 
 local function configureRosterRetry(button, isGuildRetry, retryCount, needGuildRetry)
