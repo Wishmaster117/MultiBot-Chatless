@@ -1342,12 +1342,12 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                 local playersSize = 0
 
                 if MultiBot and MultiBot.index and MultiBot.index.players then
-                    playersSize = table.getn(MultiBot.index.players)
+                    playersSize = #MultiBot.index.players
                 end
 
                 local bridgeRosterSize = 0
                 if bridge and bridge.roster then
-                    bridgeRosterSize = table.getn(bridge.roster)
+                    bridgeRosterSize = #bridge.roster
                 end
 
                 if playersSize > 1 then

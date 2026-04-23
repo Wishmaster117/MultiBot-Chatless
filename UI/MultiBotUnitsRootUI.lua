@@ -558,7 +558,7 @@ local function requestRosterBootstrap(button)
         local bridgeRosterSize = 0
 
         if bridge and bridge.roster then
-            bridgeRosterSize = table.getn(bridge.roster)
+            bridgeRosterSize = #bridge.roster
         end
 
         if bridge and bridge.connected then
@@ -821,7 +821,7 @@ function MultiBot.InitializeUnitsRootUI(tMultiBar)
     createInviteControls(controlFrame)
     createBrowseButton(controlFrame)
 
-    if MultiBot.bridge and MultiBot.bridge.roster and table.getn(MultiBot.bridge.roster) > 0 then
+    if MultiBot.bridge and MultiBot.bridge.roster and #MultiBot.bridge.roster > 0 then
         if MultiBot.SyncBridgeRosterToPlayers then
             MultiBot.SyncBridgeRosterToPlayers(MultiBot.bridge.roster)
         end
