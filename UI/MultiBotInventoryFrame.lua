@@ -713,6 +713,37 @@ local function openInventoryWindow()
     end
 end
 
+local function openInspectForInventoryBot(botName)
+    if not botName or botName == "" then
+        return false
+    end
+
+    if not MultiBot.toUnit then
+        return false
+    end
+
+    local unit = MultiBot.toUnit(botName)
+    if not unit or not UnitExists(unit) then
+        return false
+    end
+
+    if not InspectFrame and LoadAddOn then
+        pcall(LoadAddOn, "Blizzard_InspectUI")
+    end
+
+    if not InspectUnit then
+        return false
+    end
+
+    InspectUnit(unit)
+
+    if InspectFrame and ShowUIPanel and not InspectFrame:IsShown() then
+        ShowUIPanel(InspectFrame)
+    end
+
+    return true
+end
+
 local function prepareInventoryForBot(botName)
     if not botName or botName == "" then
         return false
@@ -721,6 +752,7 @@ local function prepareInventoryForBot(botName)
     disableOtherInventoryButtons(botName)
     setInventoryBotName(botName)
     openInventoryWindow()
+    openInspectForInventoryBot(botName)
 
     local inventory = MultiBot and MultiBot.inventory or nil
     if inventory and inventory.beginPayload then
