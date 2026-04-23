@@ -2064,7 +2064,7 @@ MultiBot.addPlayer = function(pClass, pName)
   local tTexture = "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tClass) .. ".blp"
   if not btn then
     btn = units.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tClass, nil, pName))
-    btn:Hide()	
+    btn:Hide()
   else
     if btn.icon and tTexture then btn.icon:SetTexture(MultiBot.SafeTexturePath(tTexture)) end
   end
@@ -2098,7 +2098,7 @@ MultiBot.addMember = function(pClass, pLevel, pName)
   local tTexture = "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tClass) .. ".blp"
   if(tButton == nil) then
     tButton = tUnits.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tClass, pLevel, pName))
-    tButton:Hide()	
+    tButton:Hide()
   else
     if(tButton.setButton ~= nil) then
       tButton.setButton(tTexture, MultiBot.toTip(tClass, pLevel, pName))
@@ -2120,7 +2120,7 @@ MultiBot.addFriend = function(pClass, pLevel, pName)
   local tTexture = "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tClass) .. ".blp"
   if(tButton == nil) then
     tButton = tUnits.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tClass, pLevel, pName))
-    tButton:Hide()	
+    tButton:Hide()
   else
     if(tButton.setButton ~= nil) then
       tButton.setButton(tTexture, MultiBot.toTip(tClass, pLevel, pName))
@@ -2143,7 +2143,7 @@ MultiBot.addActive = function(pClass, pLevel, pName)
 
 	if(tButton == nil) then
 		tButton = tUnits.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tClass, pLevel, pName))
- 		tButton:Hide()
+        tButton:Hide()
 	elseif(tButton.setButton ~= nil) then
 		tButton.setButton(tTexture, MultiBot.toTip(tClass, pLevel, pName))
 	end

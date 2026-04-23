@@ -254,7 +254,7 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
                     MultiBot.SyncBridgeRosterToPlayers(MultiBot.bridge.roster)
                 end
             elseif MultiBot.Comm and MultiBot.Comm.RequestRoster then
-                MultiBot.Comm.RequestRoster()				
+                MultiBot.Comm.RequestRoster()		
             end
         end
 
@@ -371,7 +371,7 @@ local function rebuildGuildAndFriendIndexes(button)
     elseif type(GetGuildInfo) == "function" then
         inGuild = GetGuildInfo("player") ~= nil
     end
-	
+
     local previousShowOffline = nil
     if inGuild and type(GetGuildRosterShowOffline) == "function" and type(SetGuildRosterShowOffline) == "function" then
         previousShowOffline = GetGuildRosterShowOffline()
@@ -584,7 +584,7 @@ local function requestRosterRefreshIfNeeded(button, isGuildRetry)
 
     local roster = button.roster or "players"
     if roster == "players" or roster == "actives" or roster == "favorites" then
-        requestRosterBootstrap(button)		
+        requestRosterBootstrap(button)
         if roster == "favorites" and MultiBot.UpdateFavoritesIndex ~= nil then
             MultiBot.UpdateFavoritesIndex()
         end

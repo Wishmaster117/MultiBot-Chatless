@@ -1328,13 +1328,13 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 
 	if(event == "PLAYER_ENTERING_WORLD") then
         MultiBot.dprint("EVT", "PLAYER_ENTERING_WORLD") -- DEBUG
-    
+
         if MultiBot.Comm and MultiBot.Comm.OnPlayerEnteringWorld then
             MultiBot.Comm.OnPlayerEnteringWorld()
         end
-    
+
         SendChatMessage(".account", "SAY")
-    
+
         if(MultiBot.init == nil) then
             MultiBot.init = true
             MultiBot.TimerAfter(6.0, function()
@@ -1361,7 +1361,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                 SendChatMessage(".playerbot bot list", "SAY")
             end)
         end
-    
+
         return
     end
 

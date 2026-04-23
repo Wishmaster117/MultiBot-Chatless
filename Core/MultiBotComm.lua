@@ -597,7 +597,7 @@ end
 function Comm.OnPlayerEnteringWorld()
   local state = ensureBridgeState()
   state.states = {}
-  state.inventoryActive = nil  
+  state.inventoryActive = nil
   Comm.MarkDisconnected(nil)
   state.bootstrapPending = true
   state.bootstrapDeadline = safeNow() + 4.0
