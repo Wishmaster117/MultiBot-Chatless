@@ -254,7 +254,7 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
                     MultiBot.SyncBridgeRosterToPlayers(MultiBot.bridge.roster)
                 end
             elseif MultiBot.Comm and MultiBot.Comm.RequestRoster then
-                MultiBot.Comm.RequestRoster()		
+                MultiBot.Comm.RequestRoster()
             end
         end
 
