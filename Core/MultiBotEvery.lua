@@ -181,6 +181,14 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 
 			pButton.setEnable()
 			MultiBot.spellbook.name = pButton.getName()
+
+			local tBridge = MultiBot and MultiBot.bridge or nil
+			local tComm = MultiBot and MultiBot.Comm or nil
+			if(tBridge and tBridge.connected and tComm and tComm.RequestSpellbook and tComm.RequestSpellbook(pButton.getName())) then
+				tUnits.buttons[MultiBot.spellbook.name].waitFor = ""
+				return
+			end
+
 			tUnits.buttons[MultiBot.spellbook.name].waitFor = "SPELLBOOK"
 			SendChatMessage("spells", "WHISPER", nil, pButton.getName())
 		end

@@ -465,6 +465,28 @@ function MultiBot.InitializeSpellBookFrame()
 		return self.window and self.window.frame and self.window.frame:GetBottom() or 0
 	end
 
+	MultiBot.spellbook.beginPayload = function(self, botName)
+		if(MultiBot.beginSpellbookCollection) then
+			MultiBot.beginSpellbookCollection(botName or "")
+		end
+		return self
+	end
+
+	MultiBot.spellbook.appendSpellId = function(self, spellId, botName)
+		if(MultiBot.addSpellById) then
+			return MultiBot.addSpellById(spellId, botName or self.name or "")
+		end
+
+		return false
+	end
+
+	MultiBot.spellbook.finishPayload = function(self)
+		if(MultiBot.finishSpellbookCollection) then
+			MultiBot.finishSpellbookCollection()
+		end
+		return self
+	end
+
 	for i = 1, GetNumMacroIcons() do MultiBot.spellbook.icons[GetMacroIconInfo(i)] = i end
 
 	-- Default baseline position (legacy parity), can be overridden by saved layout restore.

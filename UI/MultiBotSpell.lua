@@ -117,21 +117,16 @@ MultiBot.getSpellID = function(pInfo)
 	return 0
 end
 
-MultiBot.addSpell = function(pInfo, pName)
-	local tID = MultiBot.getSpellID(pInfo)
-	-- if(tID == 0) then return false end // Moded to DEBUG
-
-	-- DEBUG --
+MultiBot.addSpellById = function(pSpellID, pName)
+	local tID = tonumber(pSpellID or 0) or 0
 	if(tID == 0) then
-		debugSpellbookCapture("IGNORED", pName, pInfo, 0)
 		return false
 	end
-	-- DEBUG END --
 
 	local tName, tRank, tIcon = GetSpellInfo(tID)
 	local tLink = GetSpellLink(tID)
 
-	if(tName == nil) then tName = "" end
+	if(tName == nil) then return false end
 	if(tRank == nil) then tRank = "" end
 	if(tIcon == nil) then tIcon = "inv_misc_questionmark" end
 	if(tLink == nil) then tLink = "" end
@@ -148,10 +143,24 @@ MultiBot.addSpell = function(pInfo, pName)
 		MultiBot.setSpell(MultiBot.spellbook.index, tSpell, pName)
 	end
 
--- DEBUG --
-	debugSpellbookCapture("CAPTURED", pName, pInfo, tID)
--- DEBUG END --
 	return true
+end
+
+MultiBot.addSpell = function(pInfo, pName)
+	local tID = MultiBot.getSpellID(pInfo)
+	-- if(tID == 0) then return false end // Moded to DEBUG
+
+	-- DEBUG --
+	if(tID == 0) then
+		debugSpellbookCapture("IGNORED", pName, pInfo, 0)
+		return false
+	end
+	-- DEBUG END --
+
+    -- DEBUG --
+	debugSpellbookCapture("CAPTURED", pName, pInfo, tID)
+    -- DEBUG END --
+	return MultiBot.addSpellById(tID, pName)
 end
 
 MultiBot.beginSpellbookCollection = function(pName)

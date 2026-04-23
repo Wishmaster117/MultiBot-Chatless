@@ -92,7 +92,10 @@ local function ensureBridgeState()
   state.bootstrapPending = state.bootstrapPending or false
   state.bootstrapDeadline = state.bootstrapDeadline or 0
   state.inventorySeq = state.inventorySeq or 0
-  state.inventoryActive = state.inventoryActive or nil  
+  state.inventoryActive = state.inventoryActive or nil
+  state.inventoryActive = state.inventoryActive or nil
+  state.spellbookSeq = state.spellbookSeq or 0
+  state.spellbookActive = state.spellbookActive or nil
   return state
 end
 
@@ -191,6 +194,30 @@ function Comm.RequestInventory(name)
   return true
 end
 
+function Comm.RequestSpellbook(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.spellbookSeq = (tonumber(state.spellbookSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.spellbookSeq)
+  state.spellbookActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("GET", "SPELLBOOK~" .. name .. "~" .. token) then
+    state.spellbookActive = nil
+    return false
+  end
+
+  return true
+end
+
 function Comm.MarkDisconnected(reason)
   local state = ensureBridgeState()
   state.connected = false
@@ -198,6 +225,7 @@ function Comm.MarkDisconnected(reason)
   state.protocol = nil
   state.lastError = reason or nil
   state.inventoryActive = nil
+  state.spellbookActive = nil
 end
 
 local function parseRosterEntry(entry)
@@ -306,6 +334,35 @@ end
 
 local function getInventoryFrame()
   return MultiBot and MultiBot.inventory or nil
+end
+
+local function getActiveSpellbookRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.spellbookActive
+  if type(active) ~= "table" then
+    return nil
+  end
+
+  if botName and botName ~= "" and string.lower(trim(botName)) ~= trim(active.botNameKey or "") then
+    return nil
+  end
+
+  if token and token ~= "" and tostring(token) ~= tostring(active.token or "") then
+    return nil
+  end
+
+  return active
+end
+
+local function clearActiveSpellbookRequest(botName, token)
+  local state = ensureBridgeState()
+  if getActiveSpellbookRequest(botName, token) then
+    state.spellbookActive = nil
+  end
+end
+
+local function getSpellbookFrame()
+  return MultiBot and MultiBot.spellbook or nil
 end
 
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
@@ -461,6 +518,60 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     end
 
     clearActiveInventoryRequest(botName, token)
+    return true
+  end
+
+  if opcode == "SB_BEGIN" then
+    local botName, token = splitOnce(payload or "", "~")
+    state.connected = true
+    state.lastError = nil
+
+    if getActiveSpellbookRequest(botName, token) then
+      local spellbook = getSpellbookFrame()
+      if spellbook and spellbook.beginPayload then
+        spellbook:beginPayload(trim(botName))
+      elseif MultiBot and MultiBot.beginSpellbookCollection then
+        MultiBot.beginSpellbookCollection(trim(botName))
+      end
+    end
+
+    return true
+  end
+
+  if opcode == "SB_ITEM" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, spellId = splitOnce(rest or "", "~")
+
+    state.connected = true
+    state.lastError = nil
+
+    if getActiveSpellbookRequest(botName, token) then
+      local spellbook = getSpellbookFrame()
+      if spellbook and spellbook.appendSpellId then
+        spellbook:appendSpellId(tonumber(spellId or "0") or 0, trim(botName))
+      elseif MultiBot and MultiBot.addSpellById then
+        MultiBot.addSpellById(tonumber(spellId or "0") or 0, trim(botName))
+      end
+    end
+
+    return true
+  end
+
+  if opcode == "SB_END" then
+    local botName, token = splitOnce(payload or "", "~")
+    state.connected = true
+    state.lastError = nil
+
+    if getActiveSpellbookRequest(botName, token) then
+      local spellbook = getSpellbookFrame()
+      if spellbook and spellbook.finishPayload then
+        spellbook:finishPayload()
+      elseif MultiBot and MultiBot.finishSpellbookCollection then
+        MultiBot.finishSpellbookCollection()
+      end
+    end
+
+    clearActiveSpellbookRequest(botName, token)
     return true
   end
 
