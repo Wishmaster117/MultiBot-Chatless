@@ -91,6 +91,7 @@ local function ensureBridgeState()
   state.states = state.states or {}
   state.details = state.details or {}
   state.pvpStats = state.pvpStats or {}
+  state.stats = state.stats or {}
   state.bootstrapPending = state.bootstrapPending or false
   state.bootstrapDeadline = state.bootstrapDeadline or 0
   state.inventorySeq = state.inventorySeq or 0
@@ -183,6 +184,17 @@ end
 
 function Comm.RequestBotDetails()
   return Comm.Send("GET", "DETAILS")
+end
+
+function Comm.RequestStats(name)
+  ensureBridgeState()
+
+  name = trim(name)
+  if name ~= "" then
+    return Comm.Send("GET", "STATS~" .. name)
+  end
+
+  return Comm.Send("GET", "STATS")
 end
 
 function Comm.RequestPvpStats(name)
@@ -396,6 +408,62 @@ function Comm.ApplyBotDetailsPayload(payload)
 
   debugPrint("ADDON:RX", "DETAILS", tostring(applied))
   return applied
+end
+
+local function parseStatsPayload(payload)
+  local name, rest = splitOnce(payload or "", "~")
+  local level, rest2 = splitOnce(rest or "", "~")
+  local gold, rest3 = splitOnce(rest2 or "", "~")
+  local silver, rest4 = splitOnce(rest3 or "", "~")
+  local copper, rest5 = splitOnce(rest4 or "", "~")
+  local bagUsed, rest6 = splitOnce(rest5 or "", "~")
+  local bagTotal, rest7 = splitOnce(rest6 or "", "~")
+  local durabilityPct, rest8 = splitOnce(rest7 or "", "~")
+  local xpPct, manaPct = splitOnce(rest8 or "", "~")
+
+  name = trim(urlDecodeField(name))
+  if name == "" then
+    return nil
+  end
+
+  return {
+    name = name,
+    level = tonumber(level or "0") or 0,
+    gold = tonumber(gold or "0") or 0,
+    silver = tonumber(silver or "0") or 0,
+    copper = tonumber(copper or "0") or 0,
+    bagUsed = tonumber(bagUsed or "0") or 0,
+    bagTotal = tonumber(bagTotal or "0") or 0,
+    durabilityPct = tonumber(durabilityPct or "0") or 0,
+    xpPct = tonumber(xpPct or "0") or 0,
+    manaPct = tonumber(manaPct or "0") or 0,
+    lastUpdateAt = safeNow(),
+  }
+end
+
+function Comm.ApplyStatsPayload(payload)
+  local state = ensureBridgeState()
+  local stats = parseStatsPayload(payload)
+  if not stats then
+    return nil
+  end
+
+  state.stats[string.lower(stats.name)] = stats
+
+  if MultiBot.ApplyBridgeStats then
+    MultiBot.ApplyBridgeStats(stats)
+  end
+
+  debugPrint(
+    "ADDON:RX",
+    "STATS",
+    stats.name,
+    tostring(stats.level or 0),
+    tostring(stats.bagUsed or 0) .. "/" .. tostring(stats.bagTotal or 0),
+    tostring(stats.durabilityPct or 0)
+  )
+
+  return stats
 end
 
 local function parsePvpStatsPayload(payload)
@@ -612,6 +680,13 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "STATS" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyStatsPayload(payload)
+    return true
+  end
+
   if opcode == "INV_BEGIN" then
     local botName, token = splitOnce(payload or "", "~")
     state.connected = true
@@ -777,6 +852,7 @@ function Comm.OnPlayerEnteringWorld()
   local state = ensureBridgeState()
   state.states = {}
   state.details = {}
+  state.stats = {}
   state.pvpStats = {}
   state.inventoryActive = nil
   Comm.MarkDisconnected(nil)

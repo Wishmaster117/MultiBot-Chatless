@@ -46,7 +46,14 @@ function MultiBot.HandleOnUpdate(pElapsed)
 	if(MultiBot.auto.sort) then MultiBot.timer.sort.elapsed = MultiBot.timer.sort.elapsed + pElapsed end
 
 	if(MultiBot.auto.stats and MultiBot.timer.stats.elapsed >= MultiBot.timer.stats.interval) then
-		for i = 1, GetNumPartyMembers() do SendChatMessage("stats", "WHISPER", nil, UnitName("party" .. i)) end
+		for i = 1, GetNumPartyMembers() do
+			local botName = UnitName("party" .. i)
+			if not (MultiBot.RequestStatsRefresh and MultiBot.RequestStatsRefresh(botName)) then
+				if botName and botName ~= "" then
+					SendChatMessage("stats", "WHISPER", nil, botName)
+				end
+			end
+		end
 		MultiBot.timer.stats.elapsed = 0
 	end
 
@@ -1613,7 +1620,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                end
 
                tButton.waitFor = "CO"
-               SendChatMessage("co ?", "WHISPER", nil, tName) 
+               SendChatMessage("co ?", "WHISPER", nil, tName)
                tButton.setEnable()
                return
             end

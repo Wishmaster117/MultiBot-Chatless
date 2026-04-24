@@ -270,7 +270,12 @@ local function toggleStats(button)
     if MultiBot.OnOffSwitch(button) then
         MultiBot.auto.stats = true
         for index = 1, GetNumPartyMembers() do
-            SendChatMessage("stats", "WHISPER", nil, UnitName("party" .. index))
+            local botName = UnitName("party" .. index)
+            if not (MultiBot.RequestStatsRefresh and MultiBot.RequestStatsRefresh(botName)) then
+                if botName and botName ~= "" then
+                    SendChatMessage("stats", "WHISPER", nil, botName)
+                end
+            end
         end
         statsFrame:Show()
         return

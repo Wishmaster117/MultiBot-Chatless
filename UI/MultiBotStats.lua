@@ -218,3 +218,120 @@ function MultiBot.EnsureStatsUI()
 
 	return nil
 end
+
+local function formatBridgeMoney(stats)
+	local gold = tonumber(stats and stats.gold or 0) or 0
+	local silver = tonumber(stats and stats.silver or 0) or 0
+	local copper = tonumber(stats and stats.copper or 0) or 0
+
+	return gold .. "g " .. silver .. "s " .. copper .. "c"
+end
+
+local function getBridgeStatsUnitName(botName)
+	if type(botName) ~= "string" or botName == "" then
+		return nil
+	end
+
+	if MultiBot.toUnit then
+		local unit = MultiBot.toUnit(botName)
+		if unit and unit ~= "" then
+			return unit
+		end
+	end
+
+	return botName
+end
+
+local function ensureBridgeStatsFrame(botName)
+	local statsFrame = MultiBot.EnsureStatsUI and MultiBot.EnsureStatsUI() or MultiBot.stats
+	if not statsFrame then
+		return nil, nil
+	end
+
+	local unit = getBridgeStatsUnitName(botName)
+	if not unit or unit == "" then
+		return nil, nil
+	end
+
+	if not statsFrame.frames[unit] then
+		MultiBot.addStats(statsFrame, unit, 0, 0, STATS_SLOT_SIZE, STATS_SLOT_WIDTH, STATS_SLOT_HEIGHT)
+	end
+
+	return statsFrame.frames[unit], unit
+end
+
+function MultiBot.ApplyBridgeStats(stats)
+	if type(stats) ~= "table" or type(stats.name) ~= "string" or stats.name == "" then
+		return false
+	end
+
+	local statsFrame, unit = ensureBridgeStatsFrame(stats.name)
+	if not statsFrame then
+		return false
+	end
+
+	local addonFrame = statsFrame.frames and statsFrame.frames["Addon"] or nil
+	if not addonFrame then
+		return false
+	end
+
+	local level = tonumber(stats.level or 0) or 0
+	if level <= 0 and unit and UnitExists and UnitExists(unit) then
+		level = UnitLevel(unit) or 0
+	end
+
+	local bagUsed = tonumber(stats.bagUsed or 0) or 0
+	local bagTotal = tonumber(stats.bagTotal or 0) or 0
+	local durabilityPct = tonumber(stats.durabilityPct or 0) or 0
+	local xpPct = tonumber(stats.xpPct or 0) or 0
+
+	statsFrame.texts["Name"]:SetText(stats.name)
+	statsFrame.texts["Level"]:SetText(level)
+	statsFrame.texts["Values"]:SetText(
+		"|cffffdd55"
+		.. formatBridgeMoney(stats)
+		.. "|r, "
+		.. shortLabel("bag", "Bag")
+		.. " "
+		.. bagUsed
+		.. "/"
+		.. bagTotal
+	)
+
+	if level == 80 then
+		addonFrame.texts["Percent"]:SetText(
+			statsFrame.setProgress(statsFrame, durabilityPct)
+			.. "%\n"
+			.. shortLabel("dur", "Dur")
+		)
+	else
+		addonFrame.texts["Percent"]:SetText(
+			statsFrame.setProgress(statsFrame, xpPct)
+			.. "%\n"
+			.. shortLabel("xp", "XP")
+		)
+	end
+
+	statsFrame:Show()
+	if MultiBot.stats then
+		MultiBot.stats:Show()
+	end
+
+	return true
+end
+
+function MultiBot.RequestStatsRefresh(botName)
+	if type(botName) ~= "string" or botName == "" then
+		return false
+	end
+
+	local bridge = MultiBot.bridge or nil
+	local comm = MultiBot.Comm or nil
+
+	if bridge and (bridge.connected or bridge.bootstrapPending) and comm and comm.RequestStats and comm.RequestStats(botName) then
+		return true
+	end
+
+	SendChatMessage("stats", "WHISPER", nil, botName)
+	return true
+end
