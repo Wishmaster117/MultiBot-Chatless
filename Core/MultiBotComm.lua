@@ -92,6 +92,9 @@ local function ensureBridgeState()
   state.details = state.details or {}
   state.pvpStats = state.pvpStats or {}
   state.stats = state.stats or {}
+  state.quests = state.quests or {}
+  state.questSeq = state.questSeq or 0
+  state.questActive = state.questActive or {}
   state.bootstrapPending = state.bootstrapPending or false
   state.bootstrapDeadline = state.bootstrapDeadline or 0
   state.inventorySeq = state.inventorySeq or 0
@@ -195,6 +198,36 @@ function Comm.RequestStats(name)
   end
 
   return Comm.Send("GET", "STATS")
+end
+
+function Comm.RequestQuests(mode, name)
+  local state = ensureBridgeState()
+  if not state.connected and not state.bootstrapPending then
+    return false
+  end
+
+  mode = string.upper(trim(mode or "ALL"))
+  if mode ~= "INCOMPLETED" and mode ~= "COMPLETED" and mode ~= "ALL" then
+    mode = "ALL"
+  end
+
+  name = trim(name)
+  state.questSeq = (tonumber(state.questSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.questSeq)
+
+  state.questActive[token] = {
+    mode = mode,
+    botName = name,
+    isGroup = name == "",
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("GET", "QUESTS~" .. mode .. "~" .. name .. "~" .. token) then
+    state.questActive[token] = nil
+    return false
+  end
+
+  return token
 end
 
 function Comm.RequestPvpStats(name)
@@ -527,6 +560,172 @@ function Comm.ApplyPvpStatsPayload(payload)
   return stats
 end
 
+local function ensureRuntimeTable(key)
+  if MultiBot.Store and MultiBot.Store.EnsureRuntimeTable then
+    return MultiBot.Store.EnsureRuntimeTable(key)
+  end
+
+  MultiBot[key] = type(MultiBot[key]) == "table" and MultiBot[key] or {}
+  return MultiBot[key]
+end
+
+local function clearTable(tbl)
+  if type(tbl) ~= "table" then
+    return
+  end
+
+  if MultiBot.Store and MultiBot.Store.ClearTable then
+    MultiBot.Store.ClearTable(tbl)
+    return
+  end
+
+  for key in pairs(tbl) do
+    tbl[key] = nil
+  end
+end
+
+local function normalizeQuestMode(mode)
+  mode = string.upper(trim(mode or "ALL"))
+  if mode ~= "INCOMPLETED" and mode ~= "COMPLETED" and mode ~= "ALL" then
+    mode = "ALL"
+  end
+  return mode
+end
+
+local function getActiveQuestRequest(token)
+  local state = ensureBridgeState()
+  token = trim(token)
+  if token == "" then
+    return nil
+  end
+
+  return state.questActive and state.questActive[token] or nil
+end
+
+local function buildQuestLink(questID, questName)
+  questID = tonumber(questID or 0) or 0
+  questName = tostring(questName or questID)
+  return "|Hquest:" .. tostring(questID) .. ":0|h[" .. questName .. "]|h"
+end
+
+local function clearQuestStoresForMode(botName, mode)
+  if type(botName) ~= "string" or botName == "" then
+    return
+  end
+
+  mode = normalizeQuestMode(mode)
+
+  if mode == "INCOMPLETED" or mode == "ALL" then
+    ensureRuntimeTable("BotQuestsIncompleted")[botName] = {}
+  end
+
+  if mode == "COMPLETED" or mode == "ALL" then
+    ensureRuntimeTable("BotQuestsCompleted")[botName] = {}
+  end
+
+  if mode == "ALL" then
+    ensureRuntimeTable("BotQuestsAll")[botName] = {}
+  end
+end
+
+function Comm.ApplyQuestBeginPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, mode = splitOnce(rest or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  mode = normalizeQuestMode(mode)
+
+  if botName == "" or not getActiveQuestRequest(token) then
+    return false
+  end
+
+  clearQuestStoresForMode(botName, mode)
+  debugPrint("ADDON:RX", "QUESTS_BEGIN", botName, mode)
+  return true
+end
+
+function Comm.ApplyQuestItemPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local mode, rest3 = splitOnce(rest2 or "", "~")
+  local status, rest4 = splitOnce(rest3 or "", "~")
+  local questID, questName = splitOnce(rest4 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  mode = normalizeQuestMode(mode)
+  status = string.upper(trim(status))
+  questID = tonumber(questID or "0") or 0
+  questName = trim(urlDecodeField(questName))
+  if questName == "" then
+    questName = tostring(questID)
+  end
+
+  if botName == "" or questID <= 0 or not getActiveQuestRequest(token) then
+    return false
+  end
+
+  local incompletedStore = ensureRuntimeTable("BotQuestsIncompleted")
+  local completedStore = ensureRuntimeTable("BotQuestsCompleted")
+  local allStore = ensureRuntimeTable("BotQuestsAll")
+
+  if status == "I" then
+    incompletedStore[botName] = incompletedStore[botName] or {}
+    incompletedStore[botName][questID] = questName
+  elseif status == "C" then
+    completedStore[botName] = completedStore[botName] or {}
+    completedStore[botName][questID] = questName
+  else
+    return false
+  end
+
+  if mode == "ALL" then
+    allStore[botName] = allStore[botName] or {}
+    table.insert(allStore[botName], buildQuestLink(questID, questName))
+  end
+
+  debugPrint("ADDON:RX", "QUESTS_ITEM", botName, mode, status, tostring(questID))
+  return true
+end
+
+function Comm.ApplyQuestEndPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, mode = splitOnce(rest or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  mode = normalizeQuestMode(mode)
+
+  if botName == "" or not getActiveQuestRequest(token) then
+    return false
+  end
+
+  debugPrint("ADDON:RX", "QUESTS_END", botName, mode)
+  return true
+end
+
+function Comm.ApplyQuestDonePayload(payload)
+  local token, mode = splitOnce(payload or "", "~")
+  token = trim(token)
+  mode = normalizeQuestMode(mode)
+
+  local state = ensureBridgeState()
+  local request = getActiveQuestRequest(token)
+  if not request then
+    return false
+  end
+
+  state.questActive[token] = nil
+  state.quests.lastMode = mode
+  state.quests.lastDoneAt = safeNow()
+
+  if MultiBot.OnBridgeQuestsDone then
+    MultiBot.OnBridgeQuestsDone(mode, request)
+  end
+
+  debugPrint("ADDON:RX", "QUESTS_DONE", mode)
+  return true
+end
+
 local function getActiveInventoryRequest(botName, token)
   local state = ensureBridgeState()
   local active = state.inventoryActive
@@ -670,6 +869,34 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     Comm.ApplyBotDetailsPayload(payload)
+    return true
+  end
+
+  if opcode == "QUESTS_BEGIN" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyQuestBeginPayload(payload)
+    return true
+  end
+
+  if opcode == "QUESTS_ITEM" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyQuestItemPayload(payload)
+    return true
+  end
+
+  if opcode == "QUESTS_END" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyQuestEndPayload(payload)
+    return true
+  end
+
+  if opcode == "QUESTS_DONE" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyQuestDonePayload(payload)
     return true
   end
 
@@ -854,6 +1081,8 @@ function Comm.OnPlayerEnteringWorld()
   state.details = {}
   state.stats = {}
   state.pvpStats = {}
+  state.quests = {}
+  state.questActive = {}
   state.inventoryActive = nil
   Comm.MarkDisconnected(nil)
   state.bootstrapPending = true

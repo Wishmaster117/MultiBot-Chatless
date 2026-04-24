@@ -92,14 +92,38 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 
 ### PVP Stats
 
-- [x] Endpoint prévu / ajouté côté bridge : `GET~PVP_STATS~<bot>`
-- [x] Endpoint prévu / ajouté côté bridge : `GET~PVP_STATS`
+- [x] Endpoint côté bridge : `GET~PVP_STATS~<bot>`
+- [x] Endpoint côté bridge : `GET~PVP_STATS`
 - [x] Réception addon `PVP_STATS~<bot>~...`
 - [x] Cache addon `MultiBot.bridge.pvpStats`
 - [x] Hydratation de la fenêtre PVP depuis payload bridge
 - [x] Boutons PVP Stats branchés en bridge-first
 - [x] Filtre addon pour masquer les lignes legacy `[PVP] ...` si elles arrivent encore pendant la transition
-- [ ] Validation ingame finale à confirmer : plus aucune ligne `[PVP] ...` dans le chat quand la bridge est connectée
+- [x] Validation ingame : PVP Stats exploitable via bridge, fallback legacy conservé
+
+### Stats simples
+
+- [x] Endpoint côté bridge : `GET~STATS~<bot>`
+- [x] Endpoint côté bridge : `GET~STATS`
+- [x] Réception addon `STATS~<bot>~...`
+- [x] Cache addon `MultiBot.bridge.stats`
+- [x] Hydratation de la fenêtre Stats depuis payload bridge
+- [x] Bouton Auto-Stats branché en bridge-first
+- [x] Correction compilation C++ : déclaration anticipée de `GetPct`
+- [x] Fallback legacy `stats` conservé si bridge absente
+
+### Quêtes
+
+- [x] Endpoint côté bridge : `GET~QUESTS~INCOMPLETED~<bot>~<token>`
+- [x] Endpoint côté bridge : `GET~QUESTS~COMPLETED~<bot>~<token>`
+- [x] Endpoint côté bridge : `GET~QUESTS~ALL~<bot>~<token>`
+- [x] Variantes groupe/raid avec `<bot>` vide
+- [x] Réponses en paquets courts : `QUESTS_BEGIN`, `QUESTS_ITEM`, `QUESTS_END`, `QUESTS_DONE`
+- [x] Branchement des fenêtres `QuestIncomplete`, `QuestCompleted` et `QuestAll` en bridge-first
+- [x] Correction C++ : lecture du quest log runtime via `GetQuestSlotQuestId()` / `GetQuestStatus()` avant fallback DB
+- [x] Correction addon : rebuild de la vue `QuestAll` d’un bot ciblé sans forcer l’agrégat groupe
+- [x] Validation ingame : les frames affichent les quêtes via bridge et ne dépendent plus du spam chat des listes de quêtes
+- [x] Fallback legacy conservé si la bridge est absente
 
 ---
 
@@ -112,6 +136,8 @@ Avec beaucoup de bots, éviter les réponses globales trop grosses.
 - `GET~STATES` répond avec plusieurs paquets `STATE~<bot>~...` ;
 - `GET~DETAILS` répond avec plusieurs paquets `DETAIL~<bot>~...` ;
 - `GET~PVP_STATS` peut répondre avec plusieurs paquets `PVP_STATS~<bot>~...` ;
+- `GET~STATS` peut répondre avec plusieurs paquets `STATS~<bot>~...` ;
+- `GET~QUESTS` répond en paquets `QUESTS_BEGIN` / `QUESTS_ITEM` / `QUESTS_END` / `QUESTS_DONE` pour éviter le spam chat et les payloads trop longs ;
 - un paquet global vide peut seulement servir de réponse vide si aucun bot n’est disponible.
 
 ---
@@ -130,6 +156,10 @@ Le détail bot est sorti du chemin `who` pour l’UI. Les commandes manuelles `w
 
 Le refresh UI après action inventory est maintenant bridge-first. Les commandes d’action réelles peuvent encore passer en whisper volontaire (`u`, `e`, `ue`, `s`, `destroy`, etc.), mais le refresh automatique de la fenêtre ne doit plus spammer `items` quand la bridge est connectée.
 
+### Quêtes
+
+Les fenêtres de quêtes (`incompleted`, `completed`, `all`) sont migrées sur la bridge. Les commandes legacy de quêtes peuvent rester comme fallback, mais le chemin normal n’a plus besoin de parser les listes envoyées en chat.
+
 ---
 
 ## Ce qui reste partiellement legacy
@@ -144,27 +174,7 @@ Encore présent à conserver ou à traiter plus tard selon le cas :
 
 Conclusion : `Units` fonctionne en bridge-first pour roster/states/details, mais il reste des chemins legacy de compatibilité et de commande.
 
-### B) Stats simples
-
-Encore legacy :
-
-- bouton stats global ;
-- `SendChatMessage("stats", ...)` ;
-- parsing des réponses stats.
-
-C’est le prochain bloc logique après PVP Stats, parce que c’est read-only et très proche du travail déjà fait pour `PVP_STATS`.
-
-### C) PVP Stats — validation finale
-
-La migration est en place, mais il faut encore confirmer ingame après le dernier filtre legacy :
-
-- clic PVP Stats whisper ;
-- clic PVP Stats party ;
-- clic PVP Stats raid ;
-- aucune ligne `[PVP] ...` visible dans le chat si la bridge est connectée ;
-- fallback legacy toujours utilisable si bridge absente.
-
-### D) Talents / glyphes / specs détaillées
+### B) Talents / glyphes / specs détaillées
 
 Encore legacy :
 
@@ -173,9 +183,9 @@ Encore legacy :
 - `glyphs`
 - réponses chat parsées pour remplir les fenêtres.
 
-À migrer après les blocs read-only plus simples.
+À migrer maintenant, car c’est le prochain écran encore alimenté par parsing de whisper.
 
-### E) Outfits
+### C) Outfits
 
 Encore legacy :
 
@@ -183,15 +193,6 @@ Encore legacy :
 - parsing de réponse chat.
 
 À migrer plus tard.
-
-### F) Quêtes
-
-Encore legacy côté MultiBot :
-
-- certains menus de quête utilisent encore des commandes chat ;
-- intégration Questie séparée à garder en tête.
-
-À traiter après les blocs plus petits, sauf priorité spécifique.
 
 ---
 
@@ -215,54 +216,28 @@ Encore legacy côté MultiBot :
 | Inspect `ue` refresh inventory | Fait |
 | Trade sans dump inventory legacy | Fait |
 | Spellbook bridge | Fait |
-| PVP Stats bridge | Implémenté, validation finale à confirmer |
-| Stats simples bridge | À faire |
+| PVP Stats bridge | Fait |
+| Stats simples bridge | Fait |
+| Quêtes bridge | Fait |
 | Talents / glyphes / specs bridge | À faire |
 | Outfits bridge | À faire |
-| Quêtes bridge | À faire |
 | Nettoyage final parsers legacy | À faire |
 
 ---
 
 ## Prochain pas logique recommandé
 
-Le prochain pas logique est : **migrer les Stats simples en bridge-first**.
+Le prochain pas logique est maintenant : **Talents / glyphes / specs détaillées en bridge-first**.
 
-Pourquoi maintenant :
+Objectif de la prochaine phase :
 
-- c’est read-only, donc peu risqué ;
-- la logique ressemble beaucoup à `PVP_STATS` ;
-- ça retire encore du whisper automatique `stats` ;
-- ça évite d’attaquer tout de suite des blocs plus gros comme talents/glyphes/outfits/quêtes.
+1. ajouter des endpoints bridge read-only pour les talents et glyphes ;
+2. exposer les données nécessaires sans dépendre des réponses chat `talents`, `talents spec list` et `glyphs` ;
+3. brancher les fenêtres existantes en bridge-first ;
+4. garder les commandes legacy en fallback si la bridge est absente ;
+5. éviter les gros payloads globaux, comme pour states/details/quests.
 
-### Plan du prochain patch
-
-1. Ajouter côté bridge :
-
-```text
-GET~STATS~<bot>
-GET~STATS
-```
-
-2. Répondre avec un ou plusieurs paquets individuels :
-
-```text
-STATS~<bot>~...
-```
-
-3. Ajouter côté addon :
-
-```lua
-Comm.RequestStats(botName)
-Comm.ApplyStatsPayload(payload)
-MultiBot.ApplyBridgeStats(stats)
-```
-
-4. Brancher les boutons existants Stats sur la bridge.
-
-5. Garder le fallback legacy `stats` uniquement si la bridge est absente.
-
-6. Masquer temporairement les éventuelles lignes legacy de stats si un chemin ancien les produit encore pendant la transition.
+Phase conseillée en premier : **lecture des talents actifs + points par arbre**, puis **glyphes**, puis seulement ensuite **liste/specs détaillées** si l’UI en a encore besoin.
 
 ---
 
