@@ -102,7 +102,6 @@ local function ensureBridgeState()
   state.bootstrapDeadline = state.bootstrapDeadline or 0
   state.inventorySeq = state.inventorySeq or 0
   state.inventoryActive = state.inventoryActive or nil
-  state.inventoryActive = state.inventoryActive or nil
   state.spellbookSeq = state.spellbookSeq or 0
   state.spellbookActive = state.spellbookActive or nil
   return state
@@ -598,21 +597,6 @@ local function ensureRuntimeTable(key)
 
   MultiBot[key] = type(MultiBot[key]) == "table" and MultiBot[key] or {}
   return MultiBot[key]
-end
-
-local function clearTable(tbl)
-  if type(tbl) ~= "table" then
-    return
-  end
-
-  if MultiBot.Store and MultiBot.Store.ClearTable then
-    MultiBot.Store.ClearTable(tbl)
-    return
-  end
-
-  for key in pairs(tbl) do
-    tbl[key] = nil
-  end
 end
 
 local function normalizeQuestMode(mode)
