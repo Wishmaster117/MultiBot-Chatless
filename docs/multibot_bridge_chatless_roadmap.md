@@ -125,6 +125,19 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Validation ingame : les frames affichent les quêtes via bridge et ne dépendent plus du spam chat des listes de quêtes
 - [x] Fallback legacy conservé si la bridge est absente
 
+
+### Talents / sélection de specs
+
+- [x] Endpoint côté bridge : `GET~TALENT_SPEC_LIST~<bot>~<token>`
+- [x] Réponses en paquets courts : `TALENT_SPEC_BEGIN`, `TALENT_SPEC_ITEM`, `TALENT_SPEC_END`
+- [x] Lecture côté bridge des specs disponibles depuis `AiPlayerbot.PremadeSpecName.*` / `AiPlayerbot.PremadeSpecLink.*`
+- [x] Reconstruction de la frame de choix des specs depuis la bridge
+- [x] Suppression du spam automatique `talents spec list` dans le chat quand la bridge est connectée
+- [x] Conservation volontaire du whisper utile `My current talent spec is: ...`
+- [x] Filtrage des lignes d’aide legacy inutiles renvoyées par `talents` (`warlock`, `Talents usage`, etc.)
+- [x] Correction affichage : la partie `(0/56/15)` de la spé courante est ré-affichée en blanc
+- [x] Fallback legacy `talents spec list` conservé si la bridge est absente
+
 ---
 
 ## Règle importante sur les payloads volumineux
@@ -138,6 +151,7 @@ Avec beaucoup de bots, éviter les réponses globales trop grosses.
 - `GET~PVP_STATS` peut répondre avec plusieurs paquets `PVP_STATS~<bot>~...` ;
 - `GET~STATS` peut répondre avec plusieurs paquets `STATS~<bot>~...` ;
 - `GET~QUESTS` répond en paquets `QUESTS_BEGIN` / `QUESTS_ITEM` / `QUESTS_END` / `QUESTS_DONE` pour éviter le spam chat et les payloads trop longs ;
+- `GET~TALENT_SPEC_LIST` répond en paquets `TALENT_SPEC_BEGIN` / `TALENT_SPEC_ITEM` / `TALENT_SPEC_END` ;
 - un paquet global vide peut seulement servir de réponse vide si aucun bot n’est disponible.
 
 ---
@@ -160,6 +174,10 @@ Le refresh UI après action inventory est maintenant bridge-first. Les commandes
 
 Les fenêtres de quêtes (`incompleted`, `completed`, `all`) sont migrées sur la bridge. Les commandes legacy de quêtes peuvent rester comme fallback, mais le chemin normal n’a plus besoin de parser les listes envoyées en chat.
 
+### Sélection de specs
+
+La liste de choix des specs ne dépend plus de `talents spec list` en chat. Le whisper `talents` reste volontairement utilisé pour conserver la ligne utile `My current talent spec is: ...`, mais les lignes d’aide legacy sont filtrées côté addon.
+
 ---
 
 ## Ce qui reste partiellement legacy
@@ -174,16 +192,16 @@ Encore présent à conserver ou à traiter plus tard selon le cas :
 
 Conclusion : `Units` fonctionne en bridge-first pour roster/states/details, mais il reste des chemins legacy de compatibilité et de commande.
 
-### B) Talents / glyphes / specs détaillées
+### B) Talents actifs / glyphes
 
-Encore legacy :
+Encore partiellement legacy :
 
-- `talents`
-- `talents spec list`
-- `glyphs`
-- réponses chat parsées pour remplir les fenêtres.
+- `talents` reste volontairement utilisé pour afficher la spé courante, mais le spam associé est filtré ;
+- `talents spec list` n’est plus le chemin nominal pour la frame de choix des specs ;
+- `glyphs` reste à migrer ;
+- les fenêtres ou panneaux qui auraient besoin de talents actifs détaillés restent à inventorier avant migration.
 
-À migrer maintenant, car c’est le prochain écran encore alimenté par parsing de whisper.
+À traiter maintenant : **glyphes en bridge-first**, car c’est le prochain flux read-only encore basé sur parsing de whisper.
 
 ### C) Outfits
 
@@ -219,7 +237,9 @@ Encore legacy :
 | PVP Stats bridge | Fait |
 | Stats simples bridge | Fait |
 | Quêtes bridge | Fait |
-| Talents / glyphes / specs bridge | À faire |
+| Sélection specs bridge | Fait |
+| Talents actifs détaillés bridge | À évaluer / à faire si UI nécessaire |
+| Glyphes bridge | À faire |
 | Outfits bridge | À faire |
 | Nettoyage final parsers legacy | À faire |
 
@@ -227,17 +247,24 @@ Encore legacy :
 
 ## Prochain pas logique recommandé
 
-Le prochain pas logique est maintenant : **Talents / glyphes / specs détaillées en bridge-first**.
+Le prochain pas logique est maintenant : **migrer les glyphes en bridge-first**.
 
-Objectif de la prochaine phase :
+Pourquoi ce bloc en premier :
 
-1. ajouter des endpoints bridge read-only pour les talents et glyphes ;
-2. exposer les données nécessaires sans dépendre des réponses chat `talents`, `talents spec list` et `glyphs` ;
-3. brancher les fenêtres existantes en bridge-first ;
-4. garder les commandes legacy en fallback si la bridge est absente ;
-5. éviter les gros payloads globaux, comme pour states/details/quests.
+1. c’est read-only, donc peu risqué ;
+2. il reste basé sur la commande legacy `glyphs` et son parsing de whisper ;
+3. il est séparé des vraies actions utilisateur comme `talents switch` / `talents spec <nom>` ;
+4. il peut suivre le même modèle que spellbook / quests / talent spec list avec `BEGIN` / `ITEM` / `END`.
 
-Phase conseillée en premier : **lecture des talents actifs + points par arbre**, puis **glyphes**, puis seulement ensuite **liste/specs détaillées** si l’UI en a encore besoin.
+Plan recommandé :
+
+1. ajouter côté bridge `GET~GLYPHS~<bot>~<token>` ;
+2. envoyer `GLYPHS_BEGIN`, `GLYPHS_ITEM`, `GLYPHS_END` ;
+3. ajouter côté addon `Comm.RequestGlyphs(botName)` ;
+4. brancher la fenêtre existante ou le bouton qui lance actuellement `glyphs` ;
+5. conserver `glyphs` en fallback uniquement si la bridge est absente.
+
+Après glyphes, on pourra décider si les **talents actifs détaillés** doivent vraiment être migrés, ou si la ligne volontaire `My current talent spec is: ...` suffit pour l’usage actuel.
 
 ---
 

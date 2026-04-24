@@ -260,6 +260,167 @@ Spec.initialised = true
 
 Spec.pending, Spec.buttons = nil, {}
 
+local SPEC_LEGACY_USAGE_FILTER_TTL = 5
+
+local function specNow()
+    if GetTime then
+        return GetTime()
+    end
+
+    return time and time() or 0
+end
+
+local function normalizeSpecAuthorName(author)
+    if type(author) ~= "string" then
+        return ""
+    end
+
+    local name = author
+    if Ambiguate then
+        name = Ambiguate(author, "none") or author
+    end
+
+    name = string.match(name, "^[^-]+") or name
+    return string.lower(name or "")
+end
+
+local function cleanSpecChatLine(message)
+    if type(message) ~= "string" then
+        return ""
+    end
+
+    return message
+        :gsub("|c%x%x%x%x%x%x%x%x", "")
+        :gsub("|r", "")
+        :gsub("^%s+", "")
+        :gsub("%s+$", "")
+end
+
+local function extractCurrentTalentSpecLine(message)
+    local clean = cleanSpecChatLine(message)
+    if clean == "" then
+        return ""
+    end
+
+    for line in string.gmatch(clean .. "\n", "([^\r\n]+)") do
+        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+        local lower = string.lower(line)
+
+        if string.find(lower, "current talent spec", 1, true)
+            or string.find(lower, "current spec", 1, true) then
+            return line
+        end
+    end
+
+    return ""
+end
+
+local function emitPreservedTalentWhisper(author, line)
+    if type(line) ~= "string" or line == "" then
+        return
+    end
+
+    if not DEFAULT_CHAT_FRAME or not DEFAULT_CHAT_FRAME.AddMessage then
+        return
+    end
+
+    local authorName = author or ""
+    if Ambiguate then
+        authorName = Ambiguate(authorName, "none") or authorName
+    end
+
+    local template = _G.CHAT_WHISPER_GET or "%s whispers: "
+    local prefix = string.format(template, "[" .. tostring(authorName) .. "]")
+    local color = ChatTypeInfo and ChatTypeInfo["WHISPER"] or nil
+
+    if color then
+        DEFAULT_CHAT_FRAME:AddMessage(prefix .. line, color.r, color.g, color.b)
+    else
+        DEFAULT_CHAT_FRAME:AddMessage(prefix .. line)
+    end
+end
+
+local function isLegacyTalentUsageLine(message)
+    local clean = cleanSpecChatLine(message)
+    local lower = string.lower(clean)
+
+    if lower == "warrior" or lower == "paladin" or lower == "hunter" or lower == "rogue"
+        or lower == "priest" or lower == "death knight" or lower == "shaman" or lower == "mage"
+        or lower == "warlock" or lower == "druid" then
+        return true
+    end
+
+    if string.find(lower, "talents usage", 1, true) then
+        return true
+    end
+
+    if string.find(lower, "talents switch", 1, true) and string.find(lower, "talents spec", 1, true) then
+        return true
+    end
+
+    return false
+end
+
+local function ensureSpecLegacyUsageFilter()
+    if MultiBot._specLegacyUsageFilterInstalled then
+        return true
+    end
+
+    if type(ChatFrame_AddMessageEventFilter) ~= "function" then
+        return false
+    end
+
+    MultiBot._specLegacyUsageFilterInstalled = true
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", function(_, _, message, author, ...)
+        local state = MultiBot and MultiBot._specLegacyUsageFilter or nil
+        if type(state) ~= "table" then
+            return false
+        end
+
+        if state.expiresAt and specNow() > state.expiresAt then
+            MultiBot._specLegacyUsageFilter = nil
+            return false
+        end
+
+        if state.botKey and normalizeSpecAuthorName(author) ~= state.botKey then
+            return false
+        end
+
+        local currentSpecLine = extractCurrentTalentSpecLine(message)
+        if currentSpecLine ~= "" then
+            if isLegacyTalentUsageLine(message) then
+                emitPreservedTalentWhisper(author, currentSpecLine)
+                return true
+            end
+
+            return false
+        end
+
+        if isLegacyTalentUsageLine(message) then
+            return true
+        end
+
+        return false
+    end)
+
+    return true
+end
+
+local function suppressNextTalentUsageLines(botName)
+    if not botName or botName == "" then
+        return
+    end
+
+    if not ensureSpecLegacyUsageFilter() then
+        return
+    end
+
+    MultiBot._specLegacyUsageFilter = {
+        botKey = normalizeSpecAuthorName(botName),
+        expiresAt = specNow() + SPEC_LEGACY_USAGE_FILTER_TTL,
+    }
+end
+
 function Spec:RequestList(bot, wrapper)
     if self.busy then
         return                  --    on ignore le clic
@@ -279,14 +440,23 @@ function Spec:RequestList(bot, wrapper)
         builds  = {},
     }
     self.activeWrapper = wrapper
-    -- 1) on demande d'abord la spé courante
+
+    -- On garde volontairement la réponse legacy de la spé courante :
+    -- "My current talent spec is: ...".
+    -- Les lignes d'aide inutiles renvoyées par cette commande sont masquées côté chat.
+    suppressNextTalentUsageLines(bot)
     SendChatMessage("talents", "WHISPER", nil, bot)
-    -- 2) on attend ~0.2s puis on enchaîne sur la liste
+
+    -- La liste complète des modèles disponibles est maintenant demandée en bridge-first
+    -- pour éviter le spam "talents spec list" dans le chat
     MultiBot.TimerAfter(0.2, function()
-        -- si on est toujours sur le même bot, on demande la liste
         if Spec.pending and Spec.pending.bot == bot then
+            local comm = MultiBot.Comm or nil
+            if comm and comm.RequestTalentSpecList and comm.RequestTalentSpecList(bot) then
+                return
+            end
+
             SendChatMessage("talents spec list", "WHISPER", nil, bot)
-            -- print("|cffffff00[SpecDEBUG]|r Message talents spec list envoyé!!!!!!!!!!!!!!!!!")
         end
     end)
 end
@@ -509,6 +679,51 @@ function MultiBot.HandleSpecWhisper(msg, sender)
     end
 end
 
+function MultiBot.ApplyBridgeTalentSpecBegin(botName, token)
+    local pending = Spec.pending
+    if not pending or short(botName) ~= short(pending.bot) then
+        return false
+    end
+
+    pending.bridgeToken = token
+    pending.specs = {}
+    pending.builds = {}
+    return true
+end
+
+function MultiBot.ApplyBridgeTalentSpecItem(botName, token, entry)
+    local pending = Spec.pending
+    if not pending or short(botName) ~= short(pending.bot) then
+        return false
+    end
+
+    if pending.bridgeToken and token and pending.bridgeToken ~= token then
+        return false
+    end
+
+    if type(entry) ~= "table" or type(entry.name) ~= "string" or entry.name == "" then
+        return false
+    end
+
+    tinsert(pending.specs, strtrim(entry.name))
+    tinsert(pending.builds, strtrim(entry.build or ""))
+    return true
+end
+
+function MultiBot.ApplyBridgeTalentSpecEnd(botName, token)
+    local pending = Spec.pending
+    if not pending or short(botName) ~= short(pending.bot) then
+        return false
+    end
+
+    if pending.bridgeToken and token and pending.bridgeToken ~= token then
+        return false
+    end
+
+    Spec:BuildDropdown()
+    Spec.pending = nil
+    return true
+end
 
 local function getAceGUI()
     if type(LibStub) ~= "table" then

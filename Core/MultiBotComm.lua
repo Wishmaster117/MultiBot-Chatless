@@ -95,6 +95,9 @@ local function ensureBridgeState()
   state.quests = state.quests or {}
   state.questSeq = state.questSeq or 0
   state.questActive = state.questActive or {}
+  state.talentSpecs = state.talentSpecs or {}
+  state.talentSpecSeq = state.talentSpecSeq or 0
+  state.talentSpecActive = state.talentSpecActive or nil
   state.bootstrapPending = state.bootstrapPending or false
   state.bootstrapDeadline = state.bootstrapDeadline or 0
   state.inventorySeq = state.inventorySeq or 0
@@ -198,6 +201,34 @@ function Comm.RequestStats(name)
   end
 
   return Comm.Send("GET", "STATS")
+end
+
+function Comm.RequestTalentSpecList(name)
+  local state = ensureBridgeState()
+  if not state.connected and not state.bootstrapPending then
+    return false
+  end
+
+  name = trim(name)
+  if name == "" then
+    return false
+  end
+
+  state.talentSpecSeq = (tonumber(state.talentSpecSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.talentSpecSeq)
+  state.talentSpecActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("GET", "TALENT_SPEC_LIST~" .. name .. "~" .. token) then
+    state.talentSpecActive = nil
+    return false
+  end
+
+  return token
 end
 
 function Comm.RequestQuests(mode, name)
@@ -726,6 +757,99 @@ function Comm.ApplyQuestDonePayload(payload)
   return true
 end
 
+local function getActiveTalentSpecRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.talentSpecActive
+  if type(active) ~= "table" then
+    return nil
+  end
+
+  if trim(token) ~= trim(active.token or "") then
+    return nil
+  end
+
+  if string.lower(trim(botName)) ~= tostring(active.botNameKey or "") then
+    return nil
+  end
+
+  return active
+end
+
+function Comm.ApplyTalentSpecBeginPayload(payload)
+  local botName, token = splitOnce(payload or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  if botName == "" or not getActiveTalentSpecRequest(botName, token) then
+    return false
+  end
+
+  local state = ensureBridgeState()
+  state.talentSpecs[string.lower(botName)] = {}
+
+  if MultiBot.ApplyBridgeTalentSpecBegin then
+    MultiBot.ApplyBridgeTalentSpecBegin(botName, token)
+  end
+
+  debugPrint("ADDON:RX", "TALENT_SPEC_BEGIN", botName)
+  return true
+end
+
+function Comm.ApplyTalentSpecItemPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local index, rest3 = splitOnce(rest2 or "", "~")
+  local specName, build = splitOnce(rest3 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  index = tonumber(index or "0") or 0
+  specName = trim(urlDecodeField(specName))
+  build = trim(build)
+
+  if botName == "" or specName == "" or not getActiveTalentSpecRequest(botName, token) then
+    return false
+  end
+
+  local entry = {
+    index = index,
+    name = specName,
+    build = build,
+  }
+
+  local state = ensureBridgeState()
+  local key = string.lower(botName)
+  state.talentSpecs[key] = state.talentSpecs[key] or {}
+  table.insert(state.talentSpecs[key], entry)
+
+  if MultiBot.ApplyBridgeTalentSpecItem then
+    MultiBot.ApplyBridgeTalentSpecItem(botName, token, entry)
+  end
+
+  debugPrint("ADDON:RX", "TALENT_SPEC_ITEM", botName, specName, build)
+  return true
+end
+
+function Comm.ApplyTalentSpecEndPayload(payload)
+  local botName, token = splitOnce(payload or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  if botName == "" or not getActiveTalentSpecRequest(botName, token) then
+    return false
+  end
+
+  local state = ensureBridgeState()
+  state.talentSpecActive = nil
+
+  if MultiBot.ApplyBridgeTalentSpecEnd then
+    MultiBot.ApplyBridgeTalentSpecEnd(botName, token)
+  end
+
+  debugPrint("ADDON:RX", "TALENT_SPEC_END", botName)
+  return true
+end
+
 local function getActiveInventoryRequest(botName, token)
   local state = ensureBridgeState()
   local active = state.inventoryActive
@@ -869,6 +993,27 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     Comm.ApplyBotDetailsPayload(payload)
+    return true
+  end
+
+  if opcode == "TALENT_SPEC_BEGIN" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyTalentSpecBeginPayload(payload)
+    return true
+  end
+
+  if opcode == "TALENT_SPEC_ITEM" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyTalentSpecItemPayload(payload)
+    return true
+  end
+
+  if opcode == "TALENT_SPEC_END" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyTalentSpecEndPayload(payload)
     return true
   end
 
@@ -1083,6 +1228,8 @@ function Comm.OnPlayerEnteringWorld()
   state.pvpStats = {}
   state.quests = {}
   state.questActive = {}
+  state.talentSpecs = {}
+  state.talentSpecActive = nil
   state.inventoryActive = nil
   Comm.MarkDisconnected(nil)
   state.bootstrapPending = true
