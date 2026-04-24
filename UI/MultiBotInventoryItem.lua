@@ -277,31 +277,6 @@ local function requestInventoryPostActionRefresh(botName, firstDelay, secondDela
     requestInventoryRefresh(firstDelay or 0.45, targetBotName)
 end
 
-local function optimisticallyConsumeInventoryButton(button)
-    if not button or not button.item then
-        return
-    end
-
-    local count = tonumber(button.item.count or 1) or 1
-    if count <= 1 then
-        if button.Hide then
-            button:Hide()
-        end
-        return
-    end
-
-    count = count - 1
-    button.item.count = count
-
-    if button.setAmount then
-        if count > 1 then
-            button.setAmount(count)
-        elseif button.amount and button.amount.Hide then
-            button.amount:Hide()
-        end
-    end
-end
-
 local function bindInventoryDestroyConfirm(button, botName)
     if not StaticPopupDialogs["MULTIBOT_CONFIRM_DESTROY"] then
         StaticPopupDialogs["MULTIBOT_CONFIRM_DESTROY"] = {
@@ -442,7 +417,6 @@ local function handleInventoryItemClick(button)
 
     if action == "u" then
         registerInventoryPendingConsume(botName, item, 1)
-        optimisticallyConsumeInventoryButton(button)
         sendInventoryItemCommand(action, button, botName, {
             optimisticConsume = true,
             postActionRefresh = true,
