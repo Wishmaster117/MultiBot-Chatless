@@ -90,6 +90,7 @@ local function ensureBridgeState()
   state.roster = state.roster or {}
   state.states = state.states or {}
   state.details = state.details or {}
+  state.pvpStats = state.pvpStats or {}
   state.bootstrapPending = state.bootstrapPending or false
   state.bootstrapDeadline = state.bootstrapDeadline or 0
   state.inventorySeq = state.inventorySeq or 0
@@ -182,6 +183,17 @@ end
 
 function Comm.RequestBotDetails()
   return Comm.Send("GET", "DETAILS")
+end
+
+function Comm.RequestPvpStats(name)
+  ensureBridgeState()
+
+  name = trim(name)
+  if name ~= "" then
+    return Comm.Send("GET", "PVP_STATS~" .. name)
+  end
+
+  return Comm.Send("GET", "PVP_STATS")
 end
 
 function Comm.RequestInventory(name)
@@ -386,6 +398,67 @@ function Comm.ApplyBotDetailsPayload(payload)
   return applied
 end
 
+local function parsePvpStatsPayload(payload)
+  local name, rest = splitOnce(payload or "", "~")
+  local arenaPoints, rest2 = splitOnce(rest or "", "~")
+  local honorPoints, rest3 = splitOnce(rest2 or "", "~")
+  local team2v2, rest4 = splitOnce(rest3 or "", "~")
+  local rating2v2, rest5 = splitOnce(rest4 or "", "~")
+  local team3v3, rest6 = splitOnce(rest5 or "", "~")
+  local rating3v3, rest7 = splitOnce(rest6 or "", "~")
+  local team5v5, rating5v5 = splitOnce(rest7 or "", "~")
+
+  name = trim(urlDecodeField(name))
+  if name == "" then
+    return nil
+  end
+
+  return {
+    name = name,
+    arenaPoints = tonumber(arenaPoints or "0") or 0,
+    honorPoints = tonumber(honorPoints or "0") or 0,
+    teams = {
+      ["2v2"] = {
+        team = urlDecodeField(team2v2),
+        rating = tonumber(rating2v2 or "0") or 0,
+      },
+      ["3v3"] = {
+        team = urlDecodeField(team3v3),
+        rating = tonumber(rating3v3 or "0") or 0,
+      },
+      ["5v5"] = {
+        team = urlDecodeField(team5v5),
+        rating = tonumber(rating5v5 or "0") or 0,
+      },
+    },
+    lastUpdateAt = safeNow(),
+  }
+end
+
+function Comm.ApplyPvpStatsPayload(payload)
+  local state = ensureBridgeState()
+  local stats = parsePvpStatsPayload(payload)
+  if not stats then
+    return nil
+  end
+
+  state.pvpStats[string.lower(stats.name)] = stats
+
+  if MultiBot.ApplyBridgePvpStats then
+    MultiBot.ApplyBridgePvpStats(stats)
+  end
+
+  debugPrint(
+    "ADDON:RX",
+    "PVP_STATS",
+    stats.name,
+    tostring(stats.arenaPoints or 0),
+    tostring(stats.honorPoints or 0)
+  )
+
+  return stats
+end
+
 local function getActiveInventoryRequest(botName, token)
   local state = ensureBridgeState()
   local active = state.inventoryActive
@@ -529,6 +602,13 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     Comm.ApplyBotDetailsPayload(payload)
+    return true
+  end
+
+  if opcode == "PVP_STATS" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyPvpStatsPayload(payload)
     return true
   end
 
@@ -697,6 +777,7 @@ function Comm.OnPlayerEnteringWorld()
   local state = ensureBridgeState()
   state.states = {}
   state.details = {}
+  state.pvpStats = {}
   state.inventoryActive = nil
   Comm.MarkDisconnected(nil)
   state.bootstrapPending = true

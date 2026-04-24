@@ -1613,7 +1613,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                end
 
                tButton.waitFor = "CO"
-               SendChatMessage("co ?", "WHISPER", nil, tName)			   
+               SendChatMessage("co ?", "WHISPER", nil, tName) 
                tButton.setEnable()
                return
             end

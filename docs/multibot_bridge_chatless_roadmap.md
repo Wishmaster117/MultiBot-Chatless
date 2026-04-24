@@ -1,195 +1,98 @@
 # MultiBot / Bridge — roadmap chatless
 
-Dernière mise à jour : 2026-04-24
+## Objectif
 
-## Objectif exact
+Rendre MultiBot **bridge-first** pour toutes les fenêtres d’interface : l’addon ne doit plus dépendre des réponses chat des bots pour construire l’UI.
 
-Rendre **MultiBot non dépendant du retour chat pour alimenter l’UI**, tout en gardant les commandes manuelles volontaires utilisables.
-
-À conserver comme commandes manuelles fonctionnelles :
+Les commandes manuelles doivent rester fonctionnelles :
 
 - `who`
 - `co ?`
 - `nc ?`
 - `ss ?`
+- commandes utilisateur volontaires comme `items`, `spells`, `stats`, etc.
 
-Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer automatiquement pour ouvrir/remplir les fenêtres d’interface.
-
----
-
-## État validé après les derniers tests ingame
-
-### Bridge C++
-
-- [x] `HELLO` / `HELLO_ACK`
-- [x] `PING` / `PONG`
-- [x] `GET~ROSTER`
-- [x] `GET~STATE~<bot>`
-- [x] `GET~STATES`
-- [x] `GET~DETAIL~<bot>`
-- [x] `GET~DETAILS`
-- [x] `GET~INVENTORY~<bot>~<token>`
-- [x] `GET~SPELLBOOK~<bot>~<token>`
-
-### Important : payloads volumineux
-
-Pour éviter les paquets trop gros avec beaucoup de bots, `GET~STATES` et `GET~DETAILS` ne doivent plus dépendre d’un unique gros payload global.
-
-État attendu :
-
-- `GET~STATES` répond avec plusieurs paquets `STATE~<bot>~...` ;
-- `GET~DETAILS` répond avec plusieurs paquets `DETAIL~<bot>~...` ;
-- un paquet `STATES~` ou `DETAILS~` vide peut seulement servir de réponse vide si aucun bot n’est disponible.
+La cible n’est donc pas de supprimer les commandes playerbot, mais de ne plus les utiliser comme transport automatique pour ouvrir/remplir les fenêtres.
 
 ---
 
-## Blocs déjà migrés côté bridge
+## État validé actuellement
 
 ### 1) Socle bridge
 
-- [x] handshake addon/bridge
-- [x] détection de connexion bridge
-- [x] bootstrap bridge au login / reload
-- [x] logs console bridge configurables via `MultiBotBridge.EnableConsoleLogs`
+- [x] Handshake `HELLO` / `HELLO_ACK`.
+- [x] `PING` / `PONG`.
+- [x] Logs console bridge configurables via `MultiBotBridge.EnableConsoleLogs`.
+- [x] Réception addon centralisée dans `MultiBotComm.lua`.
+- [x] Fallback legacy conservé quand la bridge n’est pas disponible.
 
-### 2) Roster / Units
+### 2) Roster / Units / states
 
-- [x] refresh roster bridge-first
-- [x] synchronisation des bots visibles dans `Units`
-- [x] hydratation des states combat / non-combat via bridge
-- [x] refresh manuel `Units` via bridge quand disponible
-- [x] fallback legacy conservé quand la bridge n’est pas disponible
+- [x] `GET~ROSTER`.
+- [x] `GET~STATE~<bot>`.
+- [x] `GET~STATES`.
+- [x] Envoi des states en paquets individuels `STATE` pour éviter les payloads trop gros avec beaucoup de bots.
+- [x] Bootstrap Units bridge-first.
+- [x] Refresh manuel Units bridge-first.
+- [x] Reconnexion / `/reload` corrigés : les states reviennent sans dépendre du flux `Hello` legacy.
+- [x] Régression everybars corrigée : `ApplyBridgeBotState()` ne place plus les bars trop tôt ; le placement est repris par le relayout Units.
 
-### 3) Détail bot / Raidus
+### 3) Détail bot / données type `who`
 
-- [x] endpoint `GET~DETAIL~<bot>`
-- [x] endpoint `GET~DETAILS`
-- [x] réception addon `DETAIL`
-- [x] réception addon `DETAILS`
-- [x] stockage cache `MultiBot.bridge.details`
-- [x] alimentation de `MultiBotGlobalSave`
-- [x] Raidus peut récupérer classe / race / genre / niveau / talents / score sans dépendre du spam automatique `who`
-- [x] demande de détail bot au bootstrap et lors du `Hello` d’un bot
+- [x] Endpoint bridge ajouté : `GET~DETAIL~<bot>`.
+- [x] Endpoint bridge ajouté : `GET~DETAILS`.
+- [x] Réponse individuelle `DETAIL`.
+- [x] Hydratation côté addon dans `MultiBot.bridge.details`.
+- [x] Mise à jour de `MultiBotGlobalSave` via `MultiBot.ApplyBridgeBotDetail()`.
+- [x] Raidus / roster peuvent récupérer les infos de base sans spam automatique `who`.
 
-### 4) Everybars / states UI
+Données actuellement couvertes :
 
-- [x] states reçus individuellement par bot
-- [x] reconstruction des everybars depuis les states bridge
-- [x] correction de la régression où la première everybar se collait au bouton `selfbots`
-- [x] placement des everybars redonné au layout `Units`, pas au handler de réception `STATE`
-- [x] relayout différé après réception des states pour éviter les coordonnées par défaut après `/reload`
+- nom ;
+- race ;
+- genre ;
+- classe ;
+- niveau ;
+- points par arbre de talents ;
+- score d’équipement approximatif.
 
-### 5) Inventory snapshot
+Les commandes manuelles `who`, `co ?`, `nc ?`, `ss ?` restent utilisables.
 
-- [x] `GET~INVENTORY~<bot>~<token>`
-- [x] `INV_BEGIN`
-- [x] `INV_SUMMARY`
-- [x] `INV_ITEM`
-- [x] `INV_END`
-- [x] ouverture de la fenêtre inventory depuis bridge
-- [x] remplissage du contenu inventory depuis bridge
-- [x] fallback whisper `items` conservé si bridge indisponible
+### 4) Inventory snapshot
+
+- [x] `GET~INVENTORY~<bot>~<token>`.
+- [x] `INV_BEGIN`.
+- [x] `INV_SUMMARY`.
+- [x] `INV_ITEM`.
+- [x] `INV_END`.
+- [x] Ouverture inventory bridge-first.
+- [x] Remplissage inventory bridge-first.
+- [x] Fallback `items` conservé uniquement si la bridge n’est pas disponible.
+
+### 5) Inventory post-action
+
+- [x] Helper centralisé `MultiBot.RequestInventoryRefresh(botName, delay, options)`.
+- [x] Helper post-action `MultiBot.RequestInventoryPostActionRefresh(botName, firstDelay, secondDelay, options)`.
+- [x] Refresh après equip / use / destroy / loot bridge-first.
+- [x] Refresh après déséquipement depuis Inspect bridge-first.
+- [x] Correction du timing : refresh différé pour éviter de prendre un snapshot trop tôt.
+- [x] Correction `u <item>` : décrément local pending pour éviter que le snapshot bridge trop précoce remette l’ancien stack.
+- [x] Refresh après `TRADE_CLOSED` bridge-first.
+- [x] Suppression du fallback chat `items` après trade quand la bridge est connectée.
+- [x] Filtre du dump inventory legacy déclenché par le bouton Trade (`=== Inventory === ... Off with you`) quand la bridge est connectée.
+
+Note importante : le dump legacy lié au trade peut encore être émis par le serveur/playerbot, mais l’addon ne l’utilise plus pour fonctionner et il est masqué côté UI quand la bridge est disponible.
 
 ### 6) Spellbook
 
-- [x] `GET~SPELLBOOK~<bot>~<token>`
-- [x] `SB_BEGIN`
-- [x] `SB_ITEM`
-- [x] `SB_END`
-- [x] `Comm.RequestSpellbook(name)`
-- [x] ouverture du spellbook via bridge
-- [x] remplissage du spellbook via bridge
-- [x] fallback whisper `spells` conservé si bridge indisponible
-
----
-
-## Ce qui n’est plus à faire
-
-### Spellbook
-
-Le spellbook est considéré migré sur le chemin nominal.
-
-Le whisper `spells` peut rester comme fallback, mais ne doit plus être le chemin normal quand la bridge est connectée.
-
-### Détail bot / `who`
-
-Le détail bot est maintenant sorti du chemin `who` pour l’UI.
-
-Les commandes manuelles `who`, `co ?`, `nc ?`, `ss ?` doivent rester disponibles, mais l’UI ne doit plus dépendre automatiquement de leurs réponses pour Raidus / Units.
-
----
-
-## Ce qui reste partiellement legacy
-
-### A) Units pas encore 100% nettoyé
-
-Encore présent à conserver ou à traiter plus tard selon le cas :
-
-- fallback `.playerbot bot list` ;
-- parsing `CHAT_MSG_SYSTEM` pour certains événements add/remove/offline ;
-- commandes `.playerbot bot add/remove` toujours utilisées pour connecter/déconnecter les bots.
-
-Conclusion : `Units` fonctionne maintenant en bridge-first pour roster/states/details, mais il reste des chemins legacy de compatibilité et de commande.
-
-### B) Inventory post-action
-
-Le snapshot inventory est bridge, mais certains refreshs après action restent encore legacy.
-
-Exemples à nettoyer :
-
-- refresh après equip / use / destroy / sell ;
-- certains `SendChatMessage("items", "WHISPER", nil, botName)` ;
-- certains refreshs déclenchés par `CHAT_MSG_LOOT` ou retours système.
-
-Conclusion : inventory est migré pour l’ouverture et le contenu principal, mais pas encore totalement propre après action.
-
-### C) Stats simples
-
-Encore legacy :
-
-- bouton stats global ;
-- `SendChatMessage("stats", ...)` ;
-- parsing des réponses stats.
-
-À migrer plus tard vers endpoint bridge dédié.
-
-### D) PVP stats
-
-Encore legacy :
-
-- `pvp stats` en whisper / party / raid ;
-- parsing de réponse chat pour affichage.
-
-À migrer vers endpoint bridge dédié si on veut un panneau totalement chatless.
-
-### E) Talents / glyphes / specs détaillées
-
-Encore legacy :
-
-- `talents`
-- `talents spec list`
-- `glyphs`
-- réponses chat parsées pour remplir les fenêtres.
-
-À migrer plus tard. C’est un bloc plus gros que l’inventory post-action.
-
-### F) Outfits
-
-Encore legacy :
-
-- `outfit ?`
-- parsing de réponse chat.
-
-À migrer plus tard.
-
-### G) Quêtes
-
-Encore legacy côté MultiBot :
-
-- certains menus de quête utilisent encore des commandes chat ;
-- intégration Questie séparée à garder en tête.
-
-À traiter après les blocs plus petits, sauf priorité spécifique.
+- [x] `GET~SPELLBOOK~<bot>~<token>`.
+- [x] `SB_BEGIN`.
+- [x] `SB_ITEM`.
+- [x] `SB_END`.
+- [x] `Comm.RequestSpellbook(name)`.
+- [x] Ouverture spellbook bridge-first.
+- [x] Remplissage spellbook bridge-first.
+- [x] Fallback `spells` conservé uniquement si la bridge n’est pas disponible.
 
 ---
 
@@ -197,96 +100,118 @@ Encore legacy côté MultiBot :
 
 | Bloc | État actuel |
 |---|---|
-| Handshake bridge | Fait |
+| Socle bridge | Fait |
 | Roster bridge | Fait |
 | States bridge | Fait |
-| States en paquets individuels | Fait |
-| Details bridge | Fait |
-| Details en paquets individuels | Fait |
-| Raidus sans `who` automatique | Fait |
-| Everybars après `/reload` | Corrigé |
 | Units bridge-first | Fait |
-| Units 100% sans chemins legacy | À finir |
+| Everybars après `/reload` | Corrigé |
+| Détail bot bridge | Fait |
 | Inventory snapshot bridge | Fait |
-| Inventory post-action bridge-first | À faire |
+| Inventory post-action bridge-first | Fait |
+| Trade inventory dump visible | Masqué côté addon quand bridge connectée |
 | Spellbook bridge | Fait |
-| Stats bridge | À faire |
-| PVP stats bridge | À faire |
-| Talents / glyphes / specs bridge | À faire |
-| Outfits bridge | À faire |
-| Quêtes bridge | À faire |
-| Nettoyage final parsers legacy | À faire |
+| Stats classiques | À migrer |
+| PVP stats | À migrer |
+| Talents détaillés | À migrer |
+| Glyphes | À migrer |
+| Specs détaillées / switch specs | Partiellement legacy |
+| Outfits | À migrer |
+| Quêtes | À migrer |
+| Nettoyage final parsers legacy | À faire en dernier |
 
 ---
 
-## Prochain pas logique recommandé
+## Legacy encore présent et accepté pour l’instant
 
-Le prochain pas le plus propre est : **finir inventory post-action en bridge-first**.
+Ces chemins restent volontairement présents tant que leur équivalent bridge n’est pas terminé :
 
-Pourquoi ce bloc avant stats/talents/outfits :
-
-- le snapshot inventory est déjà bridge ;
-- il reste surtout à remplacer les refreshs automatiques `items` par `Comm.RequestInventory(botName)` quand la bridge est connectée ;
-- le risque est limité, car on ne change pas encore les actions elles-mêmes ;
-- les commandes utilisateur comme equip/use/sell/destroy peuvent rester en whisper pour l’instant ;
-- on supprime seulement le spam automatique utilisé pour reconstruire la fenêtre.
-
-### Étape concrète suivante
-
-Faire un patch addon qui remplace les refreshs automatiques :
-
-```lua
-SendChatMessage("items", "WHISPER", nil, botName)
-```
-
-par une fonction centralisée du style :
-
-```lua
-MultiBot.RequestInventoryRefresh(botName)
-```
-
-Cette fonction fera :
-
-```lua
-if MultiBot.bridge and MultiBot.bridge.connected and MultiBot.Comm and MultiBot.Comm.RequestInventory then
-  return MultiBot.Comm.RequestInventory(botName)
-end
-
-SendChatMessage("items", "WHISPER", nil, botName)
-```
-
-Ensuite on branche cette fonction dans :
-
-- `MultiBotInventoryFrame.lua`
-- `MultiBotInventoryItem.lua`
-- les vieux refreshs `items` encore présents dans `MultiBotHandler.lua`
-- éventuellement `MultiBotEngine.lua` si le cas est un refresh UI et pas une commande manuelle volontaire.
+- commandes d’action utilisateur : `u`, `e`, `ue`, `s`, `destroy`, `cast`, `talents apply`, etc. ;
+- commandes manuelles de diagnostic : `who`, `co ?`, `nc ?`, `ss ?` ;
+- fallback inventory `items` si bridge absente ;
+- fallback spellbook `spells` si bridge absente ;
+- fallback Units `.playerbot bot list` si bridge absente ou bootstrap incomplet ;
+- certains signaux système `CHAT_MSG_SYSTEM` pour add/remove/offline ;
+- stats / pvp stats / talents / glyphes / outfits / quêtes.
 
 ---
 
-## Règle de migration à conserver
+## Points techniques validés
 
-Pour chaque fenêtre :
+### Paquets individuels au lieu de gros snapshots globaux
 
-1. le bouton / l’action utilisateur peut encore envoyer une commande au bot si c’est une vraie action ;
-2. le refresh automatique de l’UI doit passer par la bridge si elle est connectée ;
-3. le fallback chat doit rester si la bridge est absente ;
-4. les commandes manuelles historiques restent fonctionnelles.
+Pour les groupes/raids avec beaucoup de bots, les réponses globales trop longues sont fragiles. Les states et détails sont maintenant mieux traités avec des paquets individuels :
+
+- `STATE~<bot>~...`
+- `DETAIL~<bot>~...`
+
+C’est le modèle à privilégier pour les prochains endpoints volumineux.
+
+### UI : ne pas placer les frames depuis les handlers bridge
+
+Les handlers bridge doivent hydrater les données, pas décider directement du layout final. Le placement visuel doit rester dans les modules UI dédiés, par exemple `MultiBotUnitsRootUI.lua` pour les bars Units.
+
+### Inventory : bridge-first avec fallback strict
+
+La règle actuelle est :
+
+1. bridge connectée : requête bridge ;
+2. bridge connectée mais requête impossible : ne pas spammer le chat automatiquement sur les chemins post-action sensibles ;
+3. bridge absente : fallback legacy.
+
+---
+
+## Prochaine modification logique
+
+### Migrer Stats / PVP Stats en bridge-first
+
+C’est la prochaine étape la plus logique parce que :
+
+- c’est un bloc read-only, donc peu risqué ;
+- il génère encore du whisper automatique (`stats`, `pvp stats`) ;
+- les données sont proches du modèle `DETAIL` déjà en place ;
+- ça supprimera un autre gros bloc de parsing chat sans toucher aux commandes manuelles.
+
+Plan recommandé :
+
+1. Ajouter côté bridge :
+   - `GET~STATS~<bot>` ;
+   - `GET~PVP_STATS~<bot>` ;
+   - éventuellement `GET~STATS_ALL` / `GET~PVP_STATS_ALL` mais avec réponses individuelles, pas gros payload unique.
+2. Ajouter côté addon :
+   - `Comm.RequestStats(botName)` ;
+   - `Comm.RequestPvpStats(botName)` ;
+   - `ApplyBridgeStatsPayload()` ;
+   - `ApplyBridgePvpStatsPayload()`.
+3. Brancher les boutons existants :
+   - bouton stats global ;
+   - bouton PVP stats Units ;
+   - refresh automatique éventuel.
+4. Garder `stats` et `pvp stats` en fallback si la bridge est absente.
+5. Ne pas encore supprimer les parsers legacy : les neutraliser seulement quand le chemin bridge est validé ingame.
+
+---
+
+## Étapes suivantes après Stats / PVP Stats
+
+1. Talents détaillés / glyphes en bridge-first.
+2. Specs détaillées et liste des specs en bridge-first.
+3. Outfits en bridge-first.
+4. Quêtes en bridge-first, probablement en plusieurs sous-étapes.
+5. Nettoyage final des parsers chat devenus inutiles.
 
 ---
 
 ## Résumé court
 
-Fait et validé :
+Ce qui est maintenant solide :
 
-- roster bridge ;
-- states bridge ;
-- détails bot bridge ;
-- Raidus sans `who` automatique ;
-- spellbook bridge ;
-- inventory snapshot bridge ;
-- everybars correctement replacées après `/reload`.
+- roster / states / Units ;
+- détail bot ;
+- inventory snapshot ;
+- inventory post-action ;
+- use item avec décrément stable ;
+- inspect unequip + refresh inventory ;
+- trade sans dump inventory visible ;
+- spellbook.
 
-Prochaine étape :
-
-- nettoyer **inventory post-action** pour remplacer les refreshs automatiques `items` par des refreshs bridge-first.
+Le prochain bloc à sortir du chat est **Stats / PVP Stats**, parce que c’est le meilleur ratio gain/risque avant d’attaquer talents, glyphes, outfits et quêtes.

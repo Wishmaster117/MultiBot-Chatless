@@ -648,6 +648,97 @@ local function createPvpStatsControls(controlFrame)
         end
     end
 
+    local PVP_STATS_LEGACY_FILTER_TTL = 8
+
+    local function pvpStatsNow()
+        if GetTime then
+            return GetTime()
+        end
+
+        return time and time() or 0
+    end
+
+    local function normalizePvpStatsAuthorName(author)
+        if type(author) ~= "string" then
+            return ""
+        end
+
+        local name = author
+        if Ambiguate then
+            name = Ambiguate(author, "none") or author
+        end
+
+        name = string.match(name, "^[^-]+") or name
+        return string.lower(name or "")
+    end
+
+    local function isPvpStatsLegacyLine(message)
+        return type(message) == "string" and string.find(message, "%[PVP%]") ~= nil
+    end
+
+    local function ensurePvpStatsLegacyFilter()
+        if MultiBot._pvpStatsLegacyFilterInstalled then
+            return true
+        end
+
+        if type(ChatFrame_AddMessageEventFilter) ~= "function" then
+            return false
+        end
+
+        MultiBot._pvpStatsLegacyFilterInstalled = true
+        ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", function(_, _, message, author, ...)
+            local state = MultiBot and MultiBot._pvpStatsLegacyFilter or nil
+            if type(state) ~= "table" then
+                return false
+            end
+
+            if state.expiresAt and pvpStatsNow() > state.expiresAt then
+                MultiBot._pvpStatsLegacyFilter = nil
+                return false
+            end
+
+            if state.botKey and normalizePvpStatsAuthorName(author) ~= state.botKey then
+                return false
+            end
+
+            if isPvpStatsLegacyLine(message) then
+                return true
+            end
+
+            return false
+        end)
+
+        return true
+    end
+
+    local function suppressNextPvpStatsLegacyWhisper(botName)
+        if not ensurePvpStatsLegacyFilter() then
+            return
+        end
+
+        local botKey = nil
+        if botName and botName ~= "" then
+            botKey = normalizePvpStatsAuthorName(botName)
+        end
+
+        MultiBot._pvpStatsLegacyFilter = {
+            botKey = botKey ~= "" and botKey or nil,
+            expiresAt = pvpStatsNow() + PVP_STATS_LEGACY_FILTER_TTL,
+        }
+    end
+
+    local function requestBridgePvpStats(botName)
+        local comm = MultiBot.Comm or nil
+
+        if comm and comm.RequestPvpStats and comm.RequestPvpStats(botName) then
+            suppressNextPvpStatsLegacyWhisper(botName)
+            showPvpFrame()
+            return true
+        end
+
+        return false
+    end
+
     mainButton.doLeft = function()
         if whisperButton:IsShown() then
             whisperButton:doHide()
@@ -667,6 +758,11 @@ local function createPvpStatsControls(controlFrame)
             UIErrorsFrame:AddMessage(MultiBot.L("pvp.stats.error_select_bot"), 1, 0.2, 0.2, 1)
             return
         end
+
+        if requestBridgePvpStats(bot) then
+            return
+        end
+
         SendChatMessage("pvp stats", "WHISPER", nil, bot)
         showPvpFrame()
     end
@@ -676,6 +772,11 @@ local function createPvpStatsControls(controlFrame)
             UIErrorsFrame:AddMessage(MultiBot.L("pvp.stats.error_not_in_group"), 1, 0.2, 0.2, 1)
             return
         end
+
+        if requestBridgePvpStats(nil) then
+            return
+        end
+
         SendChatMessage("pvp stats", "PARTY")
         showPvpFrame()
     end
@@ -685,6 +786,11 @@ local function createPvpStatsControls(controlFrame)
             UIErrorsFrame:AddMessage(MultiBot.L("pvp.stats.error_not_in_raid"), 1, 0.2, 0.2, 1)
             return
         end
+
+        if requestBridgePvpStats(nil) then
+            return
+        end
+
         SendChatMessage("pvp stats", "RAID")
         showPvpFrame()
     end

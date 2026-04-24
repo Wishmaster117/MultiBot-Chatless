@@ -300,6 +300,14 @@ local function MBPVP_NormalizeSenderName(sender)
     return simpleName
 end
 
+local function MBPVP_Trim(value)
+    if type(value) ~= "string" then
+        return ""
+    end
+
+    return value:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
 local function MBPVP_ExtractFirstTwoNumbers(line)
     local a, b
     for n in tostring(line):gmatch("(%d+)") do
@@ -568,6 +576,59 @@ local function ResetPvpUi(frame)
             end
         end
     end
+end
+
+function MultiBot.ApplyBridgePvpStats(stats)
+    if type(stats) ~= "table" or not stats.name or stats.name == "" then
+        return false
+    end
+
+    EnsurePvpUiInitialized()
+
+    local botName = MBPVP_NormalizeSenderName(stats.name)
+    if botName == "" then
+        return false
+    end
+
+    local frame = MultiBotPVPFrame
+    local st = MBPVP_GetState(frame, botName)
+
+    st.lastUpdate = time()
+    st.arenaPoints = tostring(stats.arenaPoints or 0)
+    st.honorPoints = tostring(stats.honorPoints or 0)
+    st.teams = st.teams or {}
+
+    for _, mode in ipairs({ "2v2", "3v3", "5v5" }) do
+        local incoming = stats.teams and stats.teams[mode] or nil
+        st.teams[mode] = st.teams[mode] or {}
+
+        local teamName = MBPVP_Trim(incoming and incoming.team or "")
+        local rating = tonumber(incoming and incoming.rating or 0) or 0
+
+        if teamName ~= "" then
+            st.teams[mode].team = teamName
+            st.teams[mode].rating = tostring(rating)
+            st.teams[mode].noTeam = false
+        else
+            st.teams[mode].team = nil
+            st.teams[mode].rating = nil
+            st.teams[mode].noTeam = true
+        end
+    end
+
+    if not frame:IsShown() then
+        frame:Show()
+    end
+
+    MBPVP_InitBotDropDown(frame)
+
+    if not frame._currentBot or frame._currentBot == "" then
+        MBPVP_SetCurrentBot(frame, botName)
+    elseif frame._currentBot == botName then
+        MBPVP_ApplyStateToUi(frame, botName)
+    end
+
+    return true
 end
 
 function MultiBot.HandlePvpWhisper(msg, sender)
