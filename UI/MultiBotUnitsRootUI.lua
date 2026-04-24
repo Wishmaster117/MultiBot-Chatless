@@ -551,6 +551,9 @@ local function requestRosterBootstrap(button)
         if MultiBot.Comm.RequestStates then
             MultiBot.Comm.RequestStates()
         end
+        if MultiBot.Comm.RequestBotDetails then
+            MultiBot.Comm.RequestBotDetails()
+        end
      end
 
     local function fallbackToSystemRoster()

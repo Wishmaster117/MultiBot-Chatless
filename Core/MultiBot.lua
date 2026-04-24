@@ -1439,6 +1439,82 @@ function MultiBot.ApplyAllBridgeStates()
   return applied
 end
 
+function MultiBot.GetCachedBridgeDetail(name)
+  if type(name) ~= "string" or name == "" then
+    return nil
+  end
+
+  if not (MultiBot and MultiBot.bridge and MultiBot.bridge.details) then
+    return nil
+  end
+
+  return MultiBot.bridge.details[string.lower(name)]
+end
+
+local function BuildBridgeDetailStoreValue(detail)
+  if type(detail) ~= "table" or type(detail.name) ~= "string" or detail.name == "" then
+    return nil
+  end
+
+  local classCanon = (MultiBot.toClass and MultiBot.toClass(detail.className or detail.class or "Unknown")) or "Unknown"
+  if classCanon == "" then
+    classCanon = "Unknown"
+  end
+
+  local talent1 = tonumber(detail.talent1 or 0) or 0
+  local talent2 = tonumber(detail.talent2 or 0) or 0
+  local talent3 = tonumber(detail.talent3 or 0) or 0
+  local tabIndex = 1
+  if talent3 > talent2 and talent3 > talent1 then
+    tabIndex = 3
+  elseif talent2 > talent3 and talent2 > talent1 then
+    tabIndex = 2
+  end
+
+  local special = tostring(classCanon)
+  if MultiBot.L and classCanon ~= "Unknown" then
+    local localized = MultiBot.L("info.talent." .. classCanon .. tabIndex)
+    if localized and localized ~= "" then
+      special = (MultiBot.CLEAR and MultiBot.CLEAR(localized, 1)) or localized
+    end
+  end
+
+  local classDisplay = (MultiBot.GetClassDisplay and MultiBot.GetClassDisplay(classCanon)) or classCanon
+  local race = tostring(detail.race or "Unknown")
+  local gender = tostring(detail.gender or "Unknown")
+  local talents = talent1 .. "/" .. talent2 .. "/" .. talent3
+  local level = tonumber(detail.level or 0) or 0
+  local score = tonumber(detail.score or 0) or 0
+
+  return race .. "," .. gender .. "," .. special .. "," .. talents .. "," .. classDisplay .. "," .. level .. "," .. score
+end
+
+function MultiBot.ApplyBridgeBotDetail(detail)
+  if type(detail) ~= "table" or type(detail.name) ~= "string" or detail.name == "" then
+    return false
+  end
+
+  local value = BuildBridgeDetailStoreValue(detail)
+  if not value then
+    return false
+  end
+
+  if MultiBot.SetGlobalBotEntry then
+    MultiBot.SetGlobalBotEntry(detail.name, value)
+  else
+    if type(_G.MultiBotGlobalSave) ~= "table" then
+      _G.MultiBotGlobalSave = {}
+    end
+    _G.MultiBotGlobalSave[detail.name] = value
+  end
+
+  if MultiBot.raidus and MultiBot.raidus.setRaidus and MultiBot.raidus.IsShown and MultiBot.raidus:IsShown() then
+    MultiBot.raidus.setRaidus()
+  end
+
+  return true
+end
+
 local function InsertBridgeNameUnique(list, name)
   if type(list) ~= "table" or type(name) ~= "string" or name == "" then
     return
@@ -1451,6 +1527,29 @@ local function InsertBridgeNameUnique(list, name)
   end
 
   table.insert(list, name)
+end
+
+local function RequestBridgeUnitsRelayout()
+  if MultiBot._bridgeUnitsRelayoutPending then
+    return
+  end
+
+  MultiBot._bridgeUnitsRelayoutPending = true
+
+  local function runRelayout()
+    MultiBot._bridgeUnitsRelayoutPending = nil
+    if MultiBot.RelayoutUnitsDisplay then
+      MultiBot.RelayoutUnitsDisplay()
+    end
+  end
+
+  if MultiBot.NextTick then
+    MultiBot.NextTick(runRelayout)
+  elseif MultiBot.TimerAfter then
+    MultiBot.TimerAfter(0, runRelayout)
+  else
+    runRelayout()
+  end
 end
 
 function MultiBot.ApplyBridgeBotState(name, combat, normal)
@@ -1481,7 +1580,11 @@ function MultiBot.ApplyBridgeBotState(name, combat, normal)
     return true
   end
 
-  local unitFrame = units.addFrame(name, (button.x or 0) - (button.size or 32) - 2, (button.y or 0) + 2)
+  local unitFrame = units.addFrame(name, -34, 2)
+  if unitFrame and unitFrame.Hide then
+    unitFrame:Hide()
+  end
+
   unitFrame.class = button.class
   unitFrame.name = button.name or name
 
@@ -1502,12 +1605,11 @@ function MultiBot.ApplyBridgeBotState(name, combat, normal)
     button.setEnable()
   end
 
-  if button.state and unitFrame and unitFrame.setPoint then
-    unitFrame.setPoint((button.x or 0) - (button.size or 32) - 2, (button.y or 0) + 2)
-    if unitFrame.Show then
-      unitFrame:Show()
-    end
+  if unitFrame and unitFrame.Hide then
+    unitFrame:Hide()
   end
+
+  RequestBridgeUnitsRelayout()
 
   return true
 end

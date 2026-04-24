@@ -89,6 +89,7 @@ local function ensureBridgeState()
   state.lastError = state.lastError or nil
   state.roster = state.roster or {}
   state.states = state.states or {}
+  state.details = state.details or {}
   state.bootstrapPending = state.bootstrapPending or false
   state.bootstrapDeadline = state.bootstrapDeadline or 0
   state.inventorySeq = state.inventorySeq or 0
@@ -170,6 +171,19 @@ function Comm.RequestStates()
   return Comm.Send("GET", "STATES")
 end
 
+function Comm.RequestBotDetail(name)
+  name = trim(name)
+  if name == "" then
+    return false
+  end
+
+  return Comm.Send("GET", "DETAIL~" .. name)
+end
+
+function Comm.RequestBotDetails()
+  return Comm.Send("GET", "DETAILS")
+end
+
 function Comm.RequestInventory(name)
   local state = ensureBridgeState()
   name = trim(name)
@@ -228,6 +242,35 @@ function Comm.MarkDisconnected(reason)
   state.spellbookActive = nil
 end
 
+local function parseBridgeDetailPayload(payload)
+  local name, rest = splitOnce(payload or "", "~")
+  local race, rest2 = splitOnce(rest or "", "~")
+  local gender, rest3 = splitOnce(rest2 or "", "~")
+  local className, rest4 = splitOnce(rest3 or "", "~")
+  local level, rest5 = splitOnce(rest4 or "", "~")
+  local talent1, rest6 = splitOnce(rest5 or "", "~")
+  local talent2, rest7 = splitOnce(rest6 or "", "~")
+  local talent3, score = splitOnce(rest7 or "", "~")
+
+  name = trim(urlDecodeField(name))
+  if name == "" then
+    return nil
+  end
+
+  return {
+    name = name,
+    race = urlDecodeField(race),
+    gender = urlDecodeField(gender),
+    className = urlDecodeField(className),
+    level = tonumber(level or "0") or 0,
+    talent1 = tonumber(talent1 or "0") or 0,
+    talent2 = tonumber(talent2 or "0") or 0,
+    talent3 = tonumber(talent3 or "0") or 0,
+    score = tonumber(score or "0") or 0,
+    lastUpdateAt = safeNow(),
+  }
+end
+
 local function parseRosterEntry(entry)
   local fields = {}
   for value in string.gmatch(entry or "", "([^,]+)") do
@@ -259,6 +302,10 @@ function Comm.ApplyRosterPayload(payload)
 
   if MultiBot.SyncBridgeRosterToPlayers then
     MultiBot.SyncBridgeRosterToPlayers(roster)
+  end
+
+  if state.connected and Comm.RequestBotDetails then
+    Comm.RequestBotDetails()
   end
 
   debugPrint("ADDON:RX", "ROSTER", tostring(#roster))
@@ -304,6 +351,38 @@ function Comm.ApplyStatesPayload(payload)
   end
 
   debugPrint("ADDON:RX", "STATES", tostring(applied))
+  return applied
+end
+
+function Comm.ApplyBotDetailPayload(payload)
+  local state = ensureBridgeState()
+  local detail = parseBridgeDetailPayload(payload)
+  if not detail then
+    return nil
+  end
+
+  state.details[string.lower(detail.name)] = detail
+
+  if MultiBot.ApplyBridgeBotDetail then
+    MultiBot.ApplyBridgeBotDetail(detail)
+  end
+
+  debugPrint("ADDON:RX", "DETAIL", detail.name, detail.className or "", tostring(detail.level or 0), tostring(detail.score or 0))
+  return detail
+end
+
+function Comm.ApplyBotDetailsPayload(payload)
+  local applied = 0
+
+  if type(payload) == "string" and payload ~= "" then
+    for entryPayload in string.gmatch(payload, "([^;]+)") do
+      if Comm.ApplyBotDetailPayload(entryPayload) then
+        applied = applied + 1
+      end
+    end
+  end
+
+  debugPrint("ADDON:RX", "DETAILS", tostring(applied))
   return applied
 end
 
@@ -395,6 +474,9 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
           if Comm.RequestStates then
             Comm.RequestStates()
           end
+          if Comm.RequestBotDetails then
+            Comm.RequestBotDetails()
+          end
         end
       end)
     else
@@ -433,6 +515,20 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     Comm.ApplyStatesPayload(payload)
+    return true
+  end
+
+  if opcode == "DETAIL" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyBotDetailPayload(payload)
+    return true
+  end
+
+  if opcode == "DETAILS" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyBotDetailsPayload(payload)
     return true
   end
 
@@ -592,11 +688,15 @@ local function dispatchBootstrapRequests()
   if Comm.RequestStates then
     Comm.RequestStates()
   end
+  if Comm.RequestBotDetails then
+    Comm.RequestBotDetails()
+  end
 end
 
 function Comm.OnPlayerEnteringWorld()
   local state = ensureBridgeState()
   state.states = {}
+  state.details = {}
   state.inventoryActive = nil
   Comm.MarkDisconnected(nil)
   state.bootstrapPending = true

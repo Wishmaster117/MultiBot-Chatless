@@ -1602,7 +1602,18 @@ function MultiBot.HandleMultiBotEvent(event, ...)
             if(MultiBot.isMember(tName)) then
                -- On ne redemande plus les stratégies ici pour éviter les doublons.
                -- Le flux normal via le WHISPER "Hello" s'en chargera.
+               if(BridgeBootOwnsState() and MultiBot.Comm and MultiBot.Comm.RequestState) then
+                  tButton.waitFor = "BRIDGE_STATE"
+                  tButton.setEnable()
+                  MultiBot.Comm.RequestState(tName)
+                  if(MultiBot.Comm.RequestBotDetail) then
+                     MultiBot.Comm.RequestBotDetail(tName)
+                  end
+                  return
+               end
+
                tButton.waitFor = "CO"
+               SendChatMessage("co ?", "WHISPER", nil, tName)			   
                tButton.setEnable()
                return
             end
@@ -1874,6 +1885,9 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			if(BridgeBootOwnsState() and MultiBot.Comm and MultiBot.Comm.RequestState) then
 				tButton.waitFor = "BRIDGE_STATE"
 				MultiBot.Comm.RequestState(arg2)
+				if(MultiBot.Comm.RequestBotDetail) then
+					MultiBot.Comm.RequestBotDetail(arg2)
+				end
 				return
 			end
 
@@ -2023,14 +2037,42 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 
 		if(MultiBot.inventory:IsVisible()) then
 			if(MultiBot.isInside(arg1, "装备", "卸下", "使用", "吃", "喝", "盛宴", "摧毁")) then
+				if(MultiBot.RequestInventoryPostActionRefresh and MultiBot.RequestInventoryPostActionRefresh(tButton.name, 0.45, 1.20)) then
+					return
+				end
+
+				if(MultiBot.RequestInventoryRefresh and MultiBot.RequestInventoryRefresh(tButton.name, 0.45)) then
+					return
+				end
+
 				tButton.waitFor = "INVENTORY"
-				SendChatMessage("items", "WHISPER", nil, tButton.name)
+				if(MultiBot.TimerAfter) then
+					MultiBot.TimerAfter(0.45, function()
+						SendChatMessage("items", "WHISPER", nil, tButton.name)
+					end)
+				else
+					SendChatMessage("items", "WHISPER", nil, tButton.name)
+				end
 				return
 			end
 
 			if(MultiBot.isInside(string.lower(arg1), "equipping", "unequipping", "using", "eating", "drinking", "feasting", "destroyed", "removed", "taking off")) then
+				if(MultiBot.RequestInventoryPostActionRefresh and MultiBot.RequestInventoryPostActionRefresh(tButton.name, 0.45, 1.20)) then
+					return
+				end
+
+				if(MultiBot.RequestInventoryRefresh and MultiBot.RequestInventoryRefresh(tButton.name, 0.45)) then
+					return
+				end
+
 				tButton.waitFor = "INVENTORY"
-				SendChatMessage("items", "WHISPER", nil, tButton.name)
+				if(MultiBot.TimerAfter) then
+					MultiBot.TimerAfter(0.45, function()
+						SendChatMessage("items", "WHISPER", nil, tButton.name)
+					end)
+				else
+					SendChatMessage("items", "WHISPER", nil, tButton.name)
+				end
 				return
 			end
 
@@ -2068,6 +2110,11 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			end
 
 			if(tButton ~= nil and tButton.waitFor == "LOOT" and tButton ~= nil) then
+				if(MultiBot.RequestInventoryPostActionRefresh and MultiBot.RequestInventoryPostActionRefresh(tButton.name, 0.25, 0.85)) then
+					tButton.waitFor = ""
+					return
+				end
+
 				tButton.waitFor = "INVENTORY"
 				SendChatMessage("items", "WHISPER", nil, tButton.name)
 				return
@@ -2078,8 +2125,25 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 	end
 
 	if(event == "TRADE_CLOSED") then
-		if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
-			MultiBot.RefreshInventory()
+		local inventory = MultiBot.inventory
+		local botName = inventory and inventory.name or ""
+
+		if inventory and inventory:IsVisible() and botName ~= "" then
+			local bridgeConnected = MultiBot.bridge and MultiBot.bridge.connected
+
+			if MultiBot.RequestInventoryPostActionRefresh
+				and MultiBot.RequestInventoryPostActionRefresh(botName, 0.45, 1.20, { noChatFallbackWhenBridgeConnected = true }) then
+				return
+			end
+
+			if bridgeConnected then
+				return
+			end
+
+			if MultiBot.RefreshInventory then
+				MultiBot.RefreshInventory(0.45)
+				return
+			end
 			return
 		end
 

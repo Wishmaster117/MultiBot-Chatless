@@ -93,6 +93,7 @@ local function buildInventoryItemRecord(itemInfo)
         classID = itemClassID,
         type = itemType,
         count = extractInventoryItemCount(parts),
+        _serverCount = extractInventoryItemCount(parts) or 1,
         info = itemInfo,
         parts = parts,
     }
@@ -103,9 +104,201 @@ local function getInventoryItemActionState()
     return inventory.action or "", inventory.name or ""
 end
 
-local function requestInventoryRefresh(delay)
+local function getNow()
+    if GetTime then
+        return GetTime()
+    end
+
+    return time and time() or 0
+end
+
+local function getInventoryPendingConsumeStore(botName, create)
+    if not botName or botName == "" then
+        return nil
+    end
+
+    local inventory = MultiBot.inventory
+    if not inventory then
+        if not create then
+            return nil
+        end
+
+        MultiBot.inventory = {}
+        inventory = MultiBot.inventory
+    end
+
+    if create and type(inventory.pendingConsumes) ~= "table" then
+        inventory.pendingConsumes = {}
+    end
+
+    local root = inventory.pendingConsumes
+    if type(root) ~= "table" then
+        return nil
+    end
+
+    local botKey = string.lower(botName)
+    if create and type(root[botKey]) ~= "table" then
+        root[botKey] = {}
+    end
+
+    return root[botKey]
+end
+
+local function getInventoryConsumeKey(item)
+    if not item then
+        return nil
+    end
+
+    local key = item.id or item.name or item.link
+    if key == nil or key == "" then
+        return nil
+    end
+
+    return tostring(key)
+end
+
+local function getInventoryItemDisplayCount(item)
+    local count = tonumber(item and item.count or 1) or 1
+    if count < 1 then
+        return 1
+    end
+
+    return count
+end
+
+local function registerInventoryPendingConsume(botName, item, amount)
+    local key = getInventoryConsumeKey(item)
+    local store = getInventoryPendingConsumeStore(botName, true)
+    if not key or not store then
+        return false
+    end
+
+    amount = tonumber(amount or 1) or 1
+    if amount < 1 then
+        amount = 1
+    end
+
+    local baseline = tonumber(item and item._serverCount or item and item.count or 1) or 1
+    if baseline < 1 then
+        baseline = 1
+    end
+
+    local pending = store[key]
+    if type(pending) ~= "table" then
+        pending = { amount = 0, baseline = baseline }
+        store[key] = pending
+    end
+
+    pending.amount = (tonumber(pending.amount or 0) or 0) + amount
+    pending.baseline = math.max(tonumber(pending.baseline or 0) or 0, baseline)
+    pending.expiresAt = getNow() + 60
+    return true
+end
+
+local function applyInventoryPendingConsume(botName, item)
+    local key = getInventoryConsumeKey(item)
+    local store = getInventoryPendingConsumeStore(botName, false)
+    if not key or not store or type(store[key]) ~= "table" then
+        return item
+    end
+
+    local pending = store[key]
+    local pendingAmount = tonumber(pending.amount or 0) or 0
+    if pendingAmount <= 0 or (pending.expiresAt and getNow() > pending.expiresAt) then
+        store[key] = nil
+        return item
+    end
+
+    local serverCount = getInventoryItemDisplayCount(item)
+    item._serverCount = serverCount
+
+    local expectedServerCount = math.max(0, (tonumber(pending.baseline or serverCount) or serverCount) - pendingAmount)
+    if serverCount <= expectedServerCount then
+        store[key] = nil
+        return item
+    end
+
+    local displayCount = serverCount - pendingAmount
+    if displayCount <= 0 then
+        item._pendingConsumed = true
+        return nil
+    end
+
+    item.count = displayCount > 1 and displayCount or nil
+    item._pendingConsumeAmount = pendingAmount
+    return item
+end
+
+local function optimisticallyConsumeInventoryButton(button)
+    if not button or not button.item then
+        return
+    end
+
+    local count = getInventoryItemDisplayCount(button.item)
+    if count <= 1 then
+        if button.Hide then
+            button:Hide()
+        end
+        return
+    end
+
+    count = count - 1
+    button.item.count = count > 1 and count or nil
+
+    if button.setAmount then
+        if count > 1 then
+            button.setAmount(count)
+        elseif button.amount and button.amount.Hide then
+            button.amount:Hide()
+        end
+    end
+end
+
+local function requestInventoryRefresh(delay, botName)
+    local targetBotName = botName or (MultiBot.inventory and MultiBot.inventory.name) or ""
+
+    if targetBotName ~= "" and MultiBot.RequestInventoryRefresh and MultiBot.RequestInventoryRefresh(targetBotName, delay) then
+        return
+    end
+
     if MultiBot.RefreshInventory then
         MultiBot.RefreshInventory(delay)
+    end
+end
+
+local function requestInventoryPostActionRefresh(botName, firstDelay, secondDelay)
+    local targetBotName = botName or (MultiBot.inventory and MultiBot.inventory.name) or ""
+
+    if targetBotName ~= "" and MultiBot.RequestInventoryPostActionRefresh
+        and MultiBot.RequestInventoryPostActionRefresh(targetBotName, firstDelay or 0.45, secondDelay or 1.20) then
+        return
+    end
+
+    requestInventoryRefresh(firstDelay or 0.45, targetBotName)
+end
+
+local function optimisticallyConsumeInventoryButton(button)
+    if not button or not button.item then
+        return
+    end
+
+    local count = tonumber(button.item.count or 1) or 1
+    if count <= 1 then
+        if button.Hide then
+            button:Hide()
+        end
+        return
+    end
+
+    count = count - 1
+    button.item.count = count
+
+    if button.setAmount then
+        if count > 1 then
+            button.setAmount(count)
+        elseif button.amount and button.amount.Hide then
+            button.amount:Hide()
+        end
     end
 end
 
@@ -186,14 +379,20 @@ local function sendInventoryItemCommand(command, button, botName, options)
         button:Hide()
     end
 
-    if options.refreshDelay ~= nil then
-        requestInventoryRefresh(options.refreshDelay)
-    elseif options.refresh then
-        requestInventoryRefresh()
+    if options.optimisticConsume then
+        optimisticallyConsumeInventoryButton(button)
     end
 
-    if options.followupRefreshDelay ~= nil then
-        requestInventoryRefresh(options.followupRefreshDelay)
+    if options.postActionRefresh then
+        requestInventoryPostActionRefresh(botName, options.refreshDelay, options.followupRefreshDelay)
+    elseif options.refreshDelay ~= nil then
+        requestInventoryRefresh(options.refreshDelay, botName)
+    elseif options.refresh then
+        requestInventoryRefresh(nil, botName)
+    end
+
+    if options.followupRefreshDelay ~= nil and not options.postActionRefresh then
+        requestInventoryRefresh(options.followupRefreshDelay, botName)
     end
 
     return true
@@ -242,9 +441,13 @@ local function handleInventoryItemClick(button)
     end
 
     if action == "u" then
+        registerInventoryPendingConsume(botName, item, 1)
+        optimisticallyConsumeInventoryButton(button)
         sendInventoryItemCommand(action, button, botName, {
-            refreshDelay = 0.12,
-            followupRefreshDelay = 0.45,
+            optimisticConsume = true,
+            postActionRefresh = true,
+            refreshDelay = 0.45,
+            followupRefreshDelay = 1.20,
         })
         return
     end
@@ -269,6 +472,12 @@ MultiBot.InventoryAddItem = function(frame, itemInfo)
     end
 
     local item = buildInventoryItemRecord(itemInfo)
+    if not item then
+        return nil
+    end
+
+    local botName = frame and frame.getName and frame:getName() or (MultiBot.inventory and MultiBot.inventory.name) or ""
+    item = applyInventoryPendingConsume(botName, item)
     if not item then
         return nil
     end

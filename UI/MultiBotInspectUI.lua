@@ -68,13 +68,33 @@ local function canUnequipInspectedBot(botName)
 end
 
 local function requestInventorySync(botName)
-    if MultiBot.RequestBotInventory then
-        MultiBot.RequestBotInventory(botName)
+    if not botName or botName == "" then
         return
     end
 
-    if MultiBot.RefreshInventory then
-        MultiBot.RefreshInventory(0.15)
+    if MultiBot.RequestInventoryPostActionRefresh and MultiBot.RequestInventoryPostActionRefresh(botName, 0.45, 1.20) then
+        return
+    end
+
+    if MultiBot.RequestInventoryRefresh and MultiBot.RequestInventoryRefresh(botName, 0.45) then
+        return
+    end
+
+    local function fallbackRefresh()
+        if MultiBot.RequestBotInventory then
+            MultiBot.RequestBotInventory(botName)
+            return
+        end
+
+        if MultiBot.RefreshInventory then
+            MultiBot.RefreshInventory(nil, botName)
+        end
+    end
+
+    if MultiBot.TimerAfter then
+        MultiBot.TimerAfter(0.45, fallbackRefresh)
+    else
+        fallbackRefresh()
     end
 end
 

@@ -41,6 +41,158 @@ local ACTION_MODE_CONFIG = {
     Destroy = { value = "destroy", cancelTradeOnActivate = true },
 }
 
+local TRADE_INVENTORY_DUMP_FILTER_TTL = 8
+
+local function inventoryFrameNow()
+    if GetTime then
+        return GetTime()
+    end
+
+    return time and time() or 0
+end
+
+local function normalizeInventoryAuthorName(author)
+    if type(author) ~= "string" then
+        return ""
+    end
+
+    local name = author
+    if Ambiguate then
+        name = Ambiguate(author, "none") or author
+    end
+
+    name = string.match(name, "^[^-]+") or name
+    return string.lower(name or "")
+end
+
+local function isTradeInventoryDumpStart(message)
+    if type(message) ~= "string" then
+        return false
+    end
+
+    return string.find(message, "Inventory", 1, true) ~= nil
+        or string.find(message, "背包", 1, true) ~= nil
+end
+
+local function isTradeInventoryDumpEnd(message)
+    if type(message) ~= "string" then
+        return false
+    end
+
+    return string.find(message, "Off with you", 1, true) ~= nil
+        or string.find(message, "再见", 1, true) ~= nil
+end
+
+local function isTradeInventoryDumpBodyLine(message)
+    if type(message) ~= "string" then
+        return false
+    end
+
+    if string.find(message, "|Hitem:", 1, true) then
+        return true
+    end
+
+    if string.find(message, "^%s*%-%-%-") then
+        return true
+    end
+
+    if string.find(message, "%[.-%]") and (string.find(message, "x%d+") or string.find(message, "soulbound", 1, true)) then
+        return true
+    end
+
+    return false
+end
+
+local function shouldSuppressTradeInventoryWhisper(message, author)
+    local inventory = MultiBot and MultiBot.inventory or nil
+    local state = inventory and inventory.tradeInventoryDumpFilter or nil
+    if type(state) ~= "table" then
+        return false
+    end
+
+    local now = inventoryFrameNow()
+    if state.expiresAt and now > state.expiresAt then
+        inventory.tradeInventoryDumpFilter = nil
+        return false
+    end
+
+    if normalizeInventoryAuthorName(author) ~= state.botKey then
+        return false
+    end
+
+    if isTradeInventoryDumpStart(message) then
+        state.active = true
+        return true
+    end
+
+    if not state.active then
+        return false
+    end
+
+    if isTradeInventoryDumpEnd(message) then
+        inventory.tradeInventoryDumpFilter = nil
+        return true
+    end
+
+    if isTradeInventoryDumpBodyLine(message) then
+        return true
+    end
+
+    return false
+end
+
+local function ensureTradeInventoryDumpFilter()
+    if MultiBot._inventoryTradeDumpFilterInstalled then
+        return true
+    end
+
+    if type(ChatFrame_AddMessageEventFilter) ~= "function" then
+        return false
+    end
+
+    MultiBot._inventoryTradeDumpFilterInstalled = true
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", function(_, _, message, author, ...)
+        if shouldSuppressTradeInventoryWhisper(message, author) then
+            return true
+        end
+
+        return false
+    end)
+
+    return true
+end
+
+local function suppressNextTradeInventoryDump(botName)
+    if not botName or botName == "" then
+        return
+    end
+
+    if not (MultiBot.bridge and MultiBot.bridge.connected) then
+        return
+    end
+
+    if not ensureTradeInventoryDumpFilter() then
+        return
+    end
+
+    local inventory = MultiBot.inventory
+    if not inventory then
+        return
+    end
+
+    inventory.tradeInventoryDumpFilter = {
+        botKey = normalizeInventoryAuthorName(botName),
+        expiresAt = inventoryFrameNow() + TRADE_INVENTORY_DUMP_FILTER_TTL,
+        active = false,
+    }
+end
+
+local function clearTradeInventoryDumpFilter()
+    if MultiBot.inventory then
+        MultiBot.inventory.tradeInventoryDumpFilter = nil
+    end
+end
+
 local function getInventoryAceGUI()
     if MultiBot.GetAceGUI then
         local ace = MultiBot.GetAceGUI()
@@ -657,10 +809,7 @@ local function resetInventoryViewState()
 end
 
 local function requestInventoryForBot(botName)
-    local bridge = MultiBot and MultiBot.bridge or nil
-    local comm = MultiBot and MultiBot.Comm or nil
-
-    if botName and botName ~= "" and bridge and bridge.connected and comm and comm.RequestInventory and comm.RequestInventory(botName) then
+    if botName and botName ~= "" and MultiBot.RequestInventoryRefresh and MultiBot.RequestInventoryRefresh(botName) then
         return true
     end
 
@@ -810,6 +959,10 @@ local function toggleInventoryAction(buttonKey, button)
     end
 
     if button.state then
+        if state.value == ACTION_MODE_CONFIG.Trade.value then
+            clearTradeInventoryDumpFilter()
+        end
+
         setInventoryActionState(nil, {
             cancelTrade = state.value == ACTION_MODE_CONFIG.Trade.value,
         })
@@ -817,7 +970,10 @@ local function toggleInventoryAction(buttonKey, button)
     end
 
     if buttonKey == "Trade" then
+        suppressNextTradeInventoryDump(button.getName())
         InitiateTrade(button.getName())
+    else
+        clearTradeInventoryDumpFilter()
     end
 
     setInventoryActionState(buttonKey, {
