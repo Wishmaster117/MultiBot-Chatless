@@ -193,6 +193,7 @@ function MultiBot.InitializeTalentFrameModule()
     MultiBot.TalentHostContentLayout = MultiBot.TalentHostContentLayout or DEFAULT_TALENT_HOST_CONTENT_LAYOUT
 
     MultiBot.talent.tabTextures = MultiBot.talent.tabTextures or {}
+    MultiBot.talent.__talentsTabSnapshots = MultiBot.talent.__talentsTabSnapshots or {}
     MultiBot.TalentFrameKeys = MultiBot.TalentFrameKeys or {
         TALENT_TREE_1 = "TALENT_TREE_1",
         TALENT_TREE_2 = "TALENT_TREE_2",
@@ -1539,11 +1540,98 @@ function MultiBot.InitializeTalentFrameModule()
         })
     end
 
+    function MultiBot.talent.getTalentsTabSnapshotKey(name)
+        name = name or MultiBot.talent.name
+        if name and name ~= "" then
+            return tostring(name)
+        end
+
+        return tostring(MultiBot.talent.class or "default")
+    end
+
+    function MultiBot.talent.getTalentsTabSnapshot(name)
+        local snapshots = MultiBot.talent.__talentsTabSnapshots
+        if type(snapshots) ~= "table" then
+            return nil
+        end
+
+        return snapshots[MultiBot.talent.getTalentsTabSnapshotKey(name)]
+    end
+
+    function MultiBot.talent.storeTalentsTabSnapshot(snapshot)
+        if type(snapshot) ~= "table" then
+            return
+        end
+
+        snapshot.name = snapshot.name or MultiBot.talent.name
+        snapshot.classKey = snapshot.classKey or MultiBot.talent.class
+        snapshot.titleText = snapshot.titleText or MultiBot.talent.getTalentTitleText()
+        snapshot.points = tonumber(snapshot.points or MultiBot.talent.points or 0) or 0
+        snapshot.totalRanks = tonumber(snapshot.totalRanks or 0) or 0
+
+        local key = MultiBot.talent.getTalentsTabSnapshotKey(snapshot.name)
+        local snapshots = MultiBot.talent.__talentsTabSnapshots
+        local previous = snapshots and snapshots[key]
+
+        if previous and (tonumber(previous.totalRanks or 0) or 0) > 0 and snapshot.totalRanks <= 0 then
+            return
+        end
+
+        MultiBot.talent.__talentsTabSnapshots[key] = snapshot
+    end
+
+    function MultiBot.talent.buildSnapshotTalentsResolver(snapshot)
+        return function(treeIndex, talentIndex)
+            local tree = snapshot and snapshot.talents and snapshot.talents[treeIndex]
+            local entry = tree and tree[talentIndex]
+            if type(entry) ~= "table" then
+                return nil
+            end
+
+            return {
+                name = entry.name,
+                talentId = entry.talentId,
+                rank = tonumber(entry.rank or 0) or 0,
+            }
+        end
+    end
+
+    function MultiBot.talent.restoreTalentsTabSnapshot()
+        local snapshot = MultiBot.talent.getTalentsTabSnapshot(MultiBot.talent.name)
+        if type(snapshot) ~= "table" or not snapshot.classKey then
+            return false
+        end
+
+        MultiBot.talent.class = snapshot.classKey
+
+        return MultiBot.talent.renderTalentBuild(MultiBot.talent.createTalentBuildOptions({
+            clearBeforeBuild = true,
+            requiresTalentApi = false,
+            updateBottomTabs = true,
+            retryAfter = 0.05,
+            retryAction = MultiBot.talent.setTalents,
+            titleText = snapshot.titleText or MultiBot.talent.getTalentTitleText(),
+            getPoints = function()
+                return tonumber(snapshot.points or 0) or 0
+            end,
+            resolveTalent = MultiBot.talent.buildSnapshotTalentsResolver(snapshot),
+            onSuccess = function()
+                MultiBot.talent.__talentsTabApplyMode = MultiBot.talent.hasUnspentTalentPoints() and "apply" or "copy"
+                MultiBot.talent.activateTalentsTabContext()
+            end,
+        }))
+    end
+
     function MultiBot.talent.openTalentsTab()
-	if MultiBot.talent and MultiBot.talent.__activeTab == MultiBot.TalentTabStates.CUSTOM_TALENTS then
-		MultiBot.talent.setTalents()
-		return
-	end
+        local activeTab = MultiBot.talent and MultiBot.talent.__activeTab
+        if activeTab and activeTab ~= MultiBot.TalentTabStates.TALENTS then
+            if MultiBot.talent.restoreTalentsTabSnapshot() then
+                return
+            end
+
+            MultiBot.talent.setTalents()
+            return
+        end
 
         MultiBot.talent.activateTalentsTabContext()
     end
@@ -2020,13 +2108,26 @@ function MultiBot.InitializeTalentFrameModule()
         return MultiBot.talent.finalizeTalentBuild(options)
     end
 
-    function MultiBot.talent.buildActiveTalentsResolver(activeGroup)
+    function MultiBot.talent.buildActiveTalentsResolver(activeGroup, snapshot)
         return function(treeIndex, talentIndex)
             local link = GetTalentLink(treeIndex, talentIndex, true, nil, activeGroup)
             local talentId = MultiBot.talent.extractTalentIdFromLink(link)
             local talentName, _, _, _, rank = GetTalentInfo(treeIndex, talentIndex, true, nil, activeGroup)
             if not talentName then
                 return nil
+            end
+
+            rank = tonumber(rank or 0) or 0
+
+            if type(snapshot) == "table" then
+                snapshot.talents = snapshot.talents or {}
+                snapshot.talents[treeIndex] = snapshot.talents[treeIndex] or {}
+                snapshot.talents[treeIndex][talentIndex] = {
+                    name = talentName,
+                    talentId = talentId,
+                    rank = rank,
+                }
+                snapshot.totalRanks = (tonumber(snapshot.totalRanks or 0) or 0) + rank
             end
 
             return {
@@ -2080,16 +2181,28 @@ function MultiBot.InitializeTalentFrameModule()
 
     function MultiBot.talent.getTalentsBuildOptions()
         local activeGroup = GetActiveTalentGroup(true) or 1
+        local snapshot = {
+            name = MultiBot.talent.name,
+            classKey = MultiBot.talent.class,
+            titleText = MultiBot.talent.getTalentTitleText(),
+            points = 0,
+            talents = {},
+            totalRanks = 0,
+        }
 
         return MultiBot.talent.createTalentBuildOptions({
             retryAfter = 0.1,
             retryAction = MultiBot.talent.setTalents,
-            titleText = MultiBot.talent.getTalentTitleText(),
+            titleText = snapshot.titleText,
             getPoints = function()
                 return tonumber(GetUnspentTalentPoints(true))
             end,
-            resolveTalent = MultiBot.talent.buildActiveTalentsResolver(activeGroup),
+            resolveTalent = MultiBot.talent.buildActiveTalentsResolver(activeGroup, snapshot),
             onSuccess = function()
+                snapshot.name = MultiBot.talent.name
+                snapshot.classKey = MultiBot.talent.class
+                snapshot.points = MultiBot.talent.points
+                MultiBot.talent.storeTalentsTabSnapshot(snapshot)
                 MultiBot.talent.__talentsTabApplyMode = MultiBot.talent.hasUnspentTalentPoints() and "apply" or "copy"
                 MultiBot.talent.activateTalentsTabContext()
 			MultiBot.auto.talent = false
