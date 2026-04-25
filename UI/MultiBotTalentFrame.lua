@@ -1118,7 +1118,7 @@ function MultiBot.InitializeTalentFrameModule()
 
     function MultiBot.talent.getGlyphSocketClassColor(botName)
         local unit = MultiBot.toUnit and MultiBot.toUnit(botName or MultiBot.talent.name)
-        local _, classFile = unit and UnitClass(unit)
+        local classFile = unit and select(2, UnitClass(unit))
         local color = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
 
         if color then
@@ -1239,17 +1239,21 @@ function MultiBot.InitializeTalentFrameModule()
                     runeTex:SetTexture(MultiBot.SafeTexturePath("Interface\\Spellbook\\UI-Glyph-Rune-" .. runeIdx))
                 end
 
-                local itemName, _, _, _, _, _, _, _, _, itemTexture
+                local itemName, itemTexture
                 if itemId > 0 then
-                    itemName, _, _, _, _, _, _, _, _, itemTexture = GetItemInfo(itemId)
+                    local itemInfo = { GetItemInfo(itemId) }
+                    itemName = itemInfo[1]
+                    itemTexture = itemInfo[10]
                     if not itemTexture and type(GetItemIcon) == "function" then
                         itemTexture = GetItemIcon(itemId)
                     end
                 end
 
-                local spellName, _, spellTexture
+                local spellName, spellTexture
                 if spellId > 0 then
-                    spellName, _, spellTexture = GetSpellInfo(spellId)
+                    local spellInfo = { GetSpellInfo(spellId) }
+                    spellName = spellInfo[1]
+                    spellTexture = spellInfo[3]
                     if not spellTexture and type(GetSpellTexture) == "function" then
                         spellTexture = GetSpellTexture(spellId)
                     end
@@ -2042,7 +2046,9 @@ function MultiBot.InitializeTalentFrameModule()
 
             local firstRankSpellId = tonumber(talentData and talentData[5]) or 0
             if (not talentName or talentName == "") and firstRankSpellId > 0 then
-                talentName, _, icon = GetSpellInfo(firstRankSpellId)
+                local spellInfo = { GetSpellInfo(firstRankSpellId) }
+                talentName = spellInfo[1]
+                icon = spellInfo[3]
             end
 
             if not talentName or talentName == "" then
