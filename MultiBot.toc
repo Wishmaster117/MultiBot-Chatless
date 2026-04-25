@@ -1,5 +1,5 @@
 ## Interface: 30300
-## Version: 3.0.0
+## Version: 4.0
 ## Title: MultiBot
 ## Notes: User Interface for Playerbot
 ## Author: Nico Löbbert
@@ -8,7 +8,7 @@
 ## X-Maintainer: Wishmaster117 aka TheWarlock
 ## X-Contributors: Wishmaster117 aka TheWarlock
 ## X-Contact: plexalexdcnh@gmail.com
-## X-ProjectURL: https://www.azerothdevs.com
+## X-ProjectURL: https://github.com/Wishmaster117/MultiBot-Standalone
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua

@@ -1,6 +1,6 @@
 # MultiBot / Bridge — roadmap chatless
 
-Dernière mise à jour : 2026-04-24
+Dernière mise à jour : 2026-04-25
 
 ## Objectif exact
 
@@ -125,7 +125,6 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Validation ingame : les frames affichent les quêtes via bridge et ne dépendent plus du spam chat des listes de quêtes
 - [x] Fallback legacy conservé si la bridge est absente
 
-
 ### Talents / sélection de specs
 
 - [x] Endpoint côté bridge : `GET~TALENT_SPEC_LIST~<bot>~<token>`
@@ -137,6 +136,25 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Filtrage des lignes d’aide legacy inutiles renvoyées par `talents` (`warlock`, `Talents usage`, etc.)
 - [x] Correction affichage : la partie `(0/56/15)` de la spé courante est ré-affichée en blanc
 - [x] Fallback legacy `talents spec list` conservé si la bridge est absente
+
+### Glyphes / Custom Glyphs
+
+- [x] Endpoint côté bridge : `GET~GLYPHS~<bot>~<token>`
+- [x] Réponses en paquets courts : `GLYPHS_BEGIN`, `GLYPHS_ITEM`, `GLYPHS_END`
+- [x] Envoi par item de `slot`, `itemId`, `glyphId`, `spellId`, avec fallback serveur pour retrouver l’`itemId` quand il n’est pas directement disponible
+- [x] Correction serveur : résolution des items de glyphes via `item_template` et les effets de spell liés au `glyphId` / `spellId`
+- [x] Réception addon `Comm.RequestGlyphs(botName)`
+- [x] Hydratation de la frame `Glyphs` depuis la bridge
+- [x] Affichage des icônes réelles des glyphes dans les sockets
+- [x] Tooltips fonctionnels via lien item, avec fallback spell si nécessaire
+- [x] Couleur / glow des sockets adaptée à la classe du bot
+- [x] Nettoyage de `MultiBot.awaitGlyphs` quand la bridge répond pour éviter le message `[ERROR] Message nonglyphe ignoré`
+- [x] Fallback whisper `glyphs` conservé seulement si la bridge est absente ou ne répond pas
+- [x] Correction navigation : le bouton `Custom Talents` reconstruit les arbres vides sans dépendre obligatoirement de l’API d’inspection
+- [x] Correction `Custom Glyphs` : séparation entre `socketType` et `glyphType` pour ne plus écraser le type attendu du socket
+- [x] Correction `Custom Glyphs` : mapping ordre bridge/playerbots vers ordre visuel des sockets
+- [x] Correction `Custom Glyphs` : `glyph equip` renvoie les IDs dans l’ordre attendu par playerbots, pas dans l’ordre visuel
+- [x] Nettoyage : suppression du message debug local `[DBG] glyph equip ...` après validation
 
 ---
 
@@ -152,6 +170,7 @@ Avec beaucoup de bots, éviter les réponses globales trop grosses.
 - `GET~STATS` peut répondre avec plusieurs paquets `STATS~<bot>~...` ;
 - `GET~QUESTS` répond en paquets `QUESTS_BEGIN` / `QUESTS_ITEM` / `QUESTS_END` / `QUESTS_DONE` pour éviter le spam chat et les payloads trop longs ;
 - `GET~TALENT_SPEC_LIST` répond en paquets `TALENT_SPEC_BEGIN` / `TALENT_SPEC_ITEM` / `TALENT_SPEC_END` ;
+- `GET~GLYPHS` répond en paquets `GLYPHS_BEGIN` / `GLYPHS_ITEM` / `GLYPHS_END` ;
 - un paquet global vide peut seulement servir de réponse vide si aucun bot n’est disponible.
 
 ---
@@ -178,6 +197,10 @@ Les fenêtres de quêtes (`incompleted`, `completed`, `all`) sont migrées sur l
 
 La liste de choix des specs ne dépend plus de `talents spec list` en chat. Le whisper `talents` reste volontairement utilisé pour conserver la ligne utile `My current talent spec is: ...`, mais les lignes d’aide legacy sont filtrées côté addon.
 
+### Glyphes
+
+La lecture des glyphes n’est plus dépendante du whisper `glyphs` quand la bridge est connectée. Les icônes, tooltips, sockets et couleurs de classe sont alimentés par `GET~GLYPHS`. Les actions réelles de modification restent autorisées en commande volontaire, notamment `glyph equip ...`, conformément à la règle de migration.
+
 ---
 
 ## Ce qui reste partiellement legacy
@@ -192,16 +215,16 @@ Encore présent à conserver ou à traiter plus tard selon le cas :
 
 Conclusion : `Units` fonctionne en bridge-first pour roster/states/details, mais il reste des chemins legacy de compatibilité et de commande.
 
-### B) Talents actifs / glyphes
+### B) Talents actifs détaillés
 
-Encore partiellement legacy :
+Encore à évaluer :
 
-- `talents` reste volontairement utilisé pour afficher la spé courante, mais le spam associé est filtré ;
-- `talents spec list` n’est plus le chemin nominal pour la frame de choix des specs ;
-- `glyphs` reste à migrer ;
-- les fenêtres ou panneaux qui auraient besoin de talents actifs détaillés restent à inventorier avant migration.
+- `talents` reste volontairement utilisé pour afficher la spé courante ;
+- la sélection des specs est déjà migrée ;
+- les arbres `Custom Talents` peuvent s’afficher sans dépendre obligatoirement de l’inspection ;
+- il faut encore décider si l’UI a besoin d’un endpoint bridge pour les talents actifs détaillés, ou si l’état actuel suffit.
 
-À traiter maintenant : **glyphes en bridge-first**, car c’est le prochain flux read-only encore basé sur parsing de whisper.
+Conclusion : ne pas migrer par réflexe. À traiter seulement si une fenêtre UI dépend encore réellement d’un parsing chat ou d’un inspect instable.
 
 ### C) Outfits
 
@@ -210,7 +233,7 @@ Encore legacy :
 - `outfit ?`
 - parsing de réponse chat.
 
-À migrer plus tard.
+À migrer maintenant en priorité logique.
 
 ---
 
@@ -238,8 +261,11 @@ Encore legacy :
 | Stats simples bridge | Fait |
 | Quêtes bridge | Fait |
 | Sélection specs bridge | Fait |
+| Glyphes bridge | Fait |
+| Glyphes icônes / tooltips | Fait |
+| Custom Talents navigation | Corrigé |
+| Custom Glyphs mapping sockets | Corrigé |
 | Talents actifs détaillés bridge | À évaluer / à faire si UI nécessaire |
-| Glyphes bridge | À faire |
 | Outfits bridge | À faire |
 | Nettoyage final parsers legacy | À faire |
 
@@ -247,24 +273,30 @@ Encore legacy :
 
 ## Prochain pas logique recommandé
 
-Le prochain pas logique est maintenant : **migrer les glyphes en bridge-first**.
+Le prochain pas logique est maintenant : **migrer les Outfits en bridge-first**.
 
 Pourquoi ce bloc en premier :
 
-1. c’est read-only, donc peu risqué ;
-2. il reste basé sur la commande legacy `glyphs` et son parsing de whisper ;
-3. il est séparé des vraies actions utilisateur comme `talents switch` / `talents spec <nom>` ;
-4. il peut suivre le même modèle que spellbook / quests / talent spec list avec `BEGIN` / `ITEM` / `END`.
+1. c’est le dernier gros flux UI encore listé comme clairement legacy ;
+2. il est normalement read-only pour l’affichage (`outfit ?`), donc moins risqué que les vraies actions d’équipement ;
+3. il suit le même modèle déjà validé pour inventory, spellbook, quests, specs et glyphes ;
+4. il permettra de réduire encore le parsing automatique du chat sans toucher aux commandes manuelles utiles.
 
 Plan recommandé :
 
-1. ajouter côté bridge `GET~GLYPHS~<bot>~<token>` ;
-2. envoyer `GLYPHS_BEGIN`, `GLYPHS_ITEM`, `GLYPHS_END` ;
-3. ajouter côté addon `Comm.RequestGlyphs(botName)` ;
-4. brancher la fenêtre existante ou le bouton qui lance actuellement `glyphs` ;
-5. conserver `glyphs` en fallback uniquement si la bridge est absente.
+1. inventorier précisément où l’addon lance actuellement `outfit ?` et où il parse la réponse ;
+2. ajouter côté bridge `GET~OUTFITS~<bot>~<token>` ;
+3. envoyer des paquets courts `OUTFITS_BEGIN`, `OUTFITS_ITEM`, `OUTFITS_END` ;
+4. ajouter côté addon `Comm.RequestOutfits(botName)` ;
+5. hydrater la fenêtre existante depuis un cache `MultiBot.bridge.outfits[botName]` ;
+6. conserver `outfit ?` comme fallback uniquement si la bridge est absente ;
+7. laisser les vraies actions utilisateur d’outfit en whisper volontaire tant qu’elles ne servent pas à remplir automatiquement l’UI.
 
-Après glyphes, on pourra décider si les **talents actifs détaillés** doivent vraiment être migrés, ou si la ligne volontaire `My current talent spec is: ...` suffit pour l’usage actuel.
+Après Outfits, il faudra faire un audit final des parsers `CHAT_MSG_WHISPER` / `CHAT_MSG_SYSTEM` pour séparer clairement :
+
+- les fallbacks legacy à conserver ;
+- les commandes manuelles volontaires à conserver ;
+- les anciens parsers automatiques devenus inutiles à supprimer ou neutraliser.
 
 ---
 

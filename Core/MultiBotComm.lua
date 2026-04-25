@@ -104,6 +104,9 @@ local function ensureBridgeState()
   state.inventoryActive = state.inventoryActive or nil
   state.spellbookSeq = state.spellbookSeq or 0
   state.spellbookActive = state.spellbookActive or nil
+  state.glyphs = state.glyphs or {}
+  state.glyphSeq = state.glyphSeq or 0
+  state.glyphActive = state.glyphActive or nil
   return state
 end
 
@@ -224,6 +227,34 @@ function Comm.RequestTalentSpecList(name)
 
   if not Comm.Send("GET", "TALENT_SPEC_LIST~" .. name .. "~" .. token) then
     state.talentSpecActive = nil
+    return false
+  end
+
+  return token
+end
+
+function Comm.RequestGlyphs(name)
+  local state = ensureBridgeState()
+  if not state.connected and not state.bootstrapPending then
+    return false
+  end
+
+  name = trim(name)
+  if name == "" then
+    return false
+  end
+
+  state.glyphSeq = (tonumber(state.glyphSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.glyphSeq)
+  state.glyphActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("GET", "GLYPHS~" .. name .. "~" .. token) then
+    state.glyphActive = nil
     return false
   end
 
@@ -814,6 +845,153 @@ function Comm.ApplyTalentSpecItemPayload(payload)
   return true
 end
 
+local function getActiveGlyphRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.glyphActive
+  if type(active) ~= "table" then
+    return nil
+  end
+
+  if trim(token) ~= trim(active.token or "") then
+    return nil
+  end
+
+  if string.lower(trim(botName)) ~= tostring(active.botNameKey or "") then
+    return nil
+  end
+
+  return active
+end
+
+local function applyBridgeGlyphs(botName, token)
+  local state = ensureBridgeState()
+  local key = string.lower(botName)
+  local glyphs = state.glyphs[key] or {}
+
+  table.sort(glyphs, function(a, b)
+    return (tonumber(a.index) or 0) < (tonumber(b.index) or 0)
+  end)
+
+  MultiBot.receivedGlyphs = MultiBot.receivedGlyphs or {}
+  MultiBot.receivedGlyphs[botName] = glyphs
+
+  if MultiBot.awaitGlyphs == botName then
+    MultiBot.awaitGlyphs = nil
+  end
+
+  if MultiBot.ApplyBridgeGlyphs then
+    MultiBot.ApplyBridgeGlyphs(botName, glyphs, token)
+  elseif MultiBot.talent and MultiBot.talent.OnBridgeGlyphs then
+    MultiBot.talent.OnBridgeGlyphs(botName, token, glyphs)
+  elseif MultiBot.talent and MultiBot.talent.name == botName and MultiBot.FillDefaultGlyphs then
+    MultiBot.FillDefaultGlyphs()
+  end
+end
+
+function Comm.ApplyGlyphsBeginPayload(payload)
+  local botName, token = splitOnce(payload or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  if botName == "" or not getActiveGlyphRequest(botName, token) then
+    return false
+  end
+
+  local state = ensureBridgeState()
+  state.glyphs[string.lower(botName)] = {}
+
+  debugPrint("ADDON:RX", "GLYPHS_BEGIN", botName)
+  return true
+end
+
+function Comm.ApplyGlyphsItemPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local index, rest3 = splitOnce(rest2 or "", "~")
+  local itemId, rest4 = splitOnce(rest3 or "", "~")
+  local glyphId, rest5 = splitOnce(rest4 or "", "~")
+  local spellId, glyphType = splitOnce(rest5 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  if botName == "" or not getActiveGlyphRequest(botName, token) then
+    return false
+  end
+
+  local entry = {
+    index = tonumber(index or "0") or 0,
+    id = tonumber(itemId or "0") or 0,
+    itemId = tonumber(itemId or "0") or 0,
+    glyphId = tonumber(glyphId or "0") or 0,
+    spellId = tonumber(spellId or "0") or 0,
+    type = trim(urlDecodeField(glyphType or "")),
+  }
+
+  local state = ensureBridgeState()
+  local key = string.lower(botName)
+  state.glyphs[key] = state.glyphs[key] or {}
+  table.insert(state.glyphs[key], entry)
+
+  debugPrint("ADDON:RX", "GLYPHS_ITEM", botName, entry.index, entry.itemId, entry.glyphId, entry.spellId, entry.type)
+  return true
+end
+
+function Comm.ApplyGlyphsPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, entries = splitOnce(rest or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  if botName == "" then
+    return false
+  end
+
+  local state = ensureBridgeState()
+  local key = string.lower(botName)
+  state.glyphs[key] = {}
+
+  local fields = { strsplit("~", entries or "") }
+  for i = 1, #fields do
+    local raw = fields[i]
+    if raw and raw ~= "" then
+      local itemId, r1 = splitOnce(raw, ":")
+      local glyphId, r2 = splitOnce(r1 or "", ":")
+      local spellId, glyphType = splitOnce(r2 or "", ":")
+      table.insert(state.glyphs[key], {
+        index = #state.glyphs[key] + 1,
+        id = tonumber(itemId or "0") or 0,
+        itemId = tonumber(itemId or "0") or 0,
+        glyphId = tonumber(glyphId or "0") or 0,
+        spellId = tonumber(spellId or "0") or 0,
+        type = trim(urlDecodeField(glyphType or "")),
+      })
+    end
+  end
+
+  applyBridgeGlyphs(botName, token)
+  debugPrint("ADDON:RX", "GLYPHS", botName, #state.glyphs[key])
+  return true
+end
+
+function Comm.ApplyGlyphsEndPayload(payload)
+  local botName, token = splitOnce(payload or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  if botName == "" or not getActiveGlyphRequest(botName, token) then
+    return false
+  end
+
+  applyBridgeGlyphs(botName, token)
+
+  local state = ensureBridgeState()
+  state.glyphActive = nil
+
+  debugPrint("ADDON:RX", "GLYPHS_END", botName)
+  return true
+end
+
 function Comm.ApplyTalentSpecEndPayload(payload)
   local botName, token = splitOnce(payload or "", "~")
   botName = trim(urlDecodeField(botName))
@@ -998,6 +1176,34 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     Comm.ApplyTalentSpecEndPayload(payload)
+    return true
+  end
+
+  if opcode == "GLYPHS_BEGIN" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyGlyphsBeginPayload(payload)
+    return true
+  end
+
+  if opcode == "GLYPHS_ITEM" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyGlyphsItemPayload(payload)
+    return true
+  end
+
+  if opcode == "GLYPHS" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyGlyphsPayload(payload)
+    return true
+  end
+
+  if opcode == "GLYPHS_END" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyGlyphsEndPayload(payload)
     return true
   end
 

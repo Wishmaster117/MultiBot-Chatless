@@ -603,6 +603,17 @@ function MultiBot.InitializeTalentFrameModule()
         return glyphFrame and glyphFrame.frames and glyphFrame.frames["Socket" .. socketIndex]
     end
 
+    -- Playerbots/legacy glyph wire order is not the same as this frame's visual order.
+    -- Wire/apply order:
+    -- 1 = top major, 2 = bottom-center minor, 3 = right-middle minor,
+    -- 4 = bottom-left major, 5 = left-middle minor, 6 = bottom-right major.
+    local GLYPH_WIRE_TO_VISUAL_SOCKET = { 1, 2, 5, 6, 4, 3 }
+
+    function MultiBot.talent.mapGlyphWireSlotToVisualSocket(slotIndex)
+        slotIndex = tonumber(slotIndex) or 0
+        return GLYPH_WIRE_TO_VISUAL_SOCKET[slotIndex] or slotIndex
+    end
+
     function MultiBot.talent.forEachTalentTree(callback)
         if type(callback) ~= "function" then
             return
@@ -1080,15 +1091,63 @@ function MultiBot.InitializeTalentFrameModule()
     -- Minimum level for each socket (in order 1→6) is centralized in TalentTabLimits.SOCKET_REQUIREMENTS.
 
     function MultiBot.talent.showGlyphTooltip(self)
-        local id = self.glyphID
-        if not id then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if not self then return end
 
-        if GameTooltip:SetSpellByID(id) then
+        local itemId = tonumber(self.itemID or self.item or 0) or 0
+        local spellId = tonumber(self.spellID or 0) or 0
+
+        if itemId == 0 and spellId == 0 then
             return
         end
 
-        GameTooltip:SetHyperlink("item:"..id..":0:0:0:0:0:0:0")
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+
+        if itemId > 0 then
+            GameTooltip:SetHyperlink("item:" .. itemId .. ":0:0:0:0:0:0:0")
+        elseif spellId > 0 then
+            if GameTooltip.SetSpellByID then
+                GameTooltip:SetSpellByID(spellId)
+            else
+                GameTooltip:SetHyperlink("spell:" .. spellId)
+            end
+        end
+
+        GameTooltip:Show()
+    end
+
+    function MultiBot.talent.getGlyphSocketClassColor(botName)
+        local unit = MultiBot.toUnit and MultiBot.toUnit(botName or MultiBot.talent.name)
+        local _, classFile = unit and UnitClass(unit)
+        local color = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
+
+        if color then
+            return color.r or 1, color.g or 1, color.b or 1
+        end
+
+        return 1, 1, 1
+    end
+
+    function MultiBot.talent.applyGlyphSocketClassColor(socketFrame, botName)
+        if not (socketFrame and socketFrame.frames) then
+            return
+        end
+
+        local r, g, b = MultiBot.talent.getGlyphSocketClassColor(botName)
+        local frames = socketFrame.frames
+        local glowTexture = frames.Glow and (frames.Glow.texture or frames.Glow)
+        local runeTexture = frames.Rune and (frames.Rune.texture or frames.Rune)
+        local overlayTexture = frames.Overlay and frames.Overlay.texture
+
+        if glowTexture and glowTexture.SetVertexColor then
+            glowTexture:SetVertexColor(r, g, b, 1)
+        end
+        if runeTexture and runeTexture.SetVertexColor then
+            runeTexture:SetVertexColor(r, g, b, 1)
+        end
+        if overlayTexture and overlayTexture.SetVertexColor then
+            overlayTexture:SetVertexColor(r, g, b, 1)
+        end
     end
 
     function MultiBot.talent.hideGlyphTooltip()
@@ -1129,24 +1188,74 @@ function MultiBot.InitializeTalentFrameModule()
         local glyphDB = MultiBot.data.talent.glyphs[classKey] or {}
 
         for i, entry in ipairs(rec) do
-            local id, typ = entry.id, entry.type
-            local f = MultiBot.talent.getGlyphSocket(i)
+            local wireSlotIndex = tonumber(entry and (entry.index or entry.slot) or i) or i
+            local socketIndex = MultiBot.talent.mapGlyphWireSlotToVisualSocket(wireSlotIndex)
+            local f = MultiBot.talent.getGlyphSocket(socketIndex)
             if f and f.frames then
-                f.type, f.item = typ, id
-                f.frames.Glow:Show()
 
-                local raw = glyphDB[typ] and glyphDB[typ][id] or ""
-                local _, runeIdx = strsplit(",%s*", raw)
+                local itemId = tonumber(entry.itemId or entry.id or 0) or 0
+                local glyphId = tonumber(entry.glyphId or 0) or 0
+                local spellId = tonumber(entry.spellId or 0) or 0
+                local displayId = itemId
+                if displayId == 0 then
+                    displayId = spellId
+                end
+
+                local typ = entry.type
+                if not typ or typ == "" then
+                    if itemId > 0 and glyphDB.Major and glyphDB.Major[itemId] then
+                        typ = "Major"
+                    elseif itemId > 0 and glyphDB.Minor and glyphDB.Minor[itemId] then
+                        typ = "Minor"
+                    else
+                        typ = f.socketType or f.type
+                    end
+                end
+
+                f.glyphType = typ
+                f.item = itemId
+                f.itemID = itemId
+                f.glyphID = glyphId
+                f.spellID = spellId
+
+                local gFrame = f.frames.Glow
+                if gFrame then
+                    local glowTex = gFrame.texture or gFrame
+                    if glowTex and glowTex.SetTexture then
+                        glowTex:SetTexture(MultiBot.SafeTexturePath(
+                            (typ == "Major") and "Interface\\Spellbook\\UI-Glyph-Slot-Major.blp"
+                                             or "Interface\\Spellbook\\UI-Glyph-Slot-Minor.blp"))
+                    end
+                    gFrame:Show()
+                end
+
+                local raw = glyphDB[typ] and (glyphDB[typ][itemId] or glyphDB[typ][displayId]) or ""
+                local _, runeIdx = string.match(raw, "^(.-),%s*(%d+)$")
                 runeIdx = runeIdx or "1"
                 local rFrame = f.frames.Rune
                 if rFrame then
                     rFrame:Hide()
                     local runeTex = rFrame.texture or rFrame
-                    runeTex:SetTexture(MultiBot.SafeTexturePath("Interface\\Spellbook\\UI-Glyph-Rune"..runeIdx))
+                    runeTex:SetTexture(MultiBot.SafeTexturePath("Interface\\Spellbook\\UI-Glyph-Rune-" .. runeIdx))
                 end
 
-                local tex = GetSpellTexture(id)
-                         or select(10, GetItemInfo(id))
+                local itemName, _, _, _, _, _, _, _, _, itemTexture
+                if itemId > 0 then
+                    itemName, _, _, _, _, _, _, _, _, itemTexture = GetItemInfo(itemId)
+                    if not itemTexture and type(GetItemIcon) == "function" then
+                        itemTexture = GetItemIcon(itemId)
+                    end
+                end
+
+                local spellName, _, spellTexture
+                if spellId > 0 then
+                    spellName, _, spellTexture = GetSpellInfo(spellId)
+                    if not spellTexture and type(GetSpellTexture) == "function" then
+                        spellTexture = GetSpellTexture(spellId)
+                    end
+                end
+
+                local tex = itemTexture or spellTexture
                 local isFallback = tex == nil
                 tex = tex or "Interface\\AddOns\\MultiBot\\Textures\\UI-GlyphFrame-Glow.blp"
                 local btn = f.frames.IconBtn
@@ -1157,9 +1266,18 @@ function MultiBot.InitializeTalentFrameModule()
                     MultiBot.talent.bindGlyphSocketIconButtonHandlers(btn)
                 end
 
-                btn.glyphID = id
+                btn.glyphID = glyphId
+                btn.itemID = itemId
+                btn.item = itemId
+                btn.spellID = spellId
+                btn.name = itemName or spellName or (displayId > 0 and ("ID " .. tostring(displayId))) or "Glyph"
+                btn.type = typ
                 MultiBot.talent.applyGlyphSocketIconLayout(btn, f, isFallback)
                 btn.icon:SetTexture(MultiBot.SafeTexturePath(tex))
+                btn.icon:Show()
+                if btn.bg and itemId > 0 then
+                    btn.bg:Hide()
+                end
                 btn:Show()
 
                 local ov = f.frames.Overlay
@@ -1173,17 +1291,26 @@ function MultiBot.InitializeTalentFrameModule()
                                 or "gliph_mineur_layout.blp"))
                 end
                 if ov then ov:Show() end
+                MultiBot.talent.applyGlyphSocketClassColor(f, botName)
             end
         end
+    end
 
-        local names = {}
-        for _, entry in ipairs(rec) do
-            local n = select(1, GetItemInfo(entry.id))
-                  or GetSpellInfo(entry.id)
-                  or ("ID "..entry.id)
-            table.insert(names,
-                (entry.type=="Major" and "|cffffff00" or "|cff00ff00") .. n .. "|r")
+    function MultiBot.ApplyBridgeGlyphs(botName, glyphs, token)
+        if not botName or not glyphs then
+            return
         end
+
+        MultiBot.receivedGlyphs = MultiBot.receivedGlyphs or {}
+        MultiBot.receivedGlyphs[botName] = glyphs
+
+        if MultiBot.talent and MultiBot.talent.name == botName then
+            MultiBot.FillDefaultGlyphs()
+        end
+    end
+
+    function MultiBot.talent.OnBridgeGlyphs(botName, token, glyphs)
+        MultiBot.ApplyBridgeGlyphs(botName, glyphs, token)
     end
 
     -- Glyph overview frame initialization in a scoped block
@@ -1198,13 +1325,14 @@ function MultiBot.InitializeTalentFrameModule()
     -- Apply tab is the only entry point for glyph equipment actions.
     function MultiBot.talent.applyCustomGlyphs()
         local ids = {}
-        for i = 1, MultiBot.TalentTabLimits.GLYPH_SOCKET_COUNT do
-            local socket = MultiBot.talent.getGlyphSocket(i)
-            ids[i] = (socket and socket.item) or 0
+        for wireSlot = 1, MultiBot.TalentTabLimits.GLYPH_SOCKET_COUNT do
+            local socketIndex = MultiBot.talent.mapGlyphWireSlotToVisualSocket(wireSlot)
+            local socket = MultiBot.talent.getGlyphSocket(socketIndex)
+            ids[wireSlot] = tonumber(socket and (socket.item or socket.itemID or socket.glyphID)) or 0
         end
         local payload = "glyph equip " .. table.concat(ids, " ")
-        DEFAULT_CHAT_FRAME:AddMessage("|cff66ccff[DBG]|r " .. MultiBot.L("talent.glyphs.debug_prefix") ..
-            (MultiBot.talent.name or "?") .. " : " .. payload)
+        --DEFAULT_CHAT_FRAME:AddMessage("|cff66ccff[DBG]|r " .. MultiBot.L("talent.glyphs.debug_prefix") ..
+            --(MultiBot.talent.name or "?") .. " : " .. payload)
         SendChatMessage(payload, "WHISPER", nil, MultiBot.talent.name)
     end
 
@@ -1219,13 +1347,17 @@ function MultiBot.InitializeTalentFrameModule()
         { name = "Socket6", x = -336,   y = 50.5,  size = 102, glow = "Interface\\Spellbook\\UI-Glyph-Slot-Major.blp", runeX = -29, runeY = 29, runeSize = 44,  overlayX = -12, overlayY = 12, overlaySize = 96, socketType = "Major" },
     }
 
-    for _, def in ipairs(glyphSocketDefinitions) do
+    for socketIndex, def in ipairs(glyphSocketDefinitions) do
         local layout = MultiBot.TalentHostContentLayout or DEFAULT_TALENT_HOST_CONTENT_LAYOUT
         local tGlyph = MultiBot.talent.frames[MultiBot.TalentTabGroups.GLYPH].addFrame(def.name, def.x + (layout.GLYPH_SOCKETS_TUNE_X or 0), def.y + (layout.GLYPH_SOCKETS_TUNE_Y or 0), def.size)
         tGlyph.addFrame("Glow", 0, 0, def.size).setLevel(7).doHide().addTexture(def.glow)
         tGlyph.addFrame("Rune", def.runeX, def.runeY, def.runeSize).setLevel(8).setAlpha(0.7).doHide().addTexture("Interface/Spellbook/UI-Glyph-Rune-1")
         tGlyph.frames = tGlyph.frames or {}
+        if tGlyph.SetID then
+            tGlyph:SetID(socketIndex)
+        end
         tGlyph.type = def.socketType
+        tGlyph.socketType = def.socketType
         tGlyph.item = 0
         tGlyph.addFrame("Overlay", def.overlayX, def.overlayY, def.overlaySize).setLevel(9).doHide()
     end
@@ -1414,8 +1546,17 @@ function MultiBot.InitializeTalentFrameModule()
 
     -- TAB GLYPHS --
     function MultiBot.talent.requestGlyphsForTarget(targetName)
+        if MultiBot.Comm and MultiBot.Comm.RequestGlyphs then
+            local token = MultiBot.Comm.RequestGlyphs(targetName)
+            if token then
+                MultiBot.awaitGlyphs = nil
+                return token
+            end
+        end
+
         MultiBot.awaitGlyphs = targetName
         SendChatMessage("glyphs", "WHISPER", nil, targetName)
+        return nil
     end
 
     function MultiBot.talent.openGlyphsTab()
@@ -1850,7 +1991,7 @@ function MultiBot.InitializeTalentFrameModule()
     function MultiBot.talent.renderTalentBuild(options)
         options = options or {}
 
-        if not MultiBot.talent.isTalentApiReady() then
+        if options.requiresTalentApi ~= false and not MultiBot.talent.isTalentApiReady() then
             MultiBot.talent.scheduleTalentBuildRetry(options)
             return false
         end
@@ -1893,15 +2034,36 @@ function MultiBot.InitializeTalentFrameModule()
     end
 
     function MultiBot.talent.buildCustomTalentsResolver()
-        return function(treeIndex, talentIndex)
-            local link = GetTalentLink(treeIndex, talentIndex, true)
+        return function(treeIndex, talentIndex, talentData)
+            local talentName, icon
+            if MultiBot.talent.isTalentApiReady() then
+                talentName, icon = GetTalentInfo(treeIndex, talentIndex, true)
+            end
+
+            local firstRankSpellId = tonumber(talentData and talentData[5]) or 0
+            if (not talentName or talentName == "") and firstRankSpellId > 0 then
+                talentName, _, icon = GetSpellInfo(firstRankSpellId)
+            end
+
+            if not talentName or talentName == "" then
+                return nil
+            end
+
+            local link
+            if MultiBot.talent.isTalentApiReady() then
+                link = GetTalentLink(treeIndex, talentIndex, true)
+            end
+
             local talentId = MultiBot.talent.extractTalentIdFromLink(link)
-            local talentName = GetTalentInfo(treeIndex, talentIndex, true)
+            if (not talentId or talentId == "0") and firstRankSpellId > 0 then
+                talentId = tostring(firstRankSpellId)
+            end
 
             return {
                 name = talentName,
                 talentId = talentId,
                 rank = 0,
+                icon = icon,
             }
         end
     end
@@ -1940,6 +2102,7 @@ function MultiBot.InitializeTalentFrameModule()
                 return level - 9
             end,
             resolveTalent = MultiBot.talent.buildCustomTalentsResolver(),
+            requiresTalentApi = false,
             onSuccess = function()
                 MultiBot.talent.activateTabState(MultiBot.TalentTabStates.CUSTOM_TALENTS)
             end,
@@ -2081,6 +2244,11 @@ function MultiBot.InitializeTalentFrameModule()
         if button.icon then button.icon:SetTexture(nil) end
         if button.bg then button.bg:Show() end
         button.glyphID = nil
+        button.itemID = nil
+        button.item = nil
+        button.spellID = nil
+        button.name = nil
+        button.type = nil
         button:Show()
     end
 
@@ -2178,12 +2346,24 @@ function MultiBot.InitializeTalentFrameModule()
             rune:Show()
         end
 
-        local tex = select(10, GetItemInfo(itemID)) or GetSpellTexture(itemID)
+        local tex = select(10, GetItemInfo(itemID))
+        if not tex and type(GetItemIcon) == "function" then
+            tex = GetItemIcon(itemID)
+        end
+        tex = tex or GetSpellTexture(itemID)
         local isFallback = tex == nil
         tex = tex or "Interface\\AddOns\\MultiBot\\Textures\\UI-GlyphFrame-Glow.blp"
         MultiBot.talent.applyGlyphSocketIconLayout(button, socketFrame, isFallback)
         button.icon:SetTexture(MultiBot.SafeTexturePath(tex))
+        button.icon:Show()
+        if button.bg then
+            button.bg:Hide()
+        end
         button.glyphID = itemID
+        button.itemID = itemID
+        button.item = itemID
+        button.spellID = nil
+        button.type = socketFrame.socketType or socketFrame.type
         socketFrame.item = itemID
     end
 
@@ -2242,7 +2422,8 @@ function MultiBot.InitializeTalentFrameModule()
             return
         end
 
-        if payload.glyphType ~= (socket.type or "Major") then
+        local expectedGlyphType = socket.socketType or socket.type or "Major"
+        if payload.glyphType ~= expectedGlyphType then
             UIErrorsFrame:AddMessage(MultiBot.L("info.glyphsglyphtype") .. payload.glyphType .. " : " .. MultiBot.L("info.glyphsglyphsocket"), 1, 0.3, 0.3, 1)
             return
         end
@@ -2267,7 +2448,7 @@ function MultiBot.InitializeTalentFrameModule()
     function MultiBot.talent.createGlyphSocketIconButton(socketFrame)
         local btn = CreateFrame("Button", nil, socketFrame)
         btn:SetAllPoints(socketFrame)
-        MultiBot.talent.ensureGlyphIconButtonBackground(btn, socketFrame.type, socketFrame)
+        MultiBot.talent.ensureGlyphIconButtonBackground(btn, socketFrame.socketType or socketFrame.type, socketFrame)
 
         local icon = btn:CreateTexture(nil, "ARTWORK")
         icon:SetTexCoord(0.15, 0.85, 0.15, 0.85)
