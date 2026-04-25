@@ -37,6 +37,80 @@ local function BridgeBootOwnsState()
 	return false
 end
 
+local function RequestBridgeSnapshotAfterGroupReconnect()
+	if not (MultiBot and MultiBot.Comm and MultiBot.bridge and MultiBot.bridge.connected) then
+		return
+	end
+
+	local function refresh()
+		if not (MultiBot and MultiBot.Comm and MultiBot.bridge and MultiBot.bridge.connected) then
+			return
+		end
+
+		if MultiBot.Comm.RequestRoster then
+			MultiBot.Comm.RequestRoster()
+		end
+		if MultiBot.Comm.RequestStates then
+			MultiBot.Comm.RequestStates()
+		end
+		if MultiBot.Comm.RequestBotDetails then
+			MultiBot.Comm.RequestBotDetails()
+		end
+	end
+
+	if MultiBot.TimerAfter then
+		MultiBot.TimerAfter(2.0, refresh)
+	else
+		refresh()
+	end
+end
+
+local function ReconnectExistingGroupBots(reason)
+	if MultiBot._groupReconnectDone then
+		return false
+	end
+
+	local now = (type(GetTime) == "function") and GetTime() or 0
+	if MultiBot._lastGroupReconnectAt and (now - MultiBot._lastGroupReconnectAt) < 3.0 then
+		return false
+	end
+
+	local playerName = UnitName("player")
+	local sent = 0
+
+	if GetNumRaidMembers() > 0 then
+		for i = 1, GetNumRaidMembers() do
+			local raidName = UnitName("raid" .. i)
+			if raidName and raidName ~= "" and raidName ~= playerName then
+				SendChatMessage(".playerbot bot add " .. raidName, "SAY")
+				sent = sent + 1
+			end
+		end
+	elseif GetNumPartyMembers() > 0 then
+		for i = 1, GetNumPartyMembers() do
+			local partyName = UnitName("party" .. i)
+			if partyName and partyName ~= "" and partyName ~= playerName then
+				SendChatMessage(".playerbot bot add " .. partyName, "SAY")
+				sent = sent + 1
+			end
+		end
+	end
+
+	if sent <= 0 then
+		return false
+	end
+
+	MultiBot._groupReconnectDone = true
+	MultiBot._lastGroupReconnectAt = now
+	MultiBot.dprint("GROUP_RECONNECT", reason or "?", sent)
+	RequestBridgeSnapshotAfterGroupReconnect()
+	return true
+end
+
+local function LegacyChatFallbackEnabled()
+	return MultiBot and MultiBot.allowLegacyChatFallback == true
+end
+
 function MultiBot.HandleOnUpdate(pElapsed)
 	perfCount("handler.onupdate.calls")
 	perfDuration("handler.onupdate.elapsed", tonumber(pElapsed) or 0)
@@ -48,10 +122,8 @@ function MultiBot.HandleOnUpdate(pElapsed)
 	if(MultiBot.auto.stats and MultiBot.timer.stats.elapsed >= MultiBot.timer.stats.interval) then
 		for i = 1, GetNumPartyMembers() do
 			local botName = UnitName("party" .. i)
-			if not (MultiBot.RequestStatsRefresh and MultiBot.RequestStatsRefresh(botName)) then
-				if botName and botName ~= "" then
-					SendChatMessage("stats", "WHISPER", nil, botName)
-				end
+			if MultiBot.RequestStatsRefresh then
+				MultiBot.RequestStatsRefresh(botName)
 			end
 		end
 		MultiBot.timer.stats.elapsed = 0
@@ -1327,6 +1399,16 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 		end
 
 		if event ~= "PLAYER_ENTERING_WORLD" then
+			if event ~= "UNIT_PET" then
+				if MultiBot.TimerAfter then
+					MultiBot.TimerAfter(0.8, function()
+						ReconnectExistingGroupBots(event)
+					end)
+				else
+					ReconnectExistingGroupBots(event)
+				end
+			end
+
 			return
 		end
 	end
@@ -1338,6 +1420,14 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 
         if MultiBot.Comm and MultiBot.Comm.OnPlayerEnteringWorld then
             MultiBot.Comm.OnPlayerEnteringWorld()
+        end
+
+        if MultiBot.TimerAfter then
+            MultiBot.TimerAfter(1.5, function()
+                ReconnectExistingGroupBots("entering-world")
+            end)
+        else
+            ReconnectExistingGroupBots("entering-world")
         end
 
         SendChatMessage(".account", "SAY")
@@ -1358,10 +1448,16 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                 end
 
                 if playersSize > 1 then
+                    ReconnectExistingGroupBots("players-index")
                     return
                 end
 
                 if bridge and bridge.connected and bridgeRosterSize > 0 then
+                    ReconnectExistingGroupBots("bridge-roster")
+                    return
+                end
+
+                if not LegacyChatFallbackEnabled() then
                     return
                 end
 
@@ -1619,8 +1715,12 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                   return
                end
 
-               tButton.waitFor = "CO"
-               SendChatMessage("co ?", "WHISPER", nil, tName)
+               if LegacyChatFallbackEnabled() then
+                  tButton.waitFor = "CO"
+                  SendChatMessage("co ?", "WHISPER", nil, tName)
+               else
+                  tButton.waitFor = ""
+               end
                tButton.setEnable()
                return
             end
@@ -1652,8 +1752,12 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			local tName = UnitName("player")
 			local tButton = MultiBot.frames["MultiBar"].frames["Units"].buttons[tName]
 			if(tButton == nil) then return end
-			tButton.waitFor = "CO"
-			SendChatMessage("co ?", "WHISPER", nil, tName)
+			if LegacyChatFallbackEnabled() then
+				tButton.waitFor = "CO"
+				SendChatMessage("co ?", "WHISPER", nil, tName)
+			else
+				tButton.waitFor = ""
+			end
 			tButton.setEnable()
 			return
 		end
@@ -1898,8 +2002,12 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				return
 			end
 
-			tButton.waitFor = "CO"
-			SendChatMessage("co ?", "WHISPER", nil, arg2)
+			if LegacyChatFallbackEnabled() then
+				tButton.waitFor = "CO"
+				SendChatMessage("co ?", "WHISPER", nil, arg2)
+			else
+				tButton.waitFor = ""
+			end
 			return
 		end
 
@@ -2052,13 +2160,17 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 					return
 				end
 
-				tButton.waitFor = "INVENTORY"
-				if(MultiBot.TimerAfter) then
-					MultiBot.TimerAfter(0.45, function()
+				if LegacyChatFallbackEnabled() then
+					tButton.waitFor = "INVENTORY"
+					if(MultiBot.TimerAfter) then
+						MultiBot.TimerAfter(0.45, function()
+							SendChatMessage("items", "WHISPER", nil, tButton.name)
+						end)
+					else
 						SendChatMessage("items", "WHISPER", nil, tButton.name)
-					end)
+					end
 				else
-					SendChatMessage("items", "WHISPER", nil, tButton.name)
+					tButton.waitFor = ""
 				end
 				return
 			end
@@ -2072,13 +2184,17 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 					return
 				end
 
-				tButton.waitFor = "INVENTORY"
-				if(MultiBot.TimerAfter) then
-					MultiBot.TimerAfter(0.45, function()
+				if LegacyChatFallbackEnabled() then
+					tButton.waitFor = "INVENTORY"
+					if(MultiBot.TimerAfter) then
+						MultiBot.TimerAfter(0.45, function()
+							SendChatMessage("items", "WHISPER", nil, tButton.name)
+						end)
+					else
 						SendChatMessage("items", "WHISPER", nil, tButton.name)
-					end)
+					end
 				else
-					SendChatMessage("items", "WHISPER", nil, tButton.name)
+					tButton.waitFor = ""
 				end
 				return
 			end
@@ -2122,8 +2238,12 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 					return
 				end
 
-				tButton.waitFor = "INVENTORY"
-				SendChatMessage("items", "WHISPER", nil, tButton.name)
+				if LegacyChatFallbackEnabled() then
+					tButton.waitFor = "INVENTORY"
+					SendChatMessage("items", "WHISPER", nil, tButton.name)
+				else
+					tButton.waitFor = ""
+				end
 				return
 			end
 		end

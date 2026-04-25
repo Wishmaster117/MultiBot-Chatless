@@ -483,6 +483,10 @@ refreshStrategiesForActiveBots = function()
         return
     end
 
+    if MultiBot.allowLegacyChatFallback ~= true then
+        return
+    end
+
     local function refreshStrategiesFor(name)
         if not name or name == UnitName("player") then
             return

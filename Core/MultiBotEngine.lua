@@ -2190,7 +2190,8 @@ end
 
 -- MULTIBOT:INVENTORY REFRESH --
 -- Rafraîchit l’inventaire d’un bot en bridge-first.
--- Fallback chat conservé uniquement quand la bridge n’est pas disponible.
+-- Le fallback chat legacy est désactivé par défaut ; l’activer explicitement avec
+-- MultiBot.allowLegacyChatFallback = true pendant un diagnostic legacy.
 MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 	botName = botName or (MultiBot.inventory and MultiBot.inventory.name) or ""
 	if not botName or botName == "" then
@@ -2216,7 +2217,7 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 			return false
 		end
 
-		if options.bridgeOnly then
+		if options.bridgeOnly or MultiBot.allowLegacyChatFallback ~= true then
 			return false
 		end
 

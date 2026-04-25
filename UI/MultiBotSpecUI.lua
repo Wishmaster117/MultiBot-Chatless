@@ -456,7 +456,9 @@ function Spec:RequestList(bot, wrapper)
                 return
             end
 
-            SendChatMessage("talents spec list", "WHISPER", nil, bot)
+            if MultiBot.allowLegacyChatFallback == true then
+                SendChatMessage("talents spec list", "WHISPER", nil, bot)
+            end
         end
     end)
 end

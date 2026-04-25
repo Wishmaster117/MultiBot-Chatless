@@ -27,13 +27,31 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Bootstrap au login / `/reload`
 - [x] Logs console bridge configurables via `MultiBotBridge.EnableConsoleLogs`
 
+### Audit chatless final / nettoyage legacy
+
+- [x] Ajout du switch global `MultiBot.allowLegacyChatFallback = false` dans la configuration addon
+- [x] Centralisation côté handler avec `LegacyChatFallbackEnabled()`
+- [x] Désactivation par défaut des fallbacks automatiques legacy pour les refresh UI ciblés
+- [x] `stats` automatique neutralisé si la bridge ne répond pas
+- [x] `items` / inventory automatique neutralisé si la bridge ne répond pas
+- [x] `spells` / spellbook automatique neutralisé si la bridge ne répond pas
+- [x] `glyphs` automatique neutralisé si la bridge ne répond pas
+- [x] `talents spec list` automatique neutralisé si la bridge ne répond pas
+- [x] Conservation des vraies commandes d’action volontaire : `glyph equip ...`, actions inventory, sélection de spec, add/remove/connect bots
+- [x] Conservation volontaire des commandes manuelles de diagnostic : `who`, `co ?`, `nc ?`, `ss ?`
+
+
 ### Roster / Units
 
 - [x] `GET~ROSTER`
 - [x] Roster bridge-first
 - [x] Synchronisation des bots visibles dans `Units`
 - [x] Refresh manuel `Units` via bridge quand disponible
-- [x] Fallback legacy conservé quand la bridge n’est pas disponible
+- [x] Fallback `.playerbot bot list` neutralisé par défaut via `MultiBot.allowLegacyChatFallback = false`
+- [x] Reconnexion au login / `/reload` des bots déjà présents dans le groupe ou raid via `.playerbot bot add <bot>`
+- [x] Reconnexion volontairement indépendante du switch legacy, car elle sert à connecter les bots et pas à remplir l’UI
+- [x] Refresh bridge différé après reconnexion : `GET~ROSTER`, `GET~STATES`, `GET~DETAILS`
+- [x] Refresh `Units` automatique après `AddClass` / `.playerbot bot addclass ...` via snapshot bridge immédiat puis différé
 
 ### States / Everybars
 
@@ -66,7 +84,7 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] `INV_END`
 - [x] Ouverture de la fenêtre inventory depuis bridge
 - [x] Remplissage du contenu inventory depuis bridge
-- [x] Fallback whisper `items` conservé si bridge indisponible
+- [x] Fallback whisper `items` réactivable uniquement via `MultiBot.allowLegacyChatFallback = true`
 
 ### Inventory post-action
 
@@ -77,7 +95,7 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Correction du `u [item]` : décrément visuel + pending consume local pour éviter que le snapshot bridge trop tôt remette l’ancien stack
 - [x] Correction du clic droit `ue` depuis Inspect : déséquipement puis refresh inventory bridge-first
 - [x] Trade : suppression du dump legacy `=== Inventory ===` dans le chat quand la bridge est connectée
-- [x] Fallback `items` gardé uniquement quand la bridge n’est pas disponible
+- [x] Fallback `items` gardé uniquement en mode diagnostic `MultiBot.allowLegacyChatFallback = true`
 
 ### Spellbook
 
@@ -88,7 +106,7 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] `Comm.RequestSpellbook(name)`
 - [x] Ouverture du spellbook via bridge
 - [x] Remplissage du spellbook via bridge
-- [x] Fallback whisper `spells` conservé si bridge indisponible
+- [x] Fallback whisper `spells` réactivable uniquement via `MultiBot.allowLegacyChatFallback = true`
 
 ### PVP Stats
 
@@ -110,7 +128,7 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Hydratation de la fenêtre Stats depuis payload bridge
 - [x] Bouton Auto-Stats branché en bridge-first
 - [x] Correction compilation C++ : déclaration anticipée de `GetPct`
-- [x] Fallback legacy `stats` conservé si bridge absente
+- [x] Fallback legacy `stats` réactivable uniquement via `MultiBot.allowLegacyChatFallback = true`
 
 ### Quêtes
 
@@ -131,11 +149,11 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Réponses en paquets courts : `TALENT_SPEC_BEGIN`, `TALENT_SPEC_ITEM`, `TALENT_SPEC_END`
 - [x] Lecture côté bridge des specs disponibles depuis `AiPlayerbot.PremadeSpecName.*` / `AiPlayerbot.PremadeSpecLink.*`
 - [x] Reconstruction de la frame de choix des specs depuis la bridge
-- [x] Suppression du spam automatique `talents spec list` dans le chat quand la bridge est connectée
+- [x] Suppression du spam automatique `talents spec list` dans le chat en chemin normal
 - [x] Conservation volontaire du whisper utile `My current talent spec is: ...`
 - [x] Filtrage des lignes d’aide legacy inutiles renvoyées par `talents` (`warlock`, `Talents usage`, etc.)
 - [x] Correction affichage : la partie `(0/56/15)` de la spé courante est ré-affichée en blanc
-- [x] Fallback legacy `talents spec list` conservé si la bridge est absente
+- [x] Fallback legacy `talents spec list` réactivable uniquement via `MultiBot.allowLegacyChatFallback = true`
 
 ### Glyphes / Custom Glyphs
 
@@ -149,7 +167,7 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Tooltips fonctionnels via lien item, avec fallback spell si nécessaire
 - [x] Couleur / glow des sockets adaptée à la classe du bot
 - [x] Nettoyage de `MultiBot.awaitGlyphs` quand la bridge répond pour éviter le message `[ERROR] Message nonglyphe ignoré`
-- [x] Fallback whisper `glyphs` conservé seulement si la bridge est absente ou ne répond pas
+- [x] Fallback whisper `glyphs` réactivable uniquement via `MultiBot.allowLegacyChatFallback = true`
 - [x] Correction navigation : le bouton `Custom Talents` reconstruit les arbres vides sans dépendre obligatoirement de l’API d’inspection
 - [x] Correction `Custom Glyphs` : séparation entre `socketType` et `glyphType` pour ne plus écraser le type attendu du socket
 - [x] Correction `Custom Glyphs` : mapping ordre bridge/playerbots vers ordre visuel des sockets
@@ -201,19 +219,28 @@ La liste de choix des specs ne dépend plus de `talents spec list` en chat. Le w
 
 La lecture des glyphes n’est plus dépendante du whisper `glyphs` quand la bridge est connectée. Les icônes, tooltips, sockets et couleurs de classe sont alimentés par `GET~GLYPHS`. Les actions réelles de modification restent autorisées en commande volontaire, notamment `glyph equip ...`, conformément à la règle de migration.
 
+### Audit chatless final
+
+Les refresh automatiques UI les plus sensibles ne retombent plus en chat legacy par défaut. Le switch `MultiBot.allowLegacyChatFallback` permet de réactiver temporairement les anciens fallbacks pour diagnostic, mais la configuration propre reste `false`.
+
+La reconnexion des bots déjà membres du groupe/raid reste autorisée via `.playerbot bot add <bot>`, car ce n’est pas un parser UI legacy : c’est l’action nécessaire pour reconnecter les bots au login ou après `/reload`.
+
+Le bouton `AddClass` déclenche maintenant un refresh bridge automatique du roster/states/details après l’ajout, ce qui évite d’avoir à clic droit sur `Units` pour voir apparaître le nouveau bot.
+
 ---
 
 ## Ce qui reste partiellement legacy
 
 ### A) Units / roster legacy de compatibilité
 
-Encore présent à conserver ou à traiter plus tard selon le cas :
+État actuel après nettoyage :
 
-- fallback `.playerbot bot list` ;
-- parsing `CHAT_MSG_SYSTEM` pour certains événements add/remove/offline ;
-- commandes `.playerbot bot add/remove` toujours utilisées pour connecter/déconnecter les bots.
+- le fallback `.playerbot bot list` est désactivé par défaut via `MultiBot.allowLegacyChatFallback = false` ;
+- les commandes `.playerbot bot add/remove` restent utilisées pour connecter/déconnecter réellement les bots ;
+- la reconnexion automatique au login utilise `.playerbot bot add <bot>` pour les bots déjà présents dans le groupe/raid ;
+- certains parsers `CHAT_MSG_SYSTEM` historiques peuvent encore exister pour des événements add/remove/offline ou compatibilité.
 
-Conclusion : `Units` fonctionne en bridge-first pour roster/states/details, mais il reste des chemins legacy de compatibilité et de commande.
+Conclusion : `Units` fonctionne en bridge-first pour roster/states/details. Les chemins legacy restants sont surtout des commandes de contrôle ou de compatibilité, pas le chemin nominal pour remplir l’UI.
 
 ### B) Talents actifs détaillés
 
@@ -228,12 +255,12 @@ Conclusion : ne pas migrer par réflexe. À traiter seulement si une fenêtre UI
 
 ### C) Outfits
 
-Encore legacy :
+Encore legacy, volontairement laissé comme ça pour l’instant :
 
 - `outfit ?`
 - parsing de réponse chat.
 
-À migrer maintenant en priorité logique.
+Conclusion : pas prioritaire immédiatement, car le flux ne spamme pas trop dans l’usage actuel. À migrer plus tard si l’objectif devient le zéro parsing chat sur toutes les fenêtres.
 
 ---
 
@@ -250,7 +277,7 @@ Encore legacy :
 | Raidus sans `who` automatique | Fait |
 | Everybars après `/reload` | Corrigé |
 | Units bridge-first | Fait |
-| Units 100% sans chemins legacy | À finir |
+| Units sans fallback UI legacy automatique | Fait |
 | Inventory snapshot bridge | Fait |
 | Inventory post-action bridge-first | Fait |
 | Inventory `u item` stack/pending consume | Fait |
@@ -265,9 +292,13 @@ Encore legacy :
 | Glyphes icônes / tooltips | Fait |
 | Custom Talents navigation | Corrigé |
 | Custom Glyphs mapping sockets | Corrigé |
+| Switch `MultiBot.allowLegacyChatFallback` | Fait |
+| Nettoyage fallbacks automatiques stats/items/spells/glyphs/spec list | Fait |
+| Reconnexion bots au login / `/reload` | Fait |
+| Refresh Units après AddClass | Fait |
 | Talents actifs détaillés bridge | À évaluer / à faire si UI nécessaire |
-| Outfits bridge | À faire |
-| Nettoyage final parsers legacy | À faire |
+| Outfits bridge | Reporté volontairement |
+| Nettoyage final parsers legacy | Fait pour les refresh UI ciblés ; audit résiduel à faire |
 
 ---
 
@@ -275,30 +306,22 @@ Encore legacy :
 
 Le prochain pas logique est maintenant : **migrer les Outfits en bridge-first**.
 
-Pourquoi ce bloc en premier :
+À valider avant de lancer cette migration plus tard :
 
-1. c’est le dernier gros flux UI encore listé comme clairement legacy ;
-2. il est normalement read-only pour l’affichage (`outfit ?`), donc moins risqué que les vraies actions d’équipement ;
-3. il suit le même modèle déjà validé pour inventory, spellbook, quests, specs et glyphes ;
-4. il permettra de réduire encore le parsing automatique du chat sans toucher aux commandes manuelles utiles.
+1. le chemin principal `Units` / `Roster` / `States` / `Details` / `Stats` / `Inventory` / `Spellbook` / `Quests` / `Specs` / `Glyphs` est maintenant bridge-first ;
+2. les fallbacks automatiques chat les plus gênants sont neutralisés par défaut ;
+3. la reconnexion des bots au login et le refresh après `AddClass` viennent juste d’être corrigés, donc il faut les valider en conditions réelles ;
+4. `Outfits` est volontairement laissé legacy pour l’instant, car il ne génère pas assez de spam pour justifier une migration immédiate.
 
 Plan recommandé :
 
-1. inventorier précisément où l’addon lance actuellement `outfit ?` et où il parse la réponse ;
-2. ajouter côté bridge `GET~OUTFITS~<bot>~<token>` ;
-3. envoyer des paquets courts `OUTFITS_BEGIN`, `OUTFITS_ITEM`, `OUTFITS_END` ;
-4. ajouter côté addon `Comm.RequestOutfits(botName)` ;
-5. hydrater la fenêtre existante depuis un cache `MultiBot.bridge.outfits[botName]` ;
-6. conserver `outfit ?` comme fallback uniquement si la bridge est absente ;
-7. laisser les vraies actions utilisateur d’outfit en whisper volontaire tant qu’elles ne servent pas à remplir automatiquement l’UI.
+1. tester plusieurs cycles complets : login, `/reload`, groupe, raid, ajout via `AddClass`, ouverture de chaque frame ;
+2. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list` avec `MultiBot.allowLegacyChatFallback = false` ;
+3. vérifier que les commandes de contrôle nécessaires restent fonctionnelles : `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec ;
+4. garder `Outfits` tel quel pendant cette phase ;
+5. ensuite seulement, décider entre deux suites possibles : migrer `Outfits` en bridge-first, ou auditer les derniers parsers `CHAT_MSG_WHISPER` / `CHAT_MSG_SYSTEM` restants pour supprimer ce qui est devenu inutile.
 
-Après Outfits, il faudra faire un audit final des parsers `CHAT_MSG_WHISPER` / `CHAT_MSG_SYSTEM` pour séparer clairement :
-
-- les fallbacks legacy à conserver ;
-- les commandes manuelles volontaires à conserver ;
-- les anciens parsers automatiques devenus inutiles à supprimer ou neutraliser.
-
----
+Après cette stabilisation, on pourra reprendre directement la migration fonctionnelle **Outfits bridge-first**.
 
 ## Règle de migration à conserver
 

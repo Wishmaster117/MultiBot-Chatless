@@ -1946,6 +1946,31 @@ if not GetNumSubgroupMembers then
   end
 end
 
+function MultiBot.RequestBridgeRosterRefresh()
+  local function requestSnapshot()
+    if not (MultiBot and MultiBot.Comm and MultiBot.bridge and MultiBot.bridge.connected) then
+      return
+    end
+
+    if MultiBot.Comm.RequestRoster then
+      MultiBot.Comm.RequestRoster()
+    end
+    if MultiBot.Comm.RequestStates then
+      MultiBot.Comm.RequestStates()
+    end
+    if MultiBot.Comm.RequestBotDetails then
+      MultiBot.Comm.RequestBotDetails()
+    end
+  end
+
+  requestSnapshot()
+
+  if type(MultiBot.TimerAfter) == "function" then
+    MultiBot.TimerAfter(0.8, requestSnapshot)
+    MultiBot.TimerAfter(2.0, requestSnapshot)
+  end
+end
+
 --  AddClassToTarget Wrapper
 -- Usage : MultiBot.AddClassToTarget("warlock"        ) -- Random
 --         MultiBot.AddClassToTarget("warlock","male" ) -- Male
@@ -1958,6 +1983,10 @@ MultiBot.AddClassToTarget = function(classCmd, gender)
 	print("[DBG] Message de sortie :" ,msg)
   end
   SendChatMessage(msg, "SAY")
+
+  if MultiBot.RequestBridgeRosterRefresh then
+    MultiBot.RequestBridgeRosterRefresh()
+  end
 end
 
 -- Init Wrapper
