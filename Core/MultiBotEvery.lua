@@ -189,8 +189,12 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 				return
 			end
 
-			tUnits.buttons[MultiBot.spellbook.name].waitFor = "SPELLBOOK"
-			SendChatMessage("spells", "WHISPER", nil, pButton.getName())
+			if(MultiBot.allowLegacyChatFallback == true) then
+				tUnits.buttons[MultiBot.spellbook.name].waitFor = "SPELLBOOK"
+				SendChatMessage("spells", "WHISPER", nil, pButton.getName())
+			else
+				tUnits.buttons[MultiBot.spellbook.name].waitFor = ""
+			end
 		end
 	end
 

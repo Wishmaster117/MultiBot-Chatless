@@ -813,6 +813,10 @@ local function requestInventoryForBot(botName)
         return true
     end
 
+    if MultiBot.allowLegacyChatFallback ~= true then
+        return false
+    end
+
     local waitButton = getInventoryWaitButton(botName)
     if waitButton then
         waitButton.waitFor = "INVENTORY"
