@@ -988,6 +988,9 @@ end
 MultiBot.newFrame = function(pParent, pX, pY, pSize, oWidth, oHeight, oAlign)
 	local frame = CreateFrame("Frame", nil, pParent)
 	frame:SetPoint(MultiBot.IF(oAlign ~= nil, oAlign, "BOTTOMRIGHT"), pX, pY)
+	if(pParent and pParent.GetFrameLevel and frame.SetFrameLevel) then
+		frame:SetFrameLevel((pParent:GetFrameLevel() or 0) + 1)
+	end
 	frame:Show()
 
 	if(oWidth ~= nil and oHeight ~= nil)
@@ -1188,6 +1191,9 @@ end
 
 MultiBot.newButton = function(pParent, pX, pY, pSize, pTexture, pTip, oTemplate)
 	local button = CreateFrame("Button", nil, pParent, MultiBot.IF(oTemplate ~= nil, oTemplate, "ActionButtonTemplate"))
+	if(pParent and pParent.GetFrameLevel and button.SetFrameLevel) then
+		button:SetFrameLevel((pParent:GetFrameLevel() or 0) + 5)
+	end
 	button:SetPoint("BOTTOMRIGHT", pX, pY)
 	button:SetSize(pSize, pSize)
 	button:Show()
