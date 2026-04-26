@@ -1,6 +1,6 @@
 # MultiBot / Bridge — roadmap chatless
 
-Dernière mise à jour : 2026-04-25
+Dernière mise à jour : 2026-04-26
 
 ## Objectif exact
 
@@ -37,7 +37,7 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] `spells` / spellbook automatique neutralisé si la bridge ne répond pas
 - [x] `glyphs` automatique neutralisé si la bridge ne répond pas
 - [x] `talents spec list` automatique neutralisé si la bridge ne répond pas
-- [x] Conservation des vraies commandes d’action volontaire : `glyph equip ...`, actions inventory, sélection de spec, add/remove/connect bots
+- [x] Conservation des vraies commandes d’action volontaire : `glyph equip ...`, actions inventory, Outfits, sélection de spec, add/remove/connect bots
 - [x] Conservation volontaire des commandes manuelles de diagnostic : `who`, `co ?`, `nc ?`, `ss ?`
 
 
@@ -174,6 +174,23 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Correction `Custom Glyphs` : `glyph equip` renvoie les IDs dans l’ordre attendu par playerbots, pas dans l’ordre visuel
 - [x] Nettoyage : suppression du message debug local `[DBG] glyph equip ...` après validation
 
+### Outfits
+
+- [x] Endpoint côté bridge : `GET~OUTFITS~<bot>~<token>`
+- [x] Réponses en paquets courts : `OUTFITS_BEGIN`, `OUTFITS_ITEM`, `OUTFITS_END`
+- [x] Endpoint côté bridge : `RUN~OUTFIT~<bot>~<token>~<suffix>~<persistToken>`
+- [x] Réponse d’action : `OUTFITS_CMD~<bot>~<token>~OK|ERR`
+- [x] Lecture des sets via la valeur playerbots `outfit list`, sans requête SQL `character_equipmentsets`
+- [x] Création / mise à jour de set via `UPDATE` directement côté bridge
+- [x] Suppression de set via `RESET` directement côté bridge
+- [x] Équipement / remplacement de set via `EQUIP` / `REPLACE` directement côté bridge
+- [x] Suppression du spam chat détaillé `Equipping [item] ...` pendant `EQUIP` / `REPLACE`
+- [x] Conservation d’un seul message lisible côté joueur : `Equipping outfit ...` ou `Replacing current equip with outfit ...`
+- [x] Branchement de la frame Outfits en bridge-first
+- [x] Nettoyage des erreurs Lua liées aux appels `self` pendant les callbacks bridge
+- [x] Fallback legacy `outfit ?` conservé uniquement comme compatibilité si nécessaire
+- [x] Aucun changement requis dans `mod-playerbots` : la migration est faite côté addon + bridge
+
 ---
 
 ## Règle importante sur les payloads volumineux
@@ -189,6 +206,7 @@ Avec beaucoup de bots, éviter les réponses globales trop grosses.
 - `GET~QUESTS` répond en paquets `QUESTS_BEGIN` / `QUESTS_ITEM` / `QUESTS_END` / `QUESTS_DONE` pour éviter le spam chat et les payloads trop longs ;
 - `GET~TALENT_SPEC_LIST` répond en paquets `TALENT_SPEC_BEGIN` / `TALENT_SPEC_ITEM` / `TALENT_SPEC_END` ;
 - `GET~GLYPHS` répond en paquets `GLYPHS_BEGIN` / `GLYPHS_ITEM` / `GLYPHS_END` ;
+- `GET~OUTFITS` répond en paquets `OUTFITS_BEGIN` / `OUTFITS_ITEM` / `OUTFITS_END` ;
 - un paquet global vide peut seulement servir de réponse vide si aucun bot n’est disponible.
 
 ---
@@ -218,6 +236,10 @@ La liste de choix des specs ne dépend plus de `talents spec list` en chat. Le w
 ### Glyphes
 
 La lecture des glyphes n’est plus dépendante du whisper `glyphs` quand la bridge est connectée. Les icônes, tooltips, sockets et couleurs de classe sont alimentés par `GET~GLYPHS`. Les actions réelles de modification restent autorisées en commande volontaire, notamment `glyph equip ...`, conformément à la règle de migration.
+
+### Outfits
+
+Les Outfits sont maintenant migrés en bridge-first. La liste des tenues ne dépend plus du parsing automatique `outfit ?`, et les actions `update`, `reset`, `equip` et `replace` passent par `RUN~OUTFIT`. Le bridge traite directement les actions nécessaires pour éviter le spam détaillé `Equipping [item] ...`, tout en gardant un message joueur unique et lisible.
 
 ### Audit chatless final
 
@@ -255,12 +277,15 @@ Conclusion : ne pas migrer par réflexe. À traiter seulement si une fenêtre UI
 
 ### C) Outfits
 
-Encore legacy, volontairement laissé comme ça pour l’instant :
+État actuel après migration :
 
-- `outfit ?`
-- parsing de réponse chat.
+- la liste des tenues utilise `GET~OUTFITS` ;
+- les actions utilisent `RUN~OUTFIT` ;
+- le parsing automatique `outfit ?` n’est plus le chemin nominal ;
+- le bridge évite le spam détaillé d’équipement sans modifier `mod-playerbots` ;
+- l’ancien chemin peut rester comme compatibilité / diagnostic si le fallback legacy est explicitement réactivé.
 
-Conclusion : pas prioritaire immédiatement, car le flux ne spamme pas trop dans l’usage actuel. À migrer plus tard si l’objectif devient le zéro parsing chat sur toutes les fenêtres.
+Conclusion : `Outfits` est maintenant bridge-first. Il reste seulement à surveiller les derniers parsers historiques qui ne servent plus au chemin nominal.
 
 ---
 
@@ -290,6 +315,8 @@ Conclusion : pas prioritaire immédiatement, car le flux ne spamme pas trop dans
 | Sélection specs bridge | Fait |
 | Glyphes bridge | Fait |
 | Glyphes icônes / tooltips | Fait |
+| Outfits bridge | Fait |
+| Outfits sans spam détaillé `Equipping [item]` | Fait |
 | Custom Talents navigation | Corrigé |
 | Custom Glyphs mapping sockets | Corrigé |
 | Switch `MultiBot.allowLegacyChatFallback` | Fait |
@@ -297,31 +324,25 @@ Conclusion : pas prioritaire immédiatement, car le flux ne spamme pas trop dans
 | Reconnexion bots au login / `/reload` | Fait |
 | Refresh Units après AddClass | Fait |
 | Talents actifs détaillés bridge | À évaluer / à faire si UI nécessaire |
-| Outfits bridge | Reporté volontairement |
 | Nettoyage final parsers legacy | Fait pour les refresh UI ciblés ; audit résiduel à faire |
 
 ---
 
 ## Prochain pas logique recommandé
 
-Le prochain pas logique est maintenant : **migrer les Outfits en bridge-first**.
+Le prochain pas logique est maintenant : **stabilisation finale après migration Outfits**.
 
-À valider avant de lancer cette migration plus tard :
+À valider après cette dernière migration :
 
-1. le chemin principal `Units` / `Roster` / `States` / `Details` / `Stats` / `Inventory` / `Spellbook` / `Quests` / `Specs` / `Glyphs` est maintenant bridge-first ;
-2. les fallbacks automatiques chat les plus gênants sont neutralisés par défaut ;
-3. la reconnexion des bots au login et le refresh après `AddClass` viennent juste d’être corrigés, donc il faut les valider en conditions réelles ;
-4. `Outfits` est volontairement laissé legacy pour l’instant, car il ne génère pas assez de spam pour justifier une migration immédiate.
+1. ouvrir la frame Outfits sur plusieurs bots avec et sans tenues existantes ;
+2. créer / mettre à jour une tenue avec `update` et vérifier qu’elle apparaît immédiatement dans la liste ;
+3. tester `equip` et `replace` et vérifier qu’il n’y a plus de spam détaillé `Equipping [item] ...` ;
+4. vérifier que le message joueur unique reste présent : `Equipping outfit ...` ou `Replacing current equip with outfit ...` ;
+5. refaire un cycle complet login, `/reload`, groupe, raid, ajout via `AddClass`, ouverture de chaque frame ;
+6. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list`, `outfit ?` avec `MultiBot.allowLegacyChatFallback = false` ;
+7. vérifier que les commandes manuelles volontaires restent fonctionnelles : `who`, `co ?`, `nc ?`, `ss ?`, `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec et actions Outfits.
 
-Plan recommandé :
-
-1. tester plusieurs cycles complets : login, `/reload`, groupe, raid, ajout via `AddClass`, ouverture de chaque frame ;
-2. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list` avec `MultiBot.allowLegacyChatFallback = false` ;
-3. vérifier que les commandes de contrôle nécessaires restent fonctionnelles : `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec ;
-4. garder `Outfits` tel quel pendant cette phase ;
-5. ensuite seulement, décider entre deux suites possibles : migrer `Outfits` en bridge-first, ou auditer les derniers parsers `CHAT_MSG_WHISPER` / `CHAT_MSG_SYSTEM` restants pour supprimer ce qui est devenu inutile.
-
-Après cette stabilisation, on pourra reprendre directement la migration fonctionnelle **Outfits bridge-first**.
+Après cette stabilisation, il restera surtout un audit de nettoyage : supprimer les debug temporaires, garder les fallbacks legacy uniquement quand ils sont utiles au diagnostic, et retirer les parsers historiques devenus morts.
 
 ## Règle de migration à conserver
 

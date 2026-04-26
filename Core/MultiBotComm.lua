@@ -63,6 +63,13 @@ local function urlDecodeField(value)
   end))
 end
 
+local function urlEncodeField(value)
+  value = tostring(value or "")
+  return (value:gsub("([%%~\r\n])", function(ch)
+    return string.format("%%%02X", string.byte(ch))
+  end))
+end
+
 local function getPlayerName()
   if type(UnitName) ~= "function" then
     return nil
@@ -104,6 +111,9 @@ local function ensureBridgeState()
   state.inventoryActive = state.inventoryActive or nil
   state.spellbookSeq = state.spellbookSeq or 0
   state.spellbookActive = state.spellbookActive or nil
+  state.outfitSeq = state.outfitSeq or 0
+  state.outfitActive = state.outfitActive or nil
+  state.outfitCommands = state.outfitCommands or {}
   state.glyphs = state.glyphs or {}
   state.glyphSeq = state.glyphSeq or 0
   state.glyphActive = state.glyphActive or nil
@@ -233,6 +243,57 @@ function Comm.RequestTalentSpecList(name)
   return token
 end
 
+function Comm.RequestOutfits(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.outfitSeq = (tonumber(state.outfitSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.outfitSeq)
+  state.outfitActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+    lines = {},
+  }
+
+  if not Comm.Send("GET", "OUTFITS~" .. name .. "~" .. token) then
+    state.outfitActive = nil
+    return false
+  end
+
+  return true
+end
+
+function Comm.RunOutfitCommand(name, commandSuffix, persist)
+  local state = ensureBridgeState()
+  name = trim(name)
+  commandSuffix = trim(commandSuffix)
+  if name == "" or commandSuffix == "" or not state.connected then
+    return false
+  end
+
+  state.outfitSeq = (tonumber(state.outfitSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-cmd-" .. tostring(state.outfitSeq)
+  state.outfitCommands[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    command = commandSuffix,
+    startedAt = safeNow(),
+  }
+
+  local persistToken = persist and "1" or "0"
+  if not Comm.Send("RUN", "OUTFIT~" .. name .. "~" .. token .. "~" .. urlEncodeField(commandSuffix) .. "~" .. persistToken) then
+    state.outfitCommands[token] = nil
+    return false
+  end
+
+  return true
+end
+
 function Comm.RequestGlyphs(name)
   local state = ensureBridgeState()
   if not state.connected and not state.bootstrapPending then
@@ -358,6 +419,8 @@ function Comm.MarkDisconnected(reason)
   state.lastError = reason or nil
   state.inventoryActive = nil
   state.spellbookActive = nil
+  state.outfitActive = nil
+  state.outfitCommands = {}
 end
 
 local function parseBridgeDetailPayload(payload)
@@ -888,6 +951,113 @@ local function applyBridgeGlyphs(botName, token)
   end
 end
 
+local function getActiveOutfitRequest(botName, token)
+  local active = ensureBridgeState().outfitActive
+  if not active then return nil end
+  botName = trim(botName)
+  token = trim(token)
+  if token ~= active.token then return nil end
+  if botName ~= "" and string.lower(botName) ~= active.botNameKey then return nil end
+  return active
+end
+
+local function clearActiveOutfitRequest(botName, token)
+  local state = ensureBridgeState()
+  if getActiveOutfitRequest(botName, token) then
+    state.outfitActive = nil
+  end
+end
+
+function Comm.ApplyOutfitsBeginPayload(payload)
+  local botName, token = splitOnce(payload or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  if botName == "" or not getActiveOutfitRequest(botName, token) then
+    return false
+  end
+
+  local active = getActiveOutfitRequest(botName, token)
+  if active then
+    active.botName = botName
+    active.botNameKey = string.lower(botName)
+    active.lines = {}
+  end
+
+  if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeBegin then
+    MultiBot.OutfitUI:HandleBridgeBegin(botName, token)
+  end
+
+  debugPrint("ADDON:RX", "OUTFITS_BEGIN", botName)
+  return true
+end
+
+function Comm.ApplyOutfitsItemPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, encodedLine = splitOnce(rest or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  local active = getActiveOutfitRequest(botName, token)
+  if botName == "" or not active then
+    return false
+  end
+
+  local rawLine = urlDecodeField(encodedLine)
+  active.lines[#active.lines + 1] = rawLine
+
+  if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeLine then
+    MultiBot.OutfitUI:HandleBridgeLine(botName, token, rawLine)
+  end
+
+  debugPrint("ADDON:RX", "OUTFITS_ITEM", botName, rawLine)
+  return true
+end
+
+function Comm.ApplyOutfitsEndPayload(payload)
+  local botName, token = splitOnce(payload or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+
+  if botName == "" or not getActiveOutfitRequest(botName, token) then
+    return false
+  end
+
+  if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeEnd then
+    MultiBot.OutfitUI:HandleBridgeEnd(botName, token)
+  end
+
+  clearActiveOutfitRequest(botName, token)
+  debugPrint("ADDON:RX", "OUTFITS_END", botName)
+  return true
+end
+
+function Comm.ApplyOutfitCommandPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, result = splitOnce(rest or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  result = trim(result)
+
+  local state = ensureBridgeState()
+  local command = state.outfitCommands and state.outfitCommands[token] or nil
+  if not command then
+    return false
+  end
+
+  command.botName = botName ~= "" and botName or command.botName
+  command.botNameKey = string.lower(command.botName or "")
+  command.result = result
+
+  if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeCommandResult then
+    MultiBot.OutfitUI:HandleBridgeCommandResult(command.botName, token, result)
+  end
+
+  state.outfitCommands[token] = nil
+  debugPrint("ADDON:RX", "OUTFITS_CMD", command.botName, result)
+  return true
+end
+
 function Comm.ApplyGlyphsBeginPayload(payload)
   local botName, token = splitOnce(payload or "", "~")
   botName = trim(urlDecodeField(botName))
@@ -1179,6 +1349,30 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "OUTFITS_BEGIN" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyOutfitsBeginPayload(payload)
+  end
+
+  if opcode == "OUTFITS_ITEM" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyOutfitsItemPayload(payload)
+  end
+
+  if opcode == "OUTFITS_END" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyOutfitsEndPayload(payload)
+  end
+
+  if opcode == "OUTFITS_CMD" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyOutfitCommandPayload(payload)
+  end
+
   if opcode == "GLYPHS_BEGIN" then
     state.connected = true
     state.lastError = nil
@@ -1421,6 +1615,9 @@ function Comm.OnPlayerEnteringWorld()
   state.talentSpecs = {}
   state.talentSpecActive = nil
   state.inventoryActive = nil
+  state.spellbookActive = nil
+  state.outfitActive = nil
+  state.outfitCommands = {}
   Comm.MarkDisconnected(nil)
   state.bootstrapPending = true
   state.bootstrapDeadline = safeNow() + 4.0

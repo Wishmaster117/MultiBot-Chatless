@@ -983,7 +983,99 @@ function OutfitUI:RequestList(botName)
         end)
     end
 
+    if MultiBot.Comm and MultiBot.Comm.RequestOutfits and MultiBot.Comm.RequestOutfits(botName) then
+        return true
+    end
+
     SendChatMessage("outfit ?", "WHISPER", nil, botName)
+    return true
+end
+
+function OutfitUI:HandleBridgeBegin(botName, token)
+    if not botName or botName == "" then
+        return false
+    end
+
+    self.botName = botName
+    self.pendingBot = botName
+    self.bridgeToken = token
+    self.entries = {}
+    self.selectedName = nil
+
+    if self.frame and self.frame.setBotName then
+        self.frame:setBotName(botName)
+    end
+
+    self:RenderEntryList()
+    self:RenderSelectedOutfit()
+    self:SetStatus(outfitL("loading"))
+    return true
+end
+
+function OutfitUI:HandleBridgeLine(botName, token, rawLine)
+    if not botName or botName == "" then
+        return false
+    end
+
+    if self.bridgeToken and token and token ~= self.bridgeToken then
+        return false
+    end
+
+    if self.pendingBot and self.pendingBot ~= botName then
+        return false
+    end
+
+    local entry = parseOutfitLine(rawLine)
+    if entry then
+        table.insert(self.entries, entry)
+        return true
+    end
+
+    return false
+end
+
+function OutfitUI:HandleBridgeEnd(botName, token)
+    if not botName or botName == "" then
+        return false
+    end
+
+    if self.bridgeToken and token and token ~= self.bridgeToken then
+        return false
+    end
+
+    self.bridgeToken = nil
+    self:FinishList(botName)
+
+    local waitButton = getUnitWaitButton(botName)
+    if waitButton and waitButton.waitFor == "OUTFITS" then
+        waitButton.waitFor = ""
+    end
+
+    return true
+end
+
+function OutfitUI:HandleBridgeCommandResult(botName, token, result)
+    if not botName or botName == "" then
+        return false
+    end
+
+    self:EndCommandLock(botName, nil, false)
+    if result ~= "OK" then
+        self:SetStatus(outfitL("command_failed"))
+        return false
+    end
+
+    self:SetStatus(outfitL("loaded"))
+
+    local refreshDelay = OUTFIT_UPDATE_REFRESH_DELAY
+    if MultiBot.TimerAfter then
+        MultiBot.TimerAfter(refreshDelay, function()
+            self:RequestList(botName)
+        end)
+    else
+        self:RequestList(botName)
+    end
+
     return true
 end
 
@@ -1046,15 +1138,21 @@ function OutfitUI:RunCommand(commandSuffix, statusText, refreshDelay, persistDel
         commandSuffix = trim(commandSuffix)
     end
 
-    -- print("OutfitUI DEBUG: sending -> 'outfit " .. tostring(commandSuffix) .. "' to " .. tostring(botName))
-    SendChatMessage("outfit " .. commandSuffix, "WHISPER", nil, botName)
-    self:SetStatus(statusText)
-
     if self:IsCommandBusy(botName) then
         self.pendingRefresh = true
         self:SetStatus(outfitL("busy_wait"))
         return false
     end
+
+    if MultiBot.Comm and MultiBot.Comm.RunOutfitCommand and MultiBot.Comm.RunOutfitCommand(botName, commandSuffix, type(persistDelay) == "number" and persistDelay >= 0) then
+        self:BeginCommandLock(botName)
+        self:SetStatus(statusText)
+        return true
+    end
+
+    -- print("OutfitUI DEBUG: sending -> 'outfit " .. tostring(commandSuffix) .. "' to " .. tostring(botName))
+    SendChatMessage("outfit " .. commandSuffix, "WHISPER", nil, botName)
+    self:SetStatus(statusText)
 
     local commandToken = nil
     if type(refreshDelay) == "number" and refreshDelay > 0 then
