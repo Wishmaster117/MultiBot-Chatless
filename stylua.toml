@@ -1,0 +1,12 @@
+indent_type = "Spaces" # ("Spaces" ou "Tabs")
+indent_width = 4 # (nombre d’espaces)
+column_width = 120 # (largeur max)
+quote_style = "AutoPreferDouble" # ("AutoPreferDouble", "AutoPreferSingle", "ForceDouble", "ForceSingle")
+line_endings = "Unix" # ("Unix" ou "Windows")
+collapse_simple_statement = "Never" # ("Always", "Never", "FunctionOnly")
+
+# Options supplémentaires
+no_call_parentheses = false # true/false supprime les parenthèses autour des appels de fonction avec un seul argument littéral
+
+[sort_requires]
+enabled = false

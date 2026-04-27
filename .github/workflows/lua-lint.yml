@@ -1,0 +1,22 @@
+name: Lua Lint
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Lua and LuaRocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.3 luarocks liblua5.3-dev
+
+      - name: Install Luacheck (local)
+        run: |
+          luarocks install --local luacheck
+          echo "$HOME/.luarocks/bin" >> $GITHUB_PATH
+
+      - name: Run Luacheck
+        run: luacheck .

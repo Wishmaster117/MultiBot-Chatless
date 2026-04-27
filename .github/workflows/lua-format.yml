@@ -1,0 +1,27 @@
+name: Lua Format
+
+on: [push, pull_request]
+
+jobs:
+  stylua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Stylua
+        run: cargo install stylua --locked
+        
+      - name: Run Stylua format file by file
+        run: |
+          # depuis la racine du dépôt, formate tous les .lua sous MultiBot
+          find MultiBot -type f -name "*.lua" -print0 |
+          while IFS= read -r -d '' file; do
+            echo "➡️ Formatting $file"
+            stylua "$file"
+          done

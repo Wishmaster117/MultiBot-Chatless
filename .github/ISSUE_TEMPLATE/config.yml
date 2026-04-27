@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation / Wiki
+    url: https://github.com/Wishmaster117/MultiBot/wiki
+    about: Please check the docs before opening an issue.
+  - name: 💬 Quick support
+    url: https://www.azerothdevs.com/index.php
+    about: For usage or installation questions.
