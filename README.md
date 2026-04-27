@@ -553,6 +553,8 @@ MultiBot-Chatless/
 
 MultiBot is built for use with AzerothCore `mod-playerbots`.
 
+Thanks to <b>Macx-Lio</b> for the original MultiBot Module.
+
 Thanks to the Playerbots team and the AzerothCore community.
 
 ---
