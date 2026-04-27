@@ -118,6 +118,7 @@ local function ensureBridgeState()
   state.glyphSeq = state.glyphSeq or 0
   state.glyphActive = state.glyphActive or nil
   state.rtiSeq = state.rtiSeq or 0
+  state.combatSeq = state.combatSeq or 0
   return state
 end
 
@@ -267,6 +268,31 @@ function Comm.RunRtiCommand(scope, target, command)
   local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.rtiSeq)
 
   return Comm.Send("RUN", "RTI~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
+end
+
+function Comm.RunCombatCommand(scope, target, command)
+  local state = ensureBridgeState()
+
+  if not state.connected then
+    return false
+  end
+
+  command = trim(command or "")
+  if command == "" then
+    return false
+  end
+
+  scope = string.upper(trim(scope or "BOT"))
+  target = trim(target or "")
+
+  if scope ~= "ALL" and scope ~= "GROUP" and scope ~= "BOT" then
+    return false
+  end
+
+  state.combatSeq = (tonumber(state.combatSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.combatSeq)
+
+  return Comm.Send("RUN", "COMBAT~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
 end
 
 function Comm.RequestOutfits(name)
@@ -1612,6 +1638,13 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     debugPrint("ADDON:RX", "RTI_ACK", payload or "")
+    return true
+  end
+
+  if opcode == "COMBAT_ACK" then
+    state.connected = true
+    state.lastError = nil
+    debugPrint("ADDON:RX", "COMBAT_ACK", payload or "")
     return true
   end
 
