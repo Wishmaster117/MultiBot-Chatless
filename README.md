@@ -182,7 +182,7 @@ The goal is to remove automatic UI-refresh spam.
 
 ## Server
 
-- AzerothCore WotLK.
+- [`AzerothCore WotLK`](https://github.com/mod-playerbots/azerothcore-wotlk/tree/Playerbot).
 - [`mod-playerbots`](https://github.com/mod-playerbots/mod-playerbots).
 - [`mod-multibot-bridge`](https://github.com/Wishmaster117/mod-multibot-bridge).
 
