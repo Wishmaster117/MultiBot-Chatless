@@ -32,3 +32,6 @@ Nouvelles fonctions de configuration de l'interface
 Auto masquage de la main barre avec reglage du temps
 gestion de profiles UI
 bouton pour cacher les quickshaman et quickHunter
+Nouvel interface Iconos
+Nouvel interface Itemus
+Nouvel interface et fonctions pour la gestion des RTI

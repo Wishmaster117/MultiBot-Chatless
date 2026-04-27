@@ -2,7 +2,7 @@
 std = "lua53"
 
 exclude_files = {
-   "MultiBot/Libs/**"
+   "Libs/**"
 }
 
 globals = {
