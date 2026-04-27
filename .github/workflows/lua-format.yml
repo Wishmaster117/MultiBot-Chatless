@@ -20,7 +20,7 @@ jobs:
       - name: Run Stylua format file by file
         run: |
           # depuis la racine du dépôt, formate tous les .lua sous MultiBot
-          find MultiBot -type f -name "*.lua" -print0 |
+          find . -type f -name "*.lua" -not -path "./.git/*" -print0 |
           while IFS= read -r -d '' file; do
             echo "➡️ Formatting $file"
             stylua "$file"
