@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="1024" alt="MultiBot Preview" src="https://github.com/user-attachments/assets/3ac43983-8767-4dd6-9a17-4548ede1e9d3" />
+  <img width="1024" height="1024" alt="Gemini_Generated_Image_s1mnq6s1mnq6s1mn" src="https://github.com/user-attachments/assets/08aa1768-f5c2-49ce-9fe0-a22adb184ce7" />
 </p>
 
 <div align="center">
