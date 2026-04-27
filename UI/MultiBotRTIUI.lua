@@ -11,13 +11,6 @@ local RTI_ATTACK_ICONS = {
     { key = "skull",    id = 8, label = "Skull",    labelKey = "rti.icon.skull"    },
 }
 
-local RTI_CC_ICONS = {
-    { key = "moon",     id = 5, label = "Moon",     labelKey = "rti.icon.moon"     },
-    { key = "square",   id = 6, label = "Square",   labelKey = "rti.icon.square"   },
-    { key = "triangle", id = 4, label = "Triangle", labelKey = "rti.icon.triangle" },
-    { key = "diamond",  id = 3, label = "Diamond",  labelKey = "rti.icon.diamond"  },
-}
-
 local function raidIconTexture(iconId)
     return "Interface\\TARGETINGFRAME\\UI-RaidTargetingIcon_" .. tostring(iconId)
 end

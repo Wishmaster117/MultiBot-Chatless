@@ -99,7 +99,7 @@ function MultiBot.InitializeLeftCoreUI(tLeft)
 
     if MultiBot.BindShiftRightSwapButtons then
         MultiBot.BindShiftRightSwapButtons(tLeft, "LeftRoot", {
-            { name = "BotRTI", id = "BotRTIActionButton", frameName = "BotRTIAction" },		
+            { name = "BotRTI", id = "BotRTIActionButton", frameName = "BotRTIAction" },
             { name = "Tanker" },
             { name = "Mode", frameName = "Mode" },
             { name = "Stay" },
