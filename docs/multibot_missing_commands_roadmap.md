@@ -9,12 +9,79 @@ Ce document suit les commandes `mod-playerbots` encore intéressantes à intégr
 - les commandes serveur/admin à ne pas intégrer dans l'addon ;
 - les priorités d'intégration bridge-first/chatless.
 
-Le principe reste le même que pour Inventory, Spellbook, Glyphs et Outfits :  
+Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits et RTI :  
 **éviter le spam chat automatique**, utiliser le bridge quand c'est possible, et conserver les commandes manuelles utiles comme `who`, `co ?`, `nc ?`, `ss ?`.
 
 ---
 
+## État d'avancement déjà réalisé
+
+### Déjà migré / déjà présent en bridge-first
+
+| Sujet | Statut | Notes |
+|---|---:|---|
+| Roster / Units | Fait | Peuplement via bridge, sans dépendre du spam `.playerbot bot list` côté UI. |
+| States | Fait | Récupération structurée via bridge. |
+| Inventory | Fait | Fenêtre inventaire alimentée par `GET~INVENTORY`, sans parsing chat automatique. |
+| Spellbook | Fait | Migré vers bridge, avec logs serveur, sans spam chat automatique. |
+| Glyphs | Fait | Endpoint bridge ajouté et UI alimentée par payloads structurés. |
+| Talent specs | Partiel/Fait | Liste/specs présentes côté UI/bridge, à consolider selon les prochains besoins. |
+| Stats / PvP stats | Fait | Requêtes bridge présentes. |
+| Quests | Présent | UI quêtes existante, pas à mélanger avec les commandes manuelles de diagnostic. |
+| Outfits | Fait | Endpoint bridge + commandes outfits intégrées. |
+| RTI / Target Icons | Fait | UI complète + bridge `RUN~RTI`, scopes `ALL`, `GROUP`, `BOT`. |
+
+### Dernier lot terminé : RTI / Target Icons
+
+Le système RTI a été intégré en mode bridge-first/chatless pour les usages UI. Les commandes manuelles playerbots restent utilisables séparément dans le chat.
+
+Fonctionnalités terminées :
+
+- endpoint addon -> bridge `RUN~RTI~<scope>~<target>~<token>~<command>` ;
+- validation serveur des commandes RTI autorisées ;
+- scopes supportés :
+  - `ALL` pour tous les bots ;
+  - `GROUP` avec groupe de raid ciblé ;
+  - `BOT` pour un bot précis ;
+- commandes autorisées côté bridge :
+  - `rti <icon>` ;
+  - `rti cc <icon>` ;
+  - `attack rti target` ;
+  - `pull rti target` ;
+- panneau RTI global dans la barre Units ;
+- bouton `All` à gauche du bouton RTI ;
+- boutons groupes numérotés à droite du bouton RTI ;
+- menu vertical vers le haut pour choisir l'icône RTI d'un scope ;
+- remplacement visuel du bouton All/Groupe par l'icône RTI sélectionnée ;
+- bouton/reset par défaut dans les menus RTI pour retirer l'icône mémorisée ;
+- boutons `Attack` et `Pull` pour les RTI de groupe/global ;
+- collapse/refermeture des everybars quand on ouvre un menu RTI ;
+- bouton RTI dans chaque everybar de bot ;
+- menu vertical vers le haut dans chaque everybar pour choisir l'icône RTI du bot ;
+- remplacement visuel du bouton RTI du bot par l'icône choisie ;
+- reset visuel correct vers l'icône par défaut ;
+- mémoire d'affichage des RTI bot quand on ferme/réouvre la barre Units ;
+- bouton d'action RTI personnel dans la main bar, placé à gauche de `Attaque Tank` ;
+- menu vertical `Attaquer` / `Pull` pour envoyer en batch tous les bots ayant une RTI personnelle mémorisée ;
+- tooltips RTI passés en variables AceLocale ;
+- traductions RTI ajoutables dans les fichiers locale.
+
+Notes fonctionnelles importantes :
+
+- `rti <icon>` ou `rti cc <icon>` ne doit servir qu'à mémoriser l'icône RTI que le bot ou le groupe doit focus.
+- `attack rti target` et `pull rti target` consomment ensuite cette configuration pour déclencher l'action.
+- Pour éviter les attaques involontaires, l'UI ne doit pas poser de marque sur un mob : elle configure seulement l'icône préférée côté bots.
+- Si `skull` déclenche un comportement automatique côté playerbots selon configuration/stratégie, éviter d'utiliser le crâne comme icône par défaut visuelle dans l'UI.
+
+---
+
 ## Priorité 1 - RTI / Target Icons
+
+### Statut
+
+**Terminé côté MultiBot + bridge.**
+
+Le sujet reste dans la roadmap uniquement comme référence technique et UX, car c'est le premier gros bloc de commandes manquantes ajouté dans cette phase.
 
 ### Pourquoi
 
@@ -25,38 +92,79 @@ Le système RTI est très utile pour contrôler les bots en donjon/raid :
 - définir une cible de contrôle de foule ;
 - améliorer les pulls propres et le focus mono-cible.
 
-### Commandes à couvrir
+### Commandes couvertes
 
 | Commande playerbots | Statut MultiBot | Priorité | Proposition UI |
 |---|---:|---:|---|
-| `rti skull` | Manquant | Haute | Bouton icône crâne |
-| `rti cross` | Manquant | Haute | Bouton icône croix |
-| `rti circle` | Manquant | Haute | Bouton icône cercle |
-| `rti star` | Manquant | Haute | Bouton icône étoile |
-| `rti square` | Manquant | Haute | Bouton icône carré |
-| `rti triangle` | Manquant | Haute | Bouton icône triangle |
-| `rti diamond` | Manquant | Haute | Bouton icône diamant |
-| `rti moon` | Manquant | Haute | Bouton icône lune |
-| `attack rti target` | Manquant | Haute | Bouton "Attack RTI" |
-| `rti cc <icon>` | Manquant | Haute | Sélecteur CC target |
+| `rti skull` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
+| `rti cross` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
+| `rti circle` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
+| `rti star` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
+| `rti square` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
+| `rti triangle` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
+| `rti diamond` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
+| `rti moon` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
+| `rti cc <icon>` | Fait côté bridge | Haute | Commande autorisée, UI CC à réévaluer si besoin dédié |
+| `attack rti target` | Fait | Haute | Bouton Attack global/groupe + bouton batch bots personnels |
+| `pull rti target` | Fait | Haute | Bouton Pull global/groupe + bouton batch bots personnels |
 
-### Implémentation conseillée
-
-Ajouter une petite fenêtre ou section `RTI` avec les 8 icônes de raid.
-
-Flux conseillé :
+### Flux bridge final
 
 ```text
-RUN~COMMAND~<scope/bot>~<token>~rti skull
-RUN~COMMAND~<scope/bot>~<token>~attack rti target
-RUN~COMMAND~<scope/bot>~<token>~rti cc moon
+RUN~RTI~ALL~~<token>~rti star
+RUN~RTI~GROUP~1~<token>~rti square
+RUN~RTI~GROUP~2~<token>~rti star
+RUN~RTI~BOT~Dollu~<token>~rti square
+RUN~RTI~BOT~Zakinje~<token>~rti star
+RUN~RTI~ALL~~<token>~attack rti target
+RUN~RTI~GROUP~1~<token>~pull rti target
+RUN~RTI~BOT~Dollu~<token>~attack rti target
 ```
 
-À faire idéalement en bridge-first, sans parsing chat.
+### UX actuelle
+
+#### Barre Units
+
+```text
+[All] [RTI] [1] [2] [3] [4] ... [Attack] [Pull]
+```
+
+- `All` ouvre un menu vertical vers le haut pour choisir le RTI de tous les bots.
+- Chaque bouton groupe ouvre un menu vertical vers le haut pour choisir le RTI du groupe.
+- L'icône choisie remplace l'icône par défaut du bouton.
+- Le reset remet l'icône par défaut.
+- `Attack` / `Pull` déclenchent les groupes configurés ou tous les bots selon le scope.
+
+#### Everybar de bot
+
+```text
+[RTI bot]
+  └─ menu vertical : Star / Circle / Diamond / Triangle / Moon / Square / Cross / Skull / Default
+```
+
+- Chaque bot peut recevoir son RTI personnel.
+- Le choix est mémorisé visuellement pendant l'ouverture/fermeture des Units.
+- Le bouton batch de la main bar permet d'envoyer tous les bots personnels en même temps.
+
+#### Main bar
+
+```text
+[Bot RTI Action] [Attaque Tank]
+  └─ Attaquer
+  └─ Pull
+```
+
+- `Attaquer` envoie `attack rti target` à tous les bots ayant une RTI personnelle mémorisée.
+- `Pull` envoie `pull rti target` à tous les bots ayant une RTI personnelle mémorisée.
 
 ---
 
 ## Priorité 2 - Pull Control
+
+### Statut
+
+**Partiellement fait grâce à RTI.**  
+Les actions `attack rti target` et `pull rti target` sont intégrées. Le vrai panneau `Pull Control` reste à faire pour les stratégies et temporisations.
 
 ### Pourquoi
 
@@ -66,14 +174,15 @@ Les pulls propres demandent plusieurs commandes combinées. Une UI dédiée évi
 
 | Commande playerbots | Statut MultiBot | Priorité | Proposition UI |
 |---|---:|---:|---|
+| `pull rti target` | Fait | Haute | Bouton Pull RTI global/groupe/bot personnel |
+| `attack rti target` | Fait | Haute | Bouton Attack RTI global/groupe/bot personnel |
 | `wait for attack time <seconds>` | Manquant | Haute | Champ numérique 0-10 sec |
 | `co +focus` / `co -focus` | Manquant ou non exposé clairement | Haute | Toggle Focus |
 | `co -aoe` / `co +aoe` | Partiel | Haute | Toggle AoE during pull |
 | `co +assist` | Partiel | Haute | Toggle Assist |
-| `attack rti target` | Manquant | Haute | Bouton Attack RTI |
 | `co +tank assist` | Partiel | Moyenne | Toggle Tank Assist |
 
-### Proposition UI
+### Proposition UI restante
 
 Créer une section `Pull Control` :
 
@@ -82,7 +191,8 @@ Créer une section `Pull Control` :
 | Wait before attack | `wait for attack time X` |
 | Single target pull | `co +focus,-aoe,+assist` |
 | Enable AoE again | `co +aoe,-focus` |
-| Attack RTI target | `attack rti target` |
+| Attack RTI target | Déjà fait via RTI |
+| Pull RTI target | Déjà fait via RTI |
 | Tank assist | `co +tank assist` |
 
 ### Notes
@@ -293,15 +403,15 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 
 ## Synthèse des prochaines étapes conseillées
 
-| Ordre | Sujet | Type | Priorité |
-|---:|---|---|---:|
-| 1 | RTI bridge-first | Nouvelle UI + bridge command | Haute |
-| 2 | Pull Control | Nouvelle UI + séquences commandes | Haute |
-| 3 | Advanced Combat Strategies | UI toggles | Haute/Moyenne |
-| 4 | Disperse | Petite UI | Moyenne |
-| 5 | Loot Rules | Petite UI profils | Moyenne |
-| 6 | Trainer / Maintenance extras | UI maintenance | Moyenne/Basse |
-| 7 | Items avancés | Extensions inventaire | Basse/Moyenne |
+| Ordre | Sujet | Type | Priorité | Statut |
+|---:|---|---|---:|---:|
+| 1 | RTI bridge-first | UI + bridge command | Haute | Fait |
+| 2 | Pull Control avancé | Nouvelle UI + séquences commandes | Haute | À faire |
+| 3 | Advanced Combat Strategies | UI toggles | Haute/Moyenne | À faire |
+| 4 | Disperse | Petite UI | Moyenne | À faire |
+| 5 | Loot Rules | Petite UI profils | Moyenne | À faire |
+| 6 | Trainer / Maintenance extras | UI maintenance | Moyenne/Basse | À faire |
+| 7 | Items avancés | Extensions inventaire | Basse/Moyenne | À faire |
 
 ---
 
@@ -310,6 +420,8 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 - Toute nouvelle commande utilisée automatiquement par l'addon devrait passer par le bridge quand possible.
 - Les commandes manuelles informatives doivent rester fonctionnelles en whisper/party/raid.
 - Ne pas réintroduire de parsing chat automatique pour peupler l'UI.
-- Pour les commandes qui ne nécessitent aucun retour structuré, un endpoint générique de type `RUN~COMMAND` peut suffire.
+- Pour les commandes qui ne nécessitent aucun retour structuré, un endpoint générique de type `RUN~COMMAND` ou un endpoint spécialisé comme `RUN~RTI` peut suffire.
 - Pour les commandes qui doivent alimenter une frame, préférer un endpoint structuré dédié.
 - Les commandes serveur/admin ne doivent pas être exposées dans l'addon utilisateur.
+- Les boutons ajoutés dans les barres doivent conserver une position cohérente avec `MultiBotLeftCoreUI.lua` et la position par défaut de `MultiBar` dans `MultiBotInit.lua` / reset dans `MultiBotMainUI.lua`.
+- Les tooltips nouvellement ajoutés doivent passer par AceLocale, comme les tooltips RTI.

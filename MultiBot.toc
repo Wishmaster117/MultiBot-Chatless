@@ -99,6 +99,7 @@ UI\MultiBotCreatorUI.lua
 UI\MultiBotMainUI.lua
 UI\MultiBotGmUI.lua
 UI\MultiBotRTSCUI.lua
+UI\MultiBotRTIUI.lua
 Core\MultiBotInit.lua
 Data\MultiBotIconos.lua
 Data\MultiBotItemus.lua

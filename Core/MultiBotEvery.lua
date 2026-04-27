@@ -166,6 +166,11 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 		end
 	end
 
+	local botName = pFrame.getName and pFrame.getName() or nil
+	if MultiBot.BuildBotRTIUI and botName and botName ~= "" then
+		MultiBot.BuildBotRTIUI(pFrame, botName, 394, 0)
+	end
+
 	pFrame.addButton("Spellbook", 274, 0, "inv_misc_book_09", MultiBot.L("tips.every.spellbook")).setDisable()
 	.doLeft = function(pButton)
 		if(pButton.state) then

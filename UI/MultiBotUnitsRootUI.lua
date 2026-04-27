@@ -878,7 +878,7 @@ local function createInviteControls(controlFrame)
 end
 
 local function createBrowseButton(controlFrame)
-    controlFrame.addButton("Browse", 0, 150, "Interface\\AddOns\\MultiBot\\Icons\\browse.blp", MultiBot.L("tips.units.browse"))
+    controlFrame.addButton("Browse", 0, 180, "Interface\\AddOns\\MultiBot\\Icons\\browse.blp", MultiBot.L("tips.units.browse"))
         .doLeft = function()
             local unitsButton = MultiBot.frames.MultiBar.buttons[UNITS_BUTTON_NAME]
             local unitsFrame = unitsButton.parent.frames[UNITS_FRAME_NAME]
@@ -933,6 +933,9 @@ function MultiBot.InitializeUnitsRootUI(tMultiBar)
     createAllBotsCommands(controlFrame)
     createInviteControls(controlFrame)
     createBrowseButton(controlFrame)
+    if MultiBot.BuildRTIControlUI then
+        MultiBot.BuildRTIControlUI(controlFrame)
+    end
 
     if MultiBot.bridge and MultiBot.bridge.roster and #MultiBot.bridge.roster > 0 then
         if MultiBot.SyncBridgeRosterToPlayers then
