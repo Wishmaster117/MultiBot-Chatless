@@ -22,22 +22,6 @@ body:
       required: true
 
   - type: input
-    id: addon_version
-    attributes:
-      label: Addon version
-      placeholder: "e.g., v1.2.3"
-    validations:
-      required: false
-
-  - type: input
-    id: wow_version
-    attributes:
-      label: WoW client version
-      placeholder: "e.g., 3.3.5"
-    validations:
-      required: false
-
-  - type: input
     id: server_version
     attributes:
       label: Server/AzerothCore version
@@ -66,7 +50,7 @@ body:
         3. Observe '...'
       render: markdown
     validations:
-      required: false
+      required: true
 
   - type: textarea
     id: expected
