@@ -23,6 +23,10 @@ MultiBot.addWarrior = function(pFrame, pCombat, pNormal)
 		end
 	end
 
+	if MultiBot.AddCommonCombatStrategyButtons then
+		MultiBot.AddCommonCombatStrategyButtons(pFrame, tFrame, pCombat, 52)
+	end
+
 	-- ASSIST --
 
 	pFrame.addButton("TankAssist", -30, 0, "ability_warrior_innerrage", MultiBot.L("tips.warrior.tankAssist")).setDisable()

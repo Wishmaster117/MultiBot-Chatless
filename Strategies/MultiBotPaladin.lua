@@ -322,6 +322,10 @@ MultiBot.addPaladin = function(pFrame, pCombat, pNormal)
         end
     end
 
+	if MultiBot.AddCommonCombatStrategyButtons then
+		MultiBot.AddCommonCombatStrategyButtons(pFrame, dpsFrame, pCombat, 130)
+	end
+
 	-- ASSIST --
 
 	pFrame.addButton("TankAssist", -150, 0, "ability_warrior_innerrage", MultiBot.L("tips.paladin.tankAssist")).setDisable()

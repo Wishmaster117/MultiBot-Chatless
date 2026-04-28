@@ -332,3 +332,55 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 	if(MultiBot.isInside(pNormal, "loot")) then pFrame.getButton("Loot").setEnable() end
 	if(MultiBot.isInside(pNormal, "gather")) then pFrame.getButton("Gather").setEnable() end
 end
+
+local function sendCommonCombatStrategy(pButton, command)
+	local botName = pButton and pButton.getName and pButton.getName() or nil
+	if type(botName) ~= "string" or botName == "" then
+		return false
+	end
+
+	if MultiBot.Comm and type(MultiBot.Comm.RunCombatCommand) == "function" then
+		return MultiBot.Comm.RunCombatCommand("BOT", botName, command)
+	end
+
+	SendChatMessage(command, "WHISPER", nil, botName)
+	return true
+end
+
+local function addCommonCombatStrategyButton(pFrame, pCombat, tFrame, buttonName, y, icon, tipKey, strategyName)
+	if not pFrame or not tFrame or not tFrame.addButton then
+		return
+	end
+
+	local plusCommand = "co +" .. strategyName
+	local minusCommand = "co -" .. strategyName
+
+	local button = tFrame.addButton(
+		buttonName,
+		0,
+		y,
+		"Interface\\Icons\\" .. icon,
+		MultiBot.L(tipKey)
+	):setDisable()
+
+	button.doLeft = function(self)
+		if MultiBot.OnOffSwitch(self) then
+			sendCommonCombatStrategy(self, plusCommand)
+		else
+			sendCommonCombatStrategy(self, minusCommand)
+		end
+	end
+
+	if MultiBot.isInside(pCombat, strategyName) then
+		pFrame.getButton(buttonName).setEnable()
+	end
+end
+
+function MultiBot.AddCommonCombatStrategyButtons(pFrame, tFrame, pCombat, yOffset)
+	local y = tonumber(yOffset) or 0
+
+	addCommonCombatStrategyButton(pFrame, pCombat, tFrame, "AvoidAoe", y, "spell_shadow_antishadow.blp", "tips.every.strategy.avoidaoe", "avoid aoe")
+	addCommonCombatStrategyButton(pFrame, pCombat, tFrame, "SaveMana", y + 26, "spell_frost_manarecharge.blp", "tips.every.strategy.savemana", "save mana")
+	addCommonCombatStrategyButton(pFrame, pCombat, tFrame, "Threat", y + 52, "ability_warrior_challange.blp", "tips.every.strategy.threat", "threat")
+	addCommonCombatStrategyButton(pFrame, pCombat, tFrame, "Behind", y + 78, "ability_backstab.blp", "tips.every.strategy.behind", "behind")
+end

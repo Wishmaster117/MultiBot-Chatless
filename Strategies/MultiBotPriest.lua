@@ -118,6 +118,10 @@ MultiBot.addPriest = function(pFrame, pCombat, pNormal)
 		end
 	end
 
+	if MultiBot.AddCommonCombatStrategyButtons then
+		MultiBot.AddCommonCombatStrategyButtons(pFrame, dpsControlFrame, pCombat, 104)
+	end
+
 	-- ASSIST --
 
 	pFrame.addButton("TankAssist", -120, 0, "ability_warrior_innerrage", MultiBot.L("tips.priest.tankAssist")).setDisable()

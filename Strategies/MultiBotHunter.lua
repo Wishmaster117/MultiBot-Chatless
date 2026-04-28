@@ -162,6 +162,10 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 		MultiBot.OnOffActionToTarget(pButton, "co +trap weave,?", "co -trap weave,?", pButton.getName())
 	end
 
+	if MultiBot.AddCommonCombatStrategyButtons then
+		MultiBot.AddCommonCombatStrategyButtons(pFrame, dpsFrame, pCombat, 130)
+	end
+
 	-- ASSIST --
 
 	pFrame.addButton("TankAssist", -90, 0, "ability_warrior_innerrage", MultiBot.L("tips.hunter.tankAssist")).setDisable()

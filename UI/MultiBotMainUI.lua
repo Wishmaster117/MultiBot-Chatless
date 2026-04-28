@@ -718,6 +718,143 @@ local function createPullControlFrame(mainFrame, pullButton)
     return frame
 end
 
+local function sendMainCombatStrategy(scope, strategyName, enabled)
+	local command = "co " .. (enabled and "+" or "-") .. strategyName
+
+	if MultiBot.Comm and type(MultiBot.Comm.RunCombatCommand) == "function" then
+		return MultiBot.Comm.RunCombatCommand(scope, "", command)
+	end
+
+	if scope == "ALL" then
+		SendChatMessage(command, GetNumRaidMembers() > 0 and "RAID" or "PARTY")
+	else
+		SendChatMessage(command, "PARTY")
+	end
+
+	return true
+end
+
+local function showMainCombatStrategyTooltip(owner)
+	if not owner or not GameTooltip then
+		return
+	end
+
+	GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+	GameTooltip:SetText(owner._mbTip or "", 1, 1, 1, true)
+	GameTooltip:Show()
+end
+
+local function hideMainCombatStrategyTooltip()
+	if GameTooltip then
+		GameTooltip:Hide()
+	end
+end
+
+local function addMainCombatStrategyButton(frame, name, x, y, icon, tipKey, scope, strategyName)
+	if not frame then
+		return nil
+	end
+
+	local button = CreateFrame("Button", "MultiBot" .. name, frame)
+	button:SetSize(28, 28)
+	button:SetPoint("TOPLEFT", frame, "TOPLEFT", x, y)
+	button:RegisterForClicks("LeftButtonDown")
+	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	button:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
+	button._mbTip = MultiBot.L(tipKey)
+	button._mbScope = scope
+	button._mbStrategyName = strategyName
+
+	button.icon = button:CreateTexture(nil, "BACKGROUND")
+	button.icon:SetTexture(MultiBot.SafeTexturePath("Interface\\Icons\\" .. icon))
+	button.icon:SetAllPoints(button)
+
+	button.border = button:CreateTexture(nil, "ARTWORK")
+	button.border:SetTexture("Interface\\AddOns\\MultiBot\\Icons\\border.blp")
+	button.border:SetPoint("CENTER", button, "CENTER", 0, 0)
+	button.border:SetSize(34, 34)
+	button.border:Hide()
+
+	button:SetScript("OnEnter", showMainCombatStrategyTooltip)
+	button:SetScript("OnLeave", hideMainCombatStrategyTooltip)
+	button:SetScript("OnClick", function(self)
+		local enabled = not self.state
+		if sendMainCombatStrategy(self._mbScope, self._mbStrategyName, enabled) then
+			setPullControlButtonState(self, enabled)
+		end
+	end)
+
+	setPullControlButtonState(button, false)
+
+	frame.buttons = frame.buttons or {}
+	frame.buttons[name] = button
+	return button
+end
+
+local function createCombatStrategiesHeader(frame, text, x)
+	local label = frame:CreateFontString(nil, "ARTWORK")
+	label:SetFont("Fonts\\ARIALN.ttf", 10, "OUTLINE")
+	label:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -8)
+	label:SetWidth(34)
+	label:SetJustifyH("CENTER")
+	label:SetText(text)
+	return label
+end
+
+local function createCombatStrategiesButton(mainFrame)
+	local controlFrame = CreateFrame("Frame", "MultiBotCombatStrategiesControl", mainFrame)
+	controlFrame:SetSize(92, 138)
+	controlFrame:SetFrameLevel((mainFrame:GetFrameLevel() or 0) + 20)
+	controlFrame:EnableMouse(true)
+	controlFrame._mbDropdownManaged = true
+	controlFrame:Hide()
+
+	controlFrame.bg = controlFrame:CreateTexture(nil, "BACKGROUND")
+	controlFrame.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+	controlFrame.bg:SetAllPoints(controlFrame)
+	controlFrame.bg:SetVertexColor(0, 0, 0, 0.78)
+
+	controlFrame.edge = CreateFrame("Frame", nil, controlFrame)
+	controlFrame.edge:SetPoint("TOPLEFT", controlFrame, "TOPLEFT", -1, 1)
+	controlFrame.edge:SetPoint("BOTTOMRIGHT", controlFrame, "BOTTOMRIGHT", 1, -1)
+	controlFrame.edge:SetBackdrop({
+		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+		edgeSize = 12,
+	})
+	controlFrame.edge:SetBackdropBorderColor(0.85, 0.85, 0.85, 0.85)
+
+	createCombatStrategiesHeader(controlFrame, "Party", 10)
+	createCombatStrategiesHeader(controlFrame, "Raid", 50)
+
+	addMainCombatStrategyButton(controlFrame, "CombatPartyAvoidAoe", 12, -26, "spell_shadow_antishadow", "tips.main.combat.party.avoidaoe", "GROUP", "avoid aoe")
+	addMainCombatStrategyButton(controlFrame, "CombatRaidAvoidAoe", 52, -26, "spell_shadow_antishadow.blp", "tips.main.combat.raid.avoidaoe", "ALL", "avoid aoe")
+	addMainCombatStrategyButton(controlFrame, "CombatPartySaveMana", 12, -54, "spell_frost_manarecharge.blp", "tips.main.combat.party.savemana", "GROUP", "save mana")
+	addMainCombatStrategyButton(controlFrame, "CombatRaidSaveMana", 52, -54, "spell_frost_manarecharge.blp", "tips.main.combat.raid.savemana", "ALL", "save mana")
+	addMainCombatStrategyButton(controlFrame, "CombatPartyThreat", 12, -82, "ability_warrior_challange.blp", "tips.main.combat.party.threat", "GROUP", "threat")
+	addMainCombatStrategyButton(controlFrame, "CombatRaidThreat", 52, -82, "ability_warrior_challange.blp", "tips.main.combat.raid.threat", "ALL", "threat")
+	addMainCombatStrategyButton(controlFrame, "CombatPartyBehind", 12, -110, "ability_backstab.blp", "tips.main.combat.party.behind", "GROUP", "behind")
+	addMainCombatStrategyButton(controlFrame, "CombatRaidBehind", 52, -110, "ability_backstab.blp", "tips.main.combat.raid.behind", "ALL", "behind")
+
+	return createMainActionButton(mainFrame, {
+		name = "CombatStrategies",
+		y = 340,
+		icon = "ability_warrior_battleshout",
+		tip = "tips.main.combat",
+		doLeft = function(button)
+			if controlFrame:IsShown() then
+				controlFrame:Hide()
+				button:setDisable()
+				return
+			end
+
+			controlFrame:ClearAllPoints()
+			controlFrame:SetPoint("RIGHT", button, "LEFT", -6, 0)
+			controlFrame:Show()
+			button:setEnable()
+		end,
+	})
+end
+
 local function saveMultiBarPosition()
     local multiBar = MultiBot.frames and MultiBot.frames["MultiBar"]
     if not multiBar or not MultiBot.SetSavedLayoutValue or not MultiBot.toPoint then
@@ -1086,6 +1223,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
         "Release",
         "Stats",
         "Reward",
+        "CombatStrategies",
         "PullControl",
         "Reset",
         "Actions",
@@ -1255,6 +1393,9 @@ function MultiBot.InitializeMainUI(tMultiBar)
 
     local rewardButton = createRewardButton(mainFrame)
     wireShiftRightSwap(rewardButton, "Reward")
+	
+    local combatStrategiesButton = createCombatStrategiesButton(mainFrame)
+    wireShiftRightSwap(combatStrategiesButton, "CombatStrategies")
 
     local pullControlButton = createMainActionButton(mainFrame, {
         name = "PullControl",
