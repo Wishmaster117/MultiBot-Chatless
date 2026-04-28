@@ -16,6 +16,64 @@ if not StaticPopupDialogs["MULTIBOT_AUTOGEAR_CONFIRM"] then
   }
 end
 
+local function showEveryMessage(message)
+  if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+    DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99MultiBot|r " .. tostring(message or ""))
+  elseif print then
+    print("MultiBot " .. tostring(message or ""))
+  end
+end
+
+local function runBotCombatCommand(button, command)
+  if not button or type(command) ~= "string" or command == "" then
+    return false
+  end
+
+  local botName = button.getName and button.getName() or ""
+  if botName == "" then
+    return false
+  end
+
+  local comm = MultiBot and MultiBot.Comm or nil
+  if comm and comm.RunCombatCommand and comm.RunCombatCommand("BOT", botName, command) then
+    return true
+  end
+
+  showEveryMessage(MultiBot.L("tips.every.combatbridge", "Bridge unavailable: combat command was not sent."))
+  return false
+end
+
+local function runBotCombatToggle(button, enableCommand, disableCommand)
+  if not button then
+    return
+  end
+
+  if button.state then
+    if runBotCombatCommand(button, disableCommand) then
+      button.setDisable()
+    end
+  elseif runBotCombatCommand(button, enableCommand) then
+    button.setEnable()
+  end
+end
+
+local function addBotCombatButton(parent, name, x, y, icon, tip, enableCommand, disableCommand)
+  local button = parent.addButton(name, x, y, icon, tip)
+
+  if disableCommand then
+    button.setDisable()
+    button.doLeft = function(self)
+      runBotCombatToggle(self, enableCommand, disableCommand)
+    end
+  else
+    button.doLeft = function(self)
+      runBotCombatCommand(self, enableCommand)
+    end
+  end
+
+  return button
+end
+
 MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 
     -- MENU MISC --------------------------------------------
@@ -170,6 +228,24 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 	if MultiBot.BuildBotRTIUI and botName and botName ~= "" then
 		MultiBot.BuildBotRTIUI(pFrame, botName, 394, 0)
 	end
+
+	local combatFrame = pFrame.addFrame("CombatCommands", 424, 29, nil, 58, 114)
+	combatFrame:Hide()
+	combatFrame._mbDropdownManaged = true
+
+	pFrame.addButton("Combat", 424, 0, "Ability_Warrior_BattleShout", MultiBot.L("tips.every.combat"))
+	.doLeft = function()
+		MultiBot.ShowHideSwitch(combatFrame)
+	end
+
+	addBotCombatButton(combatFrame, "CombatFocus", -28, 84, "Ability_Hunter_MasterMarksman", MultiBot.L("tips.every.combatfocus"), "co +focus", "co -focus")
+	addBotCombatButton(combatFrame, "CombatAoe", 0, 84, "Spell_Fire_SelfDestruct", MultiBot.L("tips.every.combataoe"), "co +aoe", "co -aoe")
+	addBotCombatButton(combatFrame, "CombatDpsAssist", -28, 56, "Ability_Hunter_Assassinate2", MultiBot.L("tips.every.combatdpsassist"), "co +dps assist", "co -dps assist")
+	addBotCombatButton(combatFrame, "CombatTankAssist", 0, 56, "Ability_Warrior_DefensiveStance", MultiBot.L("tips.every.combattankassist"), "co +tank assist", "co -tank assist")
+	addBotCombatButton(combatFrame, "CombatWait0", -28, 28, "Spell_Holy_BorrowedTime", MultiBot.L("tips.every.combatwait0"), "wait for attack time 0")
+	addBotCombatButton(combatFrame, "CombatWait3", 0, 28, "Spell_Holy_BorrowedTime", MultiBot.L("tips.every.combatwait3"), "wait for attack time 3")
+	addBotCombatButton(combatFrame, "CombatWait5", -28, 0, "Spell_Holy_BorrowedTime", MultiBot.L("tips.every.combatwait5"), "wait for attack time 5")
+	addBotCombatButton(combatFrame, "CombatWait10", 0, 0, "Spell_Holy_BorrowedTime", MultiBot.L("tips.every.combatwait10"), "wait for attack time 10")
 
 	pFrame.addButton("Spellbook", 274, 0, "inv_misc_book_09", MultiBot.L("tips.every.spellbook")).setDisable()
 	.doLeft = function(pButton)

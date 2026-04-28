@@ -333,6 +333,391 @@ local function createMainActionButton(mainFrame, definition)
     return button
 end
 
+local function showPullControlError(key)
+    if UIErrorsFrame then
+        UIErrorsFrame:AddMessage(MultiBot.L(key), 1, 0.25, 0.25, 1)
+    end
+end
+
+local function setPullControlButtonState(button, enabled)
+    if not button then
+        return
+    end
+
+    button.state = enabled and true or false
+    button.mbActive = button.state
+
+    if button.setEnable and button.setDisable then
+        if button.state then
+            button.setEnable()
+        else
+            button.setDisable()
+        end
+        return
+    end
+
+    if button.icon and button.icon.SetDesaturated then
+        button.icon:SetDesaturated(not button.state)
+    end
+
+    if button.border then
+        if button.state then
+            button.border:Show()
+        else
+            button.border:Hide()
+        end
+    end
+end
+
+local function resolvePullControlScope(frame)
+    local scope = frame and frame._mbPullScope or "BOT"
+    local target = ""
+
+    if scope == "BOT" then
+        target = UnitName("target") or ""
+
+        if target == "" or target == UnitName("player") then
+            showPullControlError("info.pullcontrol.no_selected_bot")
+            return nil, nil
+        end
+    end
+
+    return scope, target
+end
+
+local function runPullControlCombatCommands(frame, commands)
+    local scope, target = resolvePullControlScope(frame)
+    if not scope then
+        return false
+    end
+
+    local comm = MultiBot.Comm
+    if not comm or not comm.RunCombatCommand then
+        showPullControlError("info.pullcontrol.bridge")
+        return false
+    end
+
+    local sent = false
+
+    for _, command in ipairs(commands or {}) do
+        if comm.RunCombatCommand(scope, target, command) then
+            sent = true
+        end
+    end
+
+    if not sent then
+        showPullControlError("info.pullcontrol.bridge")
+    end
+
+    return sent
+end
+
+local function runPullControlRtiCommand(frame, command)
+    local scope, target = resolvePullControlScope(frame)
+    if not scope then
+        return false
+    end
+
+    local comm = MultiBot.Comm
+    if not comm or not comm.RunRtiCommand then
+        showPullControlError("info.pullcontrol.bridge")
+        return false
+    end
+
+    if comm.RunRtiCommand(scope, target, command) then
+        return true
+    end
+
+    showPullControlError("info.pullcontrol.bridge")
+    return false
+end
+
+local function pullControlTooltip(owner, key)
+    if not owner or not GameTooltip then
+        return
+    end
+
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:SetText(MultiBot.L(key), 1, 1, 1, true)
+    GameTooltip:Show()
+end
+
+local function createPullControlIcon(frame, name, x, y, icon, tipKey, onLeft)
+    local button = CreateFrame("Button", nil, frame)
+    button:SetWidth(28)
+    button:SetHeight(28)
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", x, y)
+    button:RegisterForClicks("LeftButtonDown")
+    button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    button:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
+    button.tipKey = tipKey
+    button.state = false
+
+    button.icon = button:CreateTexture(nil, "BACKGROUND")
+    button.icon:SetTexture(MultiBot.SafeTexturePath(icon))
+    button.icon:SetAllPoints(button)
+    if button.icon.SetTexCoord then
+        button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    end
+
+    button.border = button:CreateTexture(nil, "ARTWORK")
+    button.border:SetTexture("Interface\\AddOns\\MultiBot\\Icons\\border.blp")
+    button.border:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.border:SetWidth(34)
+    button.border:SetHeight(34)
+    button.border:Hide()
+
+    button:SetScript("OnEnter", function(self)
+        pullControlTooltip(self, self.tipKey)
+    end)
+    button:SetScript("OnLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+    button:SetScript("OnClick", function(self)
+        if type(onLeft) == "function" then
+            onLeft(self)
+        end
+    end)
+
+    frame.buttons[name] = button
+    return button
+end
+
+local function createPullControlScopeButton(frame, name, x, text, tipKey, scope)
+    local button = CreateFrame("Button", "MultiBotPullControl" .. name, frame, "UIPanelButtonTemplate")
+    button:SetWidth(66)
+    button:SetHeight(20)
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -28)
+    button:SetText(text)
+    button.tipKey = tipKey
+    button.scope = scope
+
+    button:SetScript("OnEnter", function(self)
+        pullControlTooltip(self, self.tipKey)
+    end)
+    button:SetScript("OnLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+    button:SetScript("OnClick", function(self)
+        frame._mbPullScope = self.scope
+
+        for _, scopeButton in pairs(frame.scopeButtons) do
+            scopeButton:SetButtonState(scopeButton == self and "PUSHED" or "NORMAL", scopeButton == self)
+        end
+    end)
+
+    frame.scopeButtons[name] = button
+    return button
+end
+
+local function updatePullControlWaitLabel(frame)
+    if not frame or not frame.waitLabel then
+        return
+    end
+
+    frame.waitLabel:SetText("Wait: " .. tostring(frame._mbWaitTime or 0) .. "s")
+end
+
+local function setPullControlStates(frame, wait, focus, dpsAssist, dpsAoe)
+    setPullControlButtonState(frame.buttons["PullWait"], wait)
+    setPullControlButtonState(frame.buttons["PullFocus"], focus)
+    setPullControlButtonState(frame.buttons["PullDpsAssist"], dpsAssist)
+    setPullControlButtonState(frame.buttons["PullDpsAoe"], dpsAoe)
+end
+
+local function createPullControlFrame(mainFrame, pullButton)
+    local frame = CreateFrame("Frame", "MultiBotPullControlFrame", mainFrame)
+    frame:SetWidth(232)
+    frame:SetHeight(176)
+    frame:SetFrameLevel((mainFrame:GetFrameLevel() or 0) + 12)
+    frame:EnableMouse(true)
+    frame:Hide()
+
+    if pullButton then
+        frame:SetPoint("BOTTOMLEFT", pullButton, "BOTTOMRIGHT", 8, -140)
+    else
+        frame:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", 8, -340)
+    end
+
+    frame.buttons = {}
+    frame.scopeButtons = {}
+    frame._mbDropdownManaged = true
+    frame._mbPullScope = "BOT"
+    frame._mbWaitTime = 3
+
+    frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+    frame.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    frame.bg:SetAllPoints(frame)
+    frame.bg:SetVertexColor(0, 0, 0, 0.78)
+
+    frame:SetBackdrop({
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 12,
+    })
+    frame:SetBackdropBorderColor(0.85, 0.85, 0.85, 0.85)
+
+    frame.title = frame:CreateFontString(nil, "ARTWORK")
+    frame.title:SetFont("Fonts\\ARIALN.ttf", 12, "OUTLINE")
+    frame.title:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8)
+    frame.title:SetText("Pull Control")
+
+    createPullControlScopeButton(frame, "ScopeBot", 10, "Selected", "tips.main.pullscopebot", "BOT")
+    createPullControlScopeButton(frame, "ScopeGroup", 82, "Party", "tips.main.pullscopegroup", "GROUP")
+    createPullControlScopeButton(frame, "ScopeAll", 154, "Raid", "tips.main.pullscopeall", "ALL")
+    frame.scopeButtons.ScopeBot:SetButtonState("PUSHED", true)
+
+    frame.waitLabel = frame:CreateFontString(nil, "ARTWORK")
+    frame.waitLabel:SetFont("Fonts\\ARIALN.ttf", 11, "OUTLINE")
+    frame.waitLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -58)
+
+    local waitSlider = CreateFrame("Slider", "MultiBotPullControlWaitSlider", frame, "OptionsSliderTemplate")
+    waitSlider:SetWidth(118)
+    waitSlider:SetHeight(16)
+    waitSlider:SetPoint("TOPLEFT", frame, "TOPLEFT", 92, -55)
+    waitSlider:SetMinMaxValues(0, 10)
+    waitSlider:SetValueStep(1)
+    waitSlider:SetValue(frame._mbWaitTime)
+
+    if waitSlider.SetObeyStepOnDrag then
+        waitSlider:SetObeyStepOnDrag(true)
+    end
+
+    if _G.MultiBotPullControlWaitSliderLow then
+        _G.MultiBotPullControlWaitSliderLow:SetText("0")
+    end
+    if _G.MultiBotPullControlWaitSliderHigh then
+        _G.MultiBotPullControlWaitSliderHigh:SetText("10")
+    end
+    if _G.MultiBotPullControlWaitSliderText then
+        _G.MultiBotPullControlWaitSliderText:SetText("")
+    end
+
+    waitSlider:SetScript("OnValueChanged", function(_, value)
+        frame._mbWaitTime = math.floor((tonumber(value) or 0) + 0.5)
+        updatePullControlWaitLabel(frame)
+
+        if frame.buttons["PullWait"] and frame.buttons["PullWait"].state then
+            runPullControlCombatCommands(frame, {
+                "wait for attack time " .. tostring(frame._mbWaitTime or 0),
+            })
+        end
+    end)
+
+    updatePullControlWaitLabel(frame)
+
+    createPullControlIcon(frame, "PullWait", 10, -82, "Spell_Holy_BorrowedTime", "tips.main.pullwait", function(button)
+        if button.state then
+            if runPullControlCombatCommands(frame, { "wait for attack time 0" }) then
+                setPullControlButtonState(button, false)
+            end
+            return
+        end
+
+        if runPullControlCombatCommands(frame, {
+            "wait for attack time " .. tostring(frame._mbWaitTime or 0),
+        }) then
+            setPullControlButtonState(button, true)
+        end
+    end)
+
+    createPullControlIcon(frame, "PullFocus", 44, -82, "Ability_Hunter_MasterMarksman", "tips.main.pullfocus", function(button)
+        local enabled = not button.state
+        if runPullControlCombatCommands(frame, { enabled and "co +focus" or "co -focus" }) then
+            setPullControlButtonState(button, enabled)
+        end
+    end)
+
+    createPullControlIcon(frame, "PullDpsAssist", 78, -82, "Ability_Hunter_Assassinate2", "tips.main.pulldpsassist", function(button)
+        local enabled = not button.state
+        if runPullControlCombatCommands(frame, { enabled and "co +dps assist" or "co -dps assist" }) then
+            setPullControlButtonState(button, enabled)
+        end
+    end)
+
+    createPullControlIcon(frame, "PullDpsAoe", 112, -82, "Spell_Fire_SelfDestruct", "tips.main.pullaoe", function(button)
+        local enabled = not button.state
+        if runPullControlCombatCommands(frame, { enabled and "co +dps aoe" or "co -dps aoe" }) then
+            setPullControlButtonState(button, enabled)
+        end
+    end)
+
+    createPullControlIcon(frame, "PullPresetSingle", 10, -118, "ability_warrior_punishingblow", "tips.main.pullpresetsingle", function()
+        if runPullControlCombatCommands(frame, {
+            "wait for attack time 2",
+            "co +focus",
+            "co +dps assist",
+            "co -dps aoe",
+        }) then
+            frame._mbWaitTime = 2
+            waitSlider:SetValue(2)
+            setPullControlStates(frame, true, true, true, false)
+        end
+    end)
+
+    createPullControlIcon(frame, "PullPresetAoe", 44, -118, "spell_fire_meteorstorm", "tips.main.pullpresetaoe", function()
+        if runPullControlCombatCommands(frame, {
+            "wait for attack time 1",
+            "co -focus",
+            "co +dps assist",
+            "co +dps aoe",
+        }) then
+            frame._mbWaitTime = 1
+            waitSlider:SetValue(1)
+            setPullControlStates(frame, true, false, true, true)
+        end
+    end)
+
+    createPullControlIcon(frame, "PullPresetSafe", 78, -118, "ability_hunter_snipershot", "tips.main.pullpresetsafe", function()
+        if runPullControlCombatCommands(frame, {
+            "wait for attack time 5",
+            "co +focus",
+            "co -dps aoe",
+        }) then
+            frame._mbWaitTime = 5
+            waitSlider:SetValue(5)
+            setPullControlButtonState(frame.buttons["PullWait"], true)
+            setPullControlButtonState(frame.buttons["PullFocus"], true)
+            setPullControlButtonState(frame.buttons["PullDpsAoe"], false)
+        end
+    end)
+
+    createPullControlIcon(frame, "PullPresetReset", 112, -118, "spell_shadow_charm", "tips.main.pullpresetreset", function()
+        if runPullControlCombatCommands(frame, {
+            "wait for attack time 0",
+            "co -focus",
+            "co -dps assist",
+            "co -dps aoe",
+        }) then
+            frame._mbWaitTime = 0
+            waitSlider:SetValue(0)
+            setPullControlStates(frame, false, false, false, false)
+        end
+    end)
+
+    createPullControlIcon(frame, "PullRtiTarget", 160, -82, "ability_hunter_markedfordeath", "tips.main.pullrti", function()
+        runPullControlRtiCommand(frame, "pull rti target")
+    end)
+
+    createPullControlIcon(frame, "AttackRtiTarget", 194, -82, "ability_warrior_decisivestrike", "tips.main.attackrti", function()
+        runPullControlRtiCommand(frame, "attack rti target")
+    end)
+
+    frame.actionsText = frame:CreateFontString(nil, "ARTWORK")
+    frame.actionsText:SetFont("Fonts\\ARIALN.ttf", 10, "OUTLINE")
+    frame.actionsText:SetPoint("TOPLEFT", frame, "TOPLEFT", 158, -118)
+    frame.actionsText:SetWidth(64)
+    frame.actionsText:SetJustifyH("CENTER")
+    frame.actionsText:SetText("RTI\nActions")
+
+    setPullControlStates(frame, false, false, false, false)
+
+    return frame
+end
+
 local function saveMultiBarPosition()
     local multiBar = MultiBot.frames and MultiBot.frames["MultiBar"]
     if not multiBar or not MultiBot.SetSavedLayoutValue or not MultiBot.toPoint then
@@ -472,7 +857,19 @@ local function buildResolvedOrder(defaultOrder, savedOrder)
 
     for _, name in ipairs(defaultOrder) do
         if not seen[name] then
-            table.insert(resolved, name)
+            local insertAt = #resolved + 1
+            local defaultIndex = findOrderIndex(defaultOrder, name)
+
+            for index, resolvedName in ipairs(resolved) do
+                local resolvedDefaultIndex = findOrderIndex(defaultOrder, resolvedName)
+                if resolvedDefaultIndex and defaultIndex and resolvedDefaultIndex > defaultIndex then
+                    insertAt = index
+                    break
+                end
+            end
+
+            table.insert(resolved, insertAt, name)
+            seen[name] = true
         end
     end
 
@@ -689,6 +1086,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
         "Release",
         "Stats",
         "Reward",
+        "PullControl",
         "Reset",
         "Actions",
     }
@@ -858,11 +1256,26 @@ function MultiBot.InitializeMainUI(tMultiBar)
     local rewardButton = createRewardButton(mainFrame)
     wireShiftRightSwap(rewardButton, "Reward")
 
+    local pullControlButton = createMainActionButton(mainFrame, {
+        name = "PullControl",
+        y = 340,
+        icon = "ability_hunter_markedfordeath",
+        tip = "tips.main.pullcontrol",
+        doLeft = function(button)
+            if not button._mbPullControlFrame then
+                button._mbPullControlFrame = createPullControlFrame(mainFrame, button)
+            end
+
+            MultiBot.ShowHideSwitch(button._mbPullControlFrame)
+        end,
+    })
+    wireShiftRightSwap(pullControlButton, "PullControl")
+
     refreshLeftLayout()
 
     createMainActionButton(mainFrame, {
         name = "Reset",
-        y = 340,
+        y = 374,
         icon = "inv_misc_tournaments_symbol_gnome",
         tip = "tips.main.reset",
         doLeft = function()
@@ -873,7 +1286,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
 
     createMainActionButton(mainFrame, {
         name = "Actions",
-        y = 374,
+        y = 408,
         icon = "inv_helmet_02",
         tip = "tips.main.action",
         doLeft = function()
