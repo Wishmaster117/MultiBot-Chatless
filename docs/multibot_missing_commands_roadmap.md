@@ -9,7 +9,7 @@ Ce document suit les commandes `mod-playerbots` encore intéressantes à intégr
 - les commandes serveur/admin à ne pas intégrer dans l'addon ;
 - les priorités d'intégration bridge-first/chatless.
 
-Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits et RTI :  
+Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI et Pull Control :  
 **éviter le spam chat automatique**, utiliser le bridge quand c'est possible, et conserver les commandes manuelles utiles comme `who`, `co ?`, `nc ?`, `ss ?`.
 
 ---
@@ -30,48 +30,52 @@ Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats
 | Quests | Présent | UI quêtes existante, pas à mélanger avec les commandes manuelles de diagnostic. |
 | Outfits | Fait | Endpoint bridge + commandes outfits intégrées. |
 | RTI / Target Icons | Fait | UI complète + bridge `RUN~RTI`, scopes `ALL`, `GROUP`, `BOT`. |
+| Pull Control | Fait / à fignoler | Mini-frame MainBar + bridge `RUN~COMBAT`, séquences de commandes, scopes et presets. |
 
-### Dernier lot terminé : RTI / Target Icons
+---
 
-Le système RTI a été intégré en mode bridge-first/chatless pour les usages UI. Les commandes manuelles playerbots restent utilisables séparément dans le chat.
+## Dernier lot terminé : Pull Control
+
+Le panneau `Pull Control` a été ajouté comme mini-frame ouverte depuis la MainBar. Il utilise le bridge et ne repose pas sur le parsing chat automatique.
 
 Fonctionnalités terminées :
 
-- endpoint addon -> bridge `RUN~RTI~<scope>~<target>~<token>~<command>` ;
-- validation serveur des commandes RTI autorisées ;
+- bouton `Pull Control` ajouté dans l'ordre de la MainBar ;
+- mini-frame dédiée au contrôle de pull ;
 - scopes supportés :
-  - `ALL` pour tous les bots ;
-  - `GROUP` avec groupe de raid ciblé ;
-  - `BOT` pour un bot précis ;
-- commandes autorisées côté bridge :
-  - `rti <icon>` ;
-  - `rti cc <icon>` ;
-  - `attack rti target` ;
+  - `BOT` / Selected pour un bot ciblé ;
+  - `GROUP` / Party pour le groupe ;
+  - `ALL` / Raid pour tous les bots ;
+- slider `wait for attack time` avec affichage de la valeur en secondes ;
+- toggle `Wait` envoyant `wait for attack time X` ou `wait for attack time 0` ;
+- toggle `Focus` envoyant `co +focus` / `co -focus` ;
+- toggle `DPS Assist` envoyant `co +dps assist` / `co -dps assist` ;
+- toggle `DPS AoE` envoyant `co +dps aoe` / `co -dps aoe` ;
+- preset `Single Target` ;
+- preset `AoE Pack` ;
+- preset `Safe Pull` ;
+- preset `Reset` ;
+- actions RTI depuis la frame :
   - `pull rti target` ;
-- panneau RTI global dans la barre Units ;
-- bouton `All` à gauche du bouton RTI ;
-- boutons groupes numérotés à droite du bouton RTI ;
-- menu vertical vers le haut pour choisir l'icône RTI d'un scope ;
-- remplacement visuel du bouton All/Groupe par l'icône RTI sélectionnée ;
-- bouton/reset par défaut dans les menus RTI pour retirer l'icône mémorisée ;
-- boutons `Attack` et `Pull` pour les RTI de groupe/global ;
-- collapse/refermeture des everybars quand on ouvre un menu RTI ;
-- bouton RTI dans chaque everybar de bot ;
-- menu vertical vers le haut dans chaque everybar pour choisir l'icône RTI du bot ;
-- remplacement visuel du bouton RTI du bot par l'icône choisie ;
-- reset visuel correct vers l'icône par défaut ;
-- mémoire d'affichage des RTI bot quand on ferme/réouvre la barre Units ;
-- bouton d'action RTI personnel dans la main bar, placé à gauche de `Attaque Tank` ;
-- menu vertical `Attaquer` / `Pull` pour envoyer en batch tous les bots ayant une RTI personnelle mémorisée ;
-- tooltips RTI passés en variables AceLocale ;
-- traductions RTI ajoutables dans les fichiers locale.
+  - `attack rti target` ;
+- endpoint bridge `RUN~COMBAT~<scope>~<target>~<token>~<command>` ;
+- validation serveur des commandes de combat autorisées ;
+- routage serveur vers les bots selon le scope ;
+- correction compilation liée à la résolution du scope combat ;
+- commandes testées en jeu avec réception bridge visible côté serveur.
+
+À fignoler plus tard :
+
+- ajustement visuel définitif de la mini-frame si nécessaire ;
+- harmonisation finale de tous les textes hardcodés restants vers AceLocale ;
+- vérification de chaque preset en conditions réelles donjon/raid ;
+- éventuelle sauvegarde persistante du dernier scope et de la dernière valeur de wait.
 
 Notes fonctionnelles importantes :
 
-- `rti <icon>` ou `rti cc <icon>` ne doit servir qu'à mémoriser l'icône RTI que le bot ou le groupe doit focus.
-- `attack rti target` et `pull rti target` consomment ensuite cette configuration pour déclencher l'action.
-- Pour éviter les attaques involontaires, l'UI ne doit pas poser de marque sur un mob : elle configure seulement l'icône préférée côté bots.
-- Si `skull` déclenche un comportement automatique côté playerbots selon configuration/stratégie, éviter d'utiliser le crâne comme icône par défaut visuelle dans l'UI.
+- Les commandes `co ?`, `nc ?`, `ss ?` restent manuelles et ne doivent pas devenir une source de parsing automatique.
+- Le fait qu'une stratégie apparaisse ou non dans `co ?` dépend du nom exact réellement reconnu côté playerbots. Pour le Pull Control, on garde les noms qui ont été validés via bridge/serveur.
+- `wait for attack time X` n'est pas une stratégie `co`, donc il ne faut pas attendre qu'elle apparaisse forcément dans `co ?`.
 
 ---
 
@@ -105,8 +109,8 @@ Le système RTI est très utile pour contrôler les bots en donjon/raid :
 | `rti diamond` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
 | `rti moon` | Fait | Haute | Sélecteur RTI All/Groupe/Bot |
 | `rti cc <icon>` | Fait côté bridge | Haute | Commande autorisée, UI CC à réévaluer si besoin dédié |
-| `attack rti target` | Fait | Haute | Bouton Attack global/groupe + bouton batch bots personnels |
-| `pull rti target` | Fait | Haute | Bouton Pull global/groupe + bouton batch bots personnels |
+| `attack rti target` | Fait | Haute | Bouton Attack global/groupe + bouton batch bots personnels + Pull Control |
+| `pull rti target` | Fait | Haute | Bouton Pull global/groupe + bouton batch bots personnels + Pull Control |
 
 ### Flux bridge final
 
@@ -149,13 +153,14 @@ RUN~RTI~BOT~Dollu~<token>~attack rti target
 #### Main bar
 
 ```text
-[Bot RTI Action] [Attaque Tank]
-  └─ Attaquer
-  └─ Pull
+[Bot RTI Action] [Pull Control] [Attaque Tank]
+  └─ Bot RTI Action : Attaquer / Pull pour les bots ayant une RTI personnelle
+  └─ Pull Control : mini-frame de pull, wait, focus, assist, AoE et actions RTI
 ```
 
 - `Attaquer` envoie `attack rti target` à tous les bots ayant une RTI personnelle mémorisée.
 - `Pull` envoie `pull rti target` à tous les bots ayant une RTI personnelle mémorisée.
+- `Pull Control` permet d'envoyer les mêmes actions RTI avec un scope choisi.
 
 ---
 
@@ -163,70 +168,99 @@ RUN~RTI~BOT~Dollu~<token>~attack rti target
 
 ### Statut
 
-**Partiellement fait grâce à RTI.**  
-Les actions `attack rti target` et `pull rti target` sont intégrées. Le vrai panneau `Pull Control` reste à faire pour les stratégies et temporisations.
+**Terminé côté MultiBot + bridge, à fignoler côté UX uniquement.**
 
-### Pourquoi
+Le panneau dédié existe et couvre les commandes principales de pull propre. Les actions RTI restent aussi disponibles via les boutons RTI existants.
 
-Les pulls propres demandent plusieurs commandes combinées. Une UI dédiée éviterait les macros manuelles.
+### Commandes couvertes
 
-### Commandes à couvrir
-
-| Commande playerbots | Statut MultiBot | Priorité | Proposition UI |
+| Commande playerbots | Statut MultiBot | Priorité | UI actuelle |
 |---|---:|---:|---|
-| `pull rti target` | Fait | Haute | Bouton Pull RTI global/groupe/bot personnel |
-| `attack rti target` | Fait | Haute | Bouton Attack RTI global/groupe/bot personnel |
-| `wait for attack time <seconds>` | Manquant | Haute | Champ numérique 0-10 sec |
-| `co +focus` / `co -focus` | Manquant ou non exposé clairement | Haute | Toggle Focus |
-| `co -aoe` / `co +aoe` | Partiel | Haute | Toggle AoE during pull |
-| `co +assist` | Partiel | Haute | Toggle Assist |
-| `co +tank assist` | Partiel | Moyenne | Toggle Tank Assist |
+| `pull rti target` | Fait | Haute | Bouton Pull RTI global/groupe/bot personnel + Pull Control |
+| `attack rti target` | Fait | Haute | Bouton Attack RTI global/groupe/bot personnel + Pull Control |
+| `wait for attack time <seconds>` | Fait | Haute | Slider 0-10 sec + toggle Wait |
+| `co +focus` / `co -focus` | Fait | Haute | Toggle Focus + presets |
+| `co +dps aoe` / `co -dps aoe` | Fait | Haute | Toggle DPS AoE + presets |
+| `co +dps assist` / `co -dps assist` | Fait | Haute | Toggle DPS Assist + presets |
+| `co +tank assist` | Non exposé dans Pull Control | Moyenne | Déjà couvert ailleurs par les contrôles tank/assist existants, à réévaluer si doublon utile |
 
-### Proposition UI restante
+### UX actuelle
 
-Créer une section `Pull Control` :
+```text
+MainBar
+└─ Pull Control
+   ├─ Scope: Selected / Party / Raid
+   ├─ Wait slider 0-10s avec valeur affichée
+   ├─ Toggles: Wait, Focus, DPS Assist, DPS AoE
+   ├─ Presets: Single Target, AoE Pack, Safe Pull, Reset
+   └─ Actions: Pull RTI Target, Attack RTI Target
+```
 
-| Option UI | Commande |
-|---|---|
-| Wait before attack | `wait for attack time X` |
-| Single target pull | `co +focus,-aoe,+assist` |
-| Enable AoE again | `co +aoe,-focus` |
-| Attack RTI target | Déjà fait via RTI |
-| Pull RTI target | Déjà fait via RTI |
-| Tank assist | `co +tank assist` |
+### Flux bridge final
+
+```text
+RUN~COMBAT~BOT~Sahkaal~<token>~co +focus
+RUN~COMBAT~GROUP~~<token>~co +dps assist
+RUN~COMBAT~ALL~~<token>~co +dps aoe
+RUN~COMBAT~GROUP~~<token>~wait for attack time 3
+```
 
 ### Notes
 
-Cette section peut envoyer plusieurs commandes en séquence.  
-Il faudra éviter les retours chat automatiques inutiles.
+- Le panneau peut envoyer plusieurs commandes en séquence pour les presets.
+- Les retours chat automatiques restent évités.
+- Le test fonctionnel principal est le comportement des bots en combat/pull, pas uniquement l'affichage dans `co ?`.
 
 ---
 
 ## Priorité 3 - Stratégies combat avancées
 
+### Statut
+
+**Prochaine étape logique.**
+
+Pull Control a posé la base technique : l'addon sait maintenant envoyer des commandes combat simples via `RUN~COMBAT`. La suite naturelle est donc d'exposer les stratégies combat utiles qui ne sont pas strictement liées au pull.
+
 ### Pourquoi
 
-Ces stratégies existent côté playerbots mais ne sont pas toutes exposées clairement dans MultiBot. Elles ont une vraie utilité en raid/donjon.
+Ces stratégies existent côté playerbots mais ne sont pas toutes exposées clairement dans MultiBot. Elles ont une vraie utilité en raid/donjon, mais ne doivent pas encombrer la MainBar.
 
 ### Commandes à couvrir
 
 | Stratégie | Commande | Statut MultiBot | Priorité | Intérêt |
 |---|---|---:|---:|---|
-| Focus | `co +focus` / `co -focus` | Manquant | Haute | Focus mono-cible |
-| Avoid AoE | `co +avoid aoe` / `co -avoid aoe` | À vérifier | Haute | Évite les AoE dangereuses |
-| Save Mana | `co +save mana` / `co -save mana` | Manquant | Haute | Gestion mana healers |
-| Threat | `co +threat` / `co -threat` | Manquant | Haute | Réduit la prise d'aggro |
-| Tank Face | `co +tank face` / `co -tank face` | Manquant | Moyenne | Gestion cleave/breath |
-| Behind | `co +behind` / `co -behind` | Manquant | Moyenne | Placement melee |
-| Healer DPS | `co +healer dps` / `co -healer dps` | À vérifier | Moyenne | DPS des healers hors danger |
+| Avoid AoE | `co +avoid aoe` / `co -avoid aoe` | À vérifier / probablement partiel | Haute | Évite les AoE dangereuses |
+| Save Mana | `co +save mana` / `co -save mana` | Manquant | Haute | Gestion mana healers/casters |
+| Threat | `co +threat` / `co -threat` | Manquant | Haute | Limite la prise d'aggro selon comportement playerbots |
+| Tank Face | `co +tank face` / `co -tank face` | Manquant | Moyenne | Gestion orientation tank, cleaves, breaths |
+| Behind | `co +behind` / `co -behind` | Manquant ou déjà visible selon states | Moyenne | Placement melee derrière la cible |
+| Healer DPS | `co +healer dps` / `co -healer dps` | À vérifier | Moyenne | Autorise/interdit le DPS des healers |
 | Boost | `co +boost` / `co -boost` | Probablement partiel | Moyenne | Burst cooldowns |
-| Wait for attack | `wait for attack time X` | Manquant | Haute | Pull contrôlé |
+| Focus | `co +focus` / `co -focus` | Fait via Pull Control | Référence | Focus mono-cible |
+| DPS Assist | `co +dps assist` / `co -dps assist` | Fait via Pull Control | Référence | Assist DPS |
+| DPS AoE | `co +dps aoe` / `co -dps aoe` | Fait via Pull Control | Référence | Autorise AoE DPS |
+| Wait for attack | `wait for attack time X` | Fait via Pull Control | Référence | Pull contrôlé |
 
 ### Proposition UI
 
-Créer une page `Advanced Combat` ou ajouter un panneau repliable dans les stratégies.
+Créer une page ou mini-frame `Advanced Combat`, séparée de Pull Control :
 
-Ne pas afficher tous les boutons dans la barre principale pour éviter de surcharger l'interface.
+```text
+Combat Strategies
+├─ Scope: Selected / Party / Raid
+├─ Survivability: Avoid AoE, Threat
+├─ Positioning: Behind, Tank Face
+├─ Resource: Save Mana
+├─ Damage policy: Healer DPS, Boost
+└─ Apply toggles via RUN~COMBAT
+```
+
+Recommandation UX :
+
+- ne pas ajouter ces toggles directement sur la MainBar ;
+- créer un panneau repliable ou une sous-page accessible depuis un bouton existant de stratégies/combat ;
+- réutiliser les scopes `BOT`, `GROUP`, `ALL` déjà validés par Pull Control ;
+- garder `co ?` comme vérification manuelle, sans parser automatiquement son retour.
 
 ---
 
@@ -252,13 +286,17 @@ Disperse distance: [ 8 ] yards
 [Apply] [Disable]
 ```
 
+### Note
+
+À faire après `Advanced Combat`, sauf si un besoin immédiat de mécaniques AoE impose de le passer avant.
+
 ---
 
 ## Priorité 5 - Loot Rules / Loot List
 
 ### Pourquoi
 
-Le contrôle du loot est utile, mais moins prioritaire que RTI/pull.
+Le contrôle du loot est utile, mais moins prioritaire que RTI/pull/combat.
 
 ### Commandes à couvrir
 
@@ -406,9 +444,9 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 | Ordre | Sujet | Type | Priorité | Statut |
 |---:|---|---|---:|---:|
 | 1 | RTI bridge-first | UI + bridge command | Haute | Fait |
-| 2 | Pull Control avancé | Nouvelle UI + séquences commandes | Haute | À faire |
-| 3 | Advanced Combat Strategies | UI toggles | Haute/Moyenne | À faire |
-| 4 | Disperse | Petite UI | Moyenne | À faire |
+| 2 | Pull Control avancé | Nouvelle UI + séquences commandes | Haute | Fait / à fignoler |
+| 3 | Advanced Combat Strategies | UI toggles réutilisant `RUN~COMBAT` | Haute/Moyenne | Prochaine étape |
+| 4 | Disperse | Petite UI + commande combat/mouvement | Moyenne | À faire |
 | 5 | Loot Rules | Petite UI profils | Moyenne | À faire |
 | 6 | Trainer / Maintenance extras | UI maintenance | Moyenne/Basse | À faire |
 | 7 | Items avancés | Extensions inventaire | Basse/Moyenne | À faire |
@@ -420,8 +458,19 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 - Toute nouvelle commande utilisée automatiquement par l'addon devrait passer par le bridge quand possible.
 - Les commandes manuelles informatives doivent rester fonctionnelles en whisper/party/raid.
 - Ne pas réintroduire de parsing chat automatique pour peupler l'UI.
-- Pour les commandes qui ne nécessitent aucun retour structuré, un endpoint générique de type `RUN~COMMAND` ou un endpoint spécialisé comme `RUN~RTI` peut suffire.
+- Pour les commandes qui ne nécessitent aucun retour structuré, un endpoint générique de type `RUN~COMMAND` ou un endpoint spécialisé comme `RUN~RTI` / `RUN~COMBAT` peut suffire.
 - Pour les commandes qui doivent alimenter une frame, préférer un endpoint structuré dédié.
 - Les commandes serveur/admin ne doivent pas être exposées dans l'addon utilisateur.
 - Les boutons ajoutés dans les barres doivent conserver une position cohérente avec `MultiBotLeftCoreUI.lua` et la position par défaut de `MultiBar` dans `MultiBotInit.lua` / reset dans `MultiBotMainUI.lua`.
-- Les tooltips nouvellement ajoutés doivent passer par AceLocale, comme les tooltips RTI.
+- Les tooltips nouvellement ajoutés doivent passer par AceLocale, comme les tooltips RTI et Pull Control.
+- `RUN~COMBAT` doit rester whitelisté côté bridge : ne pas en faire un exécuteur libre de n'importe quelle commande chat.
+
+---
+
+## Point logique suivant
+
+Le prochain bloc logique est **Advanced Combat Strategies**.
+
+Raison : `RUN~COMBAT` existe maintenant, les scopes sont validés, et Pull Control a déjà prouvé que l'addon peut envoyer proprement des toggles de stratégie sans spam chat. Le plus rentable est donc d'ajouter une UI dédiée aux stratégies combat permanentes ou semi-permanentes : `avoid aoe`, `save mana`, `threat`, `behind`, `tank face`, `healer dps`, `boost`.
+
+Ce bloc doit rester séparé de Pull Control : Pull Control sert aux séquences de pull, tandis qu'Advanced Combat sert aux comportements généraux des bots pendant les combats.
