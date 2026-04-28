@@ -400,7 +400,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 
     -- META MELEE (Démonologie) --
     local btnMeta = tFrame.addButton(
-      "MetaMelee", 0, 104, "Spell_Shadow_DemonForm",
+      "MetaMelee", 0, 105, "Spell_Shadow_DemonForm",
       (MultiBot.L("tips.warlock.dps.metamelee") ~= "tips.warlock.dps.metamelee" and MultiBot.L("tips.warlock.dps.metamelee") or "Meta Melee")
     )
     btnMeta.setDisable()
@@ -408,6 +408,10 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
     btnMeta.doLeft = function(pButton)
       MultiBot.OnOffActionToTarget(pButton, "co +meta melee,?", "co -meta melee,?", pButton.getName())
     end
+
+	if MultiBot.AddCommonCombatStrategyButtons then
+		MultiBot.AddCommonCombatStrategyButtons(pFrame, tFrame, pCombat, 131)
+	end
 
 		-- ASSIST --
 

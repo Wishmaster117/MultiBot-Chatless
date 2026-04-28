@@ -52,6 +52,10 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 		MultiBot.OnOffActionToTarget(pButton, "co +boost,?", "co -boost,?", pButton.getName())
 	end
 
+	if MultiBot.AddCommonCombatStrategyButtons then
+		MultiBot.AddCommonCombatStrategyButtons(pFrame, tFrame, pCombat, 156)
+	end
+
 	-- ASSIST --
 
 	pFrame.addButton("TankAssist", -30, 0, "ability_warrior_innerrage", MultiBot.L("tips.rogue.tankAssist")).setDisable()

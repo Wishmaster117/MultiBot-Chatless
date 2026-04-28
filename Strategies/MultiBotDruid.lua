@@ -163,6 +163,10 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
             end
         end
 
+	if MultiBot.AddCommonCombatStrategyButtons then
+		MultiBot.AddCommonCombatStrategyButtons(pFrame, tDpsFrame, pCombat, 156)
+	end
+
 	-- ASSIST --
 
 	pFrame.addButton("TankAssist", -120, 0, "ability_warrior_innerrage", MultiBot.L("tips.druid.tankAssist")).setDisable()
