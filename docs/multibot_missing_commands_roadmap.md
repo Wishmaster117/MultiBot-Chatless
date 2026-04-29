@@ -456,11 +456,11 @@ L'inventaire bridge-first est déjà en place. Ces commandes sont des améliorat
 
 | Commande playerbots | Statut MultiBot | Priorité | Proposition UI |
 |---|---:|---:|---|
-| `open items` | À vérifier | Moyenne | Bouton dans inventaire |
 | `roll` | Manquant | Moyenne | Bouton Roll |
 | `roll [item]` | Manquant | Moyenne | Clic droit item |
-| `s vendor` | À vérifier | Moyenne | Bouton Sell Vendor |
-| `s *` | À vérifier | Moyenne | Bouton Sell Gray |
+| `s *` | Déjà présent côté addon, legacy whisper, pas encore bridge-first | Moyenne | Bouton Sell Gray existant |
+| `s vendor` | Déjà présent côté addon inventaire, legacy whisper item par item, pas encore bridge-first | Moyenne | Bouton Sell Vendor existant |
+| `open items` | Déjà présent côté addon, legacy whisper | Moyenne | Bouton dans inventaire existant |
 | `bank [item]` | Manquant | Basse | Clic droit item |
 | `bank -[item]` | Manquant | Basse | UI banque |
 | `gb [item]` | Manquant | Basse | Clic droit item |
@@ -571,14 +571,23 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 
 ## Point logique suivant
 
-Le prochain bloc logique conseillé est **Vente / Roll / Vendor**.
+Le prochain bloc logique conseillé est **Roll + migration optionnelle des ventes existantes vers bridge**.
 
-Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse et Loot Rules couvrent maintenant le ciblage, le pull, les stratégies combat, le positionnement collectif et les profils de loot. Le prochain manque gameplay utile concerne donc les actions ponctuelles autour du loot : roll, vente vendor et vente grise.
+Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse et Loot Rules couvrent maintenant le ciblage, le pull, les stratégies combat, le positionnement collectif et les profils de loot. Après vérification du code actuel, la vente grise et la vente vendor existent déjà côté addon, mais restent en legacy whisper et ne sont pas encore bridge-first.
 
-Proposition de prochaine itération :
+État précis des commandes items/loot ponctuelles :
 
-- vérifier les commandes réellement utiles pour `roll`, `roll [item]`, `s vendor` et `s *` ;
-- décider si ces actions doivent passer par un endpoint dédié ou par un endpoint existant whitelisté ;
+- `roll` : Manquant ;
+- `roll [item]` : Manquant ;
+- `s *` : Déjà présent côté addon, legacy whisper, pas encore bridge-first ;
+- `s vendor` : Déjà présent côté addon inventaire, legacy whisper item par item, pas encore bridge-first ;
+- `open items` : Déjà présent côté addon, legacy whisper.
+
+Proposition de prochaine itération, plus tard :
+
+- ajouter `roll` / `roll [item]`, car c'est le vrai manque fonctionnel restant dans ce bloc ;
+- ne pas recréer de boutons `s *`, `s vendor` ou `open items`, car ils existent déjà côté addon ;
+- décider si les ventes existantes doivent passer par un endpoint dédié ou par un endpoint existant whitelisté ;
 - éviter toute vente automatique dangereuse sans action explicite de l'utilisateur ;
-- garder les commandes informatives manuelles inchangées.
+- garder les commandes informatives manuelles inchangées ;
 - A noter que `Quest` et `Skill` devront être remplacés plus tard par `Disenchant`, ou devenir de vrais profils ajoutés côté `mod-playerbots` avant exposition définitive ;
