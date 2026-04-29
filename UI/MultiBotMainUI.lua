@@ -165,7 +165,7 @@ local function refreshLeftLayout()
 end
 
 local function resetDefaultWindowPositions()
-    MultiBot.frames["MultiBar"].setPoint(-333, 144)
+    MultiBot.frames["MultiBar"].setPoint(-363, 144)
     MultiBot.inventory.setPoint(-700, -144)
     MultiBot.spellbook.setPoint(-802, 302)
     MultiBot.talent.setPoint(-104, -276)

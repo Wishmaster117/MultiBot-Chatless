@@ -37,6 +37,45 @@ local STATS_SLOT_X = 0
 local STATS_SLOT_SIZE = 32
 local STATS_SLOT_WIDTH = 192
 local STATS_SLOT_HEIGHT = 96
+local STATS_TEXT_X = 58
+local STATS_NAME_Y = -11
+local STATS_VALUES_Y = -27
+local STATS_TEXT_RIGHT_RESERVED = 56
+local STATS_TEXT_MAX_WIDTH = STATS_SLOT_WIDTH - STATS_TEXT_X - STATS_TEXT_RIGHT_RESERVED
+local STATS_FONT_PATH = "Fonts\\ARIALN.ttf"
+local STATS_TEXT_MAX_FONT = 11
+local STATS_NAME_MIN_FONT = 9
+local STATS_VALUES_MIN_FONT = 8
+
+local function fitFontStringToWidth(fontString, text, maxWidth, maxFontSize, minFontSize)
+	if not fontString then
+		return
+	end
+
+	fontString:SetText(text or "")
+	fontString:SetFont(STATS_FONT_PATH, maxFontSize, "PLAIN")
+
+	local fontSize = maxFontSize
+	while fontSize > minFontSize and fontString:GetStringWidth() > maxWidth do
+		fontSize = fontSize - 1
+		fontString:SetFont(STATS_FONT_PATH, fontSize, "PLAIN")
+	end
+end
+
+local function updateStatsTextLayout(statsFrame, nameText, valuesText)
+	if not statsFrame or not statsFrame.texts then
+		return
+	end
+
+	fitFontStringToWidth(
+		statsFrame.texts["Name"],
+		nameText,
+		STATS_TEXT_MAX_WIDTH,
+		STATS_TEXT_MAX_FONT,
+		STATS_NAME_MIN_FONT
+	)
+	fitFontStringToWidth(statsFrame.texts["Values"], valuesText, STATS_TEXT_MAX_WIDTH, STATS_TEXT_MAX_FONT, STATS_VALUES_MIN_FONT)
+end
 
 MultiBot.addStats = function(pFrame, pIndex, pX, pY, pSize, pWidth, pHeight)
 	local tFrame = pFrame.addFrame(pIndex, pX, pY, pSize, pWidth, pHeight)
@@ -45,8 +84,8 @@ MultiBot.addStats = function(pFrame, pIndex, pX, pY, pSize, pWidth, pHeight)
 	tFrame.addTexture("Interface\\AddOns\\MultiBot\\Textures\\Stats.blp")
 	tFrame:Hide()
 
-	tFrame.addText("Name", "", "TOPLEFT", 54, -11, 11)
-	tFrame.addText("Values", "", "TOPLEFT", 54, -27, 11)
+	tFrame.addText("Name", "", "TOPLEFT", STATS_TEXT_X, STATS_NAME_Y, STATS_TEXT_MAX_FONT)
+	tFrame.addText("Values", "", "TOPLEFT", STATS_TEXT_X, STATS_VALUES_Y, STATS_TEXT_MAX_FONT)
 	tAddon.addText("Percent", "", "CENTER", 0, 0, 11)
 	tFrame.addText("Level", "", "CENTER", 85.25, 5, 11)
 
@@ -113,10 +152,10 @@ MultiBot.addStats = function(pFrame, pIndex, pX, pY, pSize, pWidth, pHeight)
 			local tStats = MultiBot.doSplit(pStats, ", ")
 			local tMana = tonumber(tStats[5])
 			local tXP = tonumber(tStats[4])
+			local valuesText = PLAYER
 
-			statsFrame.texts["Name"]:SetText(pName)
 			statsFrame.texts["Level"]:SetText(pLevel)
-			statsFrame.texts["Values"]:SetText(PLAYER)
+			updateStatsTextLayout(statsFrame, pName, valuesText)
 
 			if pLevel == 80 then
 				addonFrame.texts["Percent"]:SetText(
@@ -143,10 +182,10 @@ MultiBot.addStats = function(pFrame, pIndex, pX, pY, pSize, pWidth, pHeight)
 			MultiBot.doReplace(tStats[2], "Bag", shortLabel("bag", "Bag")),
 			tStats[2]
 		)
+		local valuesText = tMoney .. tBag
 
-		statsFrame.texts["Name"]:SetText(pName)
 		statsFrame.texts["Level"]:SetText(pLevel)
-		statsFrame.texts["Values"]:SetText(tMoney .. tBag)
+		updateStatsTextLayout(statsFrame, pName, valuesText)
 
 		if pLevel == 80 then
 			local durabilityString = MultiBot.doSplit(tStats[3], "|")[2]
@@ -284,11 +323,7 @@ function MultiBot.ApplyBridgeStats(stats)
 	local bagTotal = tonumber(stats.bagTotal or 0) or 0
 	local durabilityPct = tonumber(stats.durabilityPct or 0) or 0
 	local xpPct = tonumber(stats.xpPct or 0) or 0
-
-	statsFrame.texts["Name"]:SetText(stats.name)
-	statsFrame.texts["Level"]:SetText(level)
-	statsFrame.texts["Values"]:SetText(
-		"|cffffdd55"
+	local valuesText = "|cffffdd55"
 		.. formatBridgeMoney(stats)
 		.. "|r, "
 		.. shortLabel("bag", "Bag")
@@ -296,7 +331,9 @@ function MultiBot.ApplyBridgeStats(stats)
 		.. bagUsed
 		.. "/"
 		.. bagTotal
-	)
+
+	statsFrame.texts["Level"]:SetText(level)
+	updateStatsTextLayout(statsFrame, stats.name, valuesText)
 
 	if level == 80 then
 		addonFrame.texts["Percent"]:SetText(
