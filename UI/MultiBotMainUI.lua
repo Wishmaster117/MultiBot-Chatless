@@ -1393,7 +1393,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
 
     local rewardButton = createRewardButton(mainFrame)
     wireShiftRightSwap(rewardButton, "Reward")
-	
+
     local combatStrategiesButton = createCombatStrategiesButton(mainFrame)
     wireShiftRightSwap(combatStrategiesButton, "CombatStrategies")
 

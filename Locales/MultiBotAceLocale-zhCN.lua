@@ -5,6 +5,13 @@ end
 
 local zhCNValues = {
   ["tips.units.rti"] = "RTI",
+  ["tips.disperse.main"] = "分散",
+  ["tips.disperse.set"] = "设置分散距离",
+  ["tips.disperse.disable"] = "禁用分散",
+  ["disperse.bridge.required"] = "位置桥接未连接。",
+  ["disperse.invalid_distance"] = "请输入 1 到 100 码之间的距离。",
+  ["disperse.confirm.set"] = "分散距离已设置为 %s 码。",
+  ["disperse.confirm.disable"] = "分散已禁用。",
   ["rti.bridge.required"] = "RTI 桥接未连接。",
   ["info.rti.no_bot_selection"] = "未选择任何机器人专用 RTI 图标。",
   ["rti.icon.star"] = "星星",

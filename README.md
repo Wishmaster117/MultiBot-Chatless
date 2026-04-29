@@ -96,6 +96,7 @@ GET~GLYPHS
 GET~OUTFITS
 RUN~RTI
 RUN~COMBAT
+RUN~POSITION
 ```
 
 Manual playerbot commands are still intentionally preserved for diagnostics and gameplay actions.
@@ -170,6 +171,10 @@ The goal is to remove automatic UI-refresh spam.
   <tr>
     <td>Combat strategy fine tuning</td>
     <td><strong>Bridge-first</strong> avoid AoE, save mana, threat and behind controls</td>
+  </tr>
+  <tr>
+    <td>Disperse controls</td>
+    <td><strong>Bridge-first</strong> distance set and disable actions through <code>RUN~POSITION</code></td>
   </tr>
   <tr>
     <td>Units / EveryBars</td>
@@ -400,6 +405,7 @@ Implemented bridge-first / chatless areas:
 - RTI controls through the bridge.
 - Pull Control frame through the bridge.
 - Combat strategy fine tuning through the bridge.
+- Disperse controls through the bridge with `disperse set <yards>` and `disperse disable`.
 - Custom glyph socket mapping and apply order.
 - Talent tab navigation stability after switching between tabs.
 - Automatic bot reconnect on login/reload for bots already present in the group or raid.
@@ -416,12 +422,11 @@ Kept intentionally:
 
 # Remaining Work
 
-The Outfits, RTI, Pull Control and Combat Strategy migrations are implemented. The next step is Disperse, followed by final stabilization and cleanup.
+The Outfits, RTI, Pull Control, Combat Strategy and Disperse migrations are implemented. The next step is final stabilization and cleanup.
 
 Planned follow-up work:
 
-- Start the Disperse command migration.
-- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, Inventory, Spellbook, Talents, Glyphs, Outfits, RTI, Pull Control and Combat Strategies.
+- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, Inventory, Spellbook, Talents, Glyphs, Outfits, RTI, Pull Control, Combat Strategies and Disperse.
 - Verify that `MultiBot.allowLegacyChatFallback = false` prevents automatic legacy refresh spam on all migrated UI paths.
 - Keep manual diagnostic commands documented and functional.
 - Remove obsolete debug prints.

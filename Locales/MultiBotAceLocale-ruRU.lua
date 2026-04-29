@@ -5,6 +5,13 @@ end
 
 local ruRUValues = {
   ["tips.units.rti"] = "RTI",
+  ["tips.disperse.main"] = "Рассредоточение",
+  ["tips.disperse.set"] = "Задать дистанцию рассредоточения",
+  ["tips.disperse.disable"] = "Отключить рассредоточение",
+  ["disperse.bridge.required"] = "Мост позиционирования не подключен.",
+  ["disperse.invalid_distance"] = "Введите дистанцию от 1 до 100 ярдов.",
+  ["disperse.confirm.set"] = "Рассредоточение установлено на %s ярдов.",
+  ["disperse.confirm.disable"] = "Рассредоточение отключено.",
   ["rti.bridge.required"] = "RTI-мост не подключен.",
   ["info.rti.no_bot_selection"] = "Не выбрана RTI-иконка для отдельного бота.",
   ["rti.icon.star"] = "Звезда",
