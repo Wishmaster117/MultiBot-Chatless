@@ -1726,9 +1726,9 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.lastError = nil
     debugPrint("ADDON:RX", "POSITION_ACK", payload or "")
 
-    local scope, rest = splitOnce(payload or "", "~")
-    local encodedTarget, rest2 = splitOnce(rest, "~")
-    local token, rest3 = splitOnce(rest2, "~")
+    local rest = select(2, splitOnce(payload or "", "~"))
+    local rest2 = select(2, splitOnce(rest, "~"))
+    local rest3 = select(2, splitOnce(rest2, "~"))
     local executedText, encodedCommand = splitOnce(rest3, "~")
     local executed = tonumber(executedText) or 0
     local command = trim(urlDecodeField(encodedCommand))
@@ -1754,9 +1754,9 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.lastError = nil
     debugPrint("ADDON:RX", "LOOT_ACK", payload or "")
 
-    local scope, rest = splitOnce(payload or "", "~")
-    local encodedTarget, rest2 = splitOnce(rest, "~")
-    local token, rest3 = splitOnce(rest2, "~")
+    local rest = select(2, splitOnce(payload or "", "~"))
+    local rest2 = select(2, splitOnce(rest, "~"))
+    local rest3 = select(2, splitOnce(rest2, "~"))
     local executedText, encodedCommand = splitOnce(rest3, "~")
     local executed = tonumber(executedText) or 0
     local command = string.lower(trim(urlDecodeField(encodedCommand)))
