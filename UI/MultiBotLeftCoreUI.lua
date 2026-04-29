@@ -92,6 +92,10 @@ function MultiBot.InitializeLeftCoreUI(tLeft)
         MultiBot.BuildDisperseUI(tLeft)
     end
 
+    if MultiBot.BuildLootUI then
+        MultiBot.BuildLootUI(tLeft)
+    end
+
     tLeft.addButton("Tanker", -170, 0, "ability_warrior_shieldbash", MultiBot.L("tips.tanker.master")).doLeft = function()
         if MultiBot.isTarget() then
             MultiBot.ActionToGroup("@tank do attack my target")
@@ -105,6 +109,7 @@ function MultiBot.InitializeLeftCoreUI(tLeft)
         MultiBot.BindShiftRightSwapButtons(tLeft, "LeftRoot", {
             { name = "BotRTI", id = "BotRTIActionButton", frameName = "BotRTIAction" },
             { name = "Disperse", frameName = "DisperseMenu" },
+            { name = "Loot", frameName = "LootMenu" },
             { name = "Tanker" },
             { name = "Mode", frameName = "Mode" },
             { name = "Stay" },

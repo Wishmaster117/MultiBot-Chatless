@@ -97,6 +97,7 @@ GET~OUTFITS
 RUN~RTI
 RUN~COMBAT
 RUN~POSITION
+RUN~LOOT
 ```
 
 Manual playerbot commands are still intentionally preserved for diagnostics and gameplay actions.
@@ -175,6 +176,10 @@ The goal is to remove automatic UI-refresh spam.
   <tr>
     <td>Disperse controls</td>
     <td><strong>Bridge-first</strong> distance set and disable actions through <code>RUN~POSITION</code></td>
+  </tr>
+  <tr>
+    <td>Loot rules</td>
+    <td><strong>Bridge-first</strong> loot enable/disable and loot list profiles through <code>RUN~LOOT</code></td>
   </tr>
   <tr>
     <td>Units / EveryBars</td>
@@ -406,6 +411,7 @@ Implemented bridge-first / chatless areas:
 - Pull Control frame through the bridge.
 - Combat strategy fine tuning through the bridge.
 - Disperse controls through the bridge with `disperse set <yards>` and `disperse disable`.
+- Loot rules through the bridge with `nc +loot`, `nc -loot` and `ll all|normal|gray|quest|skill`.
 - Custom glyph socket mapping and apply order.
 - Talent tab navigation stability after switching between tabs.
 - Automatic bot reconnect on login/reload for bots already present in the group or raid.
@@ -422,11 +428,11 @@ Kept intentionally:
 
 # Remaining Work
 
-The Outfits, RTI, Pull Control, Combat Strategy and Disperse migrations are implemented. The next step is final stabilization and cleanup.
+The Outfits, RTI, Pull Control, Combat Strategy, Disperse and Loot Rules migrations are implemented. The next step is final stabilization and cleanup.
 
 Planned follow-up work:
 
-- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, Inventory, Spellbook, Talents, Glyphs, Outfits, RTI, Pull Control, Combat Strategies and Disperse.
+- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, Inventory, Spellbook, Talents, Glyphs, Outfits, RTI, Pull Control, Combat Strategies, Disperse and Loot Rules.
 - Verify that `MultiBot.allowLegacyChatFallback = false` prevents automatic legacy refresh spam on all migrated UI paths.
 - Keep manual diagnostic commands documented and functional.
 - Remove obsolete debug prints.

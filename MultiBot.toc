@@ -101,6 +101,7 @@ UI\MultiBotGmUI.lua
 UI\MultiBotRTSCUI.lua
 UI\MultiBotRTIUI.lua
 UI\MultiBotDisperseUI.lua
+UI\MultiBotLootUI.lua
 Core\MultiBotInit.lua
 Data\MultiBotIconos.lua
 Data\MultiBotItemus.lua

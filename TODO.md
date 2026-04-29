@@ -1,4 +1,5 @@
 ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mains, le bot ne les équipe pas!
+* J'ai l'impression que le disperse ne fait rien
 * Passer les gobject dans la bridge
 * Recentrer les icones des glyphes
 * Mettre un bouton à raidus pour enlever les bots inconnus et les virer en même temps de saved variables
@@ -18,6 +19,9 @@ ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mai
 * trouver un moyen de charger tous les skins des pets hunter
 * Implémenter Focus
 * Implémenter new pull
+* Voir pour l'inventaire bridge si pas limité à 16 places
+* Ne pas faire apparaitre les quick bares pour les joueurs humain
+* Remplacer dans le menu loot Quest et Skill par desanchante
 
 -- Nouvelles fonctions:
 Gestion des Outfits

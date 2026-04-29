@@ -62,9 +62,9 @@ function MultiBot.BuildDisperseUI(tLeft)
     local input = CreateFrame("EditBox", "MultiBotDisperseDistanceEditBox", menu, "InputBoxTemplate")
     input:SetAutoFocus(false)
     input:SetMaxLetters(3)
-    input:SetWidth(25)
+    input:SetWidth(40)
     input:SetHeight(20)
-    input:SetPoint("TOPLEFT", menu, "TOPLEFT", 30, -23)
+    input:SetPoint("TOPLEFT", menu, "TOPLEFT", 23, -23)
     input:SetText(lastDistance)
     input:SetFrameLevel(menu:GetFrameLevel() + 3)
     input:SetScript("OnEscapePressed", function(self)
@@ -152,7 +152,7 @@ function MultiBot.BuildDisperseUI(tLeft)
             hideDisperseMenu()
         else
             showDisperseMenu()
-        end		
+        end
     end
 
     button.doRight = function()

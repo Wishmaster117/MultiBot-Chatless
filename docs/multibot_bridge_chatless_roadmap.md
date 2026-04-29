@@ -191,6 +191,16 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Fallback legacy `outfit ?` conservé uniquement comme compatibilité si nécessaire
 - [x] Aucun changement requis dans `mod-playerbots` : la migration est faite côté addon + bridge
 
+### Loot Rules / Loot List
+
+- [x] Endpoint côté bridge : `RUN~LOOT~<scope>~<target>~<token>~<command>`
+- [x] Whitelist stricte côté bridge : `nc +loot`, `nc -loot`, `ll all`, `ll normal`, `ll gray`, `ll quest`, `ll skill`
+- [x] Mini-frame addon `Loot` avec boutons Enable, Disable, All, Normal, Gray, Quest et Skill
+- [x] Réponse d’action : `LOOT_ACK~<scope>~<target>~<token>~<executed>~<command>`
+- [x] Messages système de confirmation côté addon
+- [x] Pas de parsing automatique de réponse `nc ?` ou `ll`
+- [x] Les commandes manuelles informatives restent disponibles
+
 ---
 
 ## Règle importante sur les payloads volumineux
@@ -317,6 +327,7 @@ Conclusion : `Outfits` est maintenant bridge-first. Il reste seulement à survei
 | Glyphes icônes / tooltips | Fait |
 | Outfits bridge | Fait |
 | Outfits sans spam détaillé `Equipping [item]` | Fait |
+| Loot Rules / Loot List bridge | Fait |
 | Custom Talents navigation | Corrigé |
 | Custom Glyphs mapping sockets | Corrigé |
 | Switch `MultiBot.allowLegacyChatFallback` | Fait |
@@ -330,17 +341,20 @@ Conclusion : `Outfits` est maintenant bridge-first. Il reste seulement à survei
 
 ## Prochain pas logique recommandé
 
-Le prochain pas logique est maintenant : **stabilisation finale après migration Outfits**.
+Le prochain pas logique est maintenant : **stabilisation finale après migration Loot Rules**.
 
 À valider après cette dernière migration :
 
-1. ouvrir la frame Outfits sur plusieurs bots avec et sans tenues existantes ;
-2. créer / mettre à jour une tenue avec `update` et vérifier qu’elle apparaît immédiatement dans la liste ;
-3. tester `equip` et `replace` et vérifier qu’il n’y a plus de spam détaillé `Equipping [item] ...` ;
-4. vérifier que le message joueur unique reste présent : `Equipping outfit ...` ou `Replacing current equip with outfit ...` ;
-5. refaire un cycle complet login, `/reload`, groupe, raid, ajout via `AddClass`, ouverture de chaque frame ;
-6. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list`, `outfit ?` avec `MultiBot.allowLegacyChatFallback = false` ;
-7. vérifier que les commandes manuelles volontaires restent fonctionnelles : `who`, `co ?`, `nc ?`, `ss ?`, `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec et actions Outfits.
+1. ouvrir la mini-frame Loot et tester `Enable`, `Disable`, `All`, `Normal`, `Gray`, `Quest`, `Skill` sur un groupe et un raid ;
+2. vérifier que les confirmations système `LOOT_ACK` affichent bien le nombre de bots concernés ;
+3. vérifier que les commandes refusées côté bridge ne s’exécutent pas ;
+4. ouvrir la frame Outfits sur plusieurs bots avec et sans tenues existantes ;
+5. créer / mettre à jour une tenue avec `update` et vérifier qu’elle apparaît immédiatement dans la liste ;
+6. tester `equip` et `replace` et vérifier qu’il n’y a plus de spam détaillé `Equipping [item] ...` ;
+7. vérifier que le message joueur unique reste présent : `Equipping outfit ...` ou `Replacing current equip with outfit ...` ;
+8. refaire un cycle complet login, `/reload`, groupe, raid, ajout via `AddClass`, ouverture de chaque frame ;
+9. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list`, `outfit ?` avec `MultiBot.allowLegacyChatFallback = false` ;
+10. vérifier que les commandes manuelles volontaires restent fonctionnelles : `who`, `co ?`, `nc ?`, `ss ?`, `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec et actions Outfits.
 
 Après cette stabilisation, il restera surtout un audit de nettoyage : supprimer les debug temporaires, garder les fallbacks legacy uniquement quand ils sont utiles au diagnostic, et retirer les parsers historiques devenus morts.
 
