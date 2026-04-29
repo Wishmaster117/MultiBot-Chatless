@@ -1,7 +1,7 @@
 MultiBot.MB_PAGE_DEFAULT = string.format("%d/%d", 0, 0)
 
 -- MULTIBAR --
-local tMultiBar = MultiBot.addFrame("MultiBar", -333, 144, 36)
+local tMultiBar = MultiBot.addFrame("MultiBar", -363, 144, 36)
 MultiBot.PromoteFrame(tMultiBar)
 tMultiBar:SetMovable(true)
 tMultiBar:SetClampedToScreen(true)
