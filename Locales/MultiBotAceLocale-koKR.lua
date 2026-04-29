@@ -5,6 +5,13 @@ end
 
 local koKRValues = {
   ["tips.units.rti"] = "RTI",
+  ["tips.disperse.main"] = "분산",
+  ["tips.disperse.set"] = "분산 거리 설정",
+  ["tips.disperse.disable"] = "분산 비활성화",
+  ["disperse.bridge.required"] = "위치 브리지가 연결되어 있지 않습니다.",
+  ["disperse.invalid_distance"] = "1에서 100 야드 사이의 거리를 입력하세요.",
+  ["disperse.confirm.set"] = "분산 거리가 %s 야드로 설정되었습니다.",
+  ["disperse.confirm.disable"] = "분산이 비활성화되었습니다.",
   ["rti.bridge.required"] = "RTI 브리지가 연결되어 있지 않습니다.",
   ["info.rti.no_bot_selection"] = "봇 전용 RTI 아이콘이 선택되지 않았습니다.",
   ["rti.icon.star"] = "별",

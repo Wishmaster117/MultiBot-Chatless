@@ -119,12 +119,34 @@ local function ensureBridgeState()
   state.glyphActive = state.glyphActive or nil
   state.rtiSeq = state.rtiSeq or 0
   state.combatSeq = state.combatSeq or 0
+  state.positionSeq = state.positionSeq or 0
   return state
 end
 
 local function debugPrint(...)
   if MultiBot and MultiBot.dprint then
     MultiBot.dprint(...)
+  end
+end
+
+local function L(key, fallback)
+  if MultiBot and type(MultiBot.L) == "function" then
+    return MultiBot.L(key, fallback)
+  end
+
+  return fallback or key
+end
+
+local function systemMessage(message)
+  message = trim(message)
+  if message == "" then
+    return
+  end
+
+  if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+    DEFAULT_CHAT_FRAME:AddMessage(message)
+  elseif type(print) == "function" then
+    print(message)
   end
 end
 
@@ -293,6 +315,31 @@ function Comm.RunCombatCommand(scope, target, command)
   local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.combatSeq)
 
   return Comm.Send("RUN", "COMBAT~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
+end
+
+function Comm.RunPositionCommand(scope, target, command)
+  local state = ensureBridgeState()
+
+  if not state.connected then
+    return false
+  end
+
+  command = trim(command or "")
+  if command == "" then
+    return false
+  end
+
+  scope = string.upper(trim(scope or "ALL"))
+  target = trim(target or "")
+
+  if scope ~= "ALL" and scope ~= "GROUP" and scope ~= "BOT" then
+    return false
+  end
+
+  state.positionSeq = (tonumber(state.positionSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-position-" .. tostring(state.positionSeq)
+
+  return Comm.Send("RUN", "POSITION~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
 end
 
 function Comm.RequestOutfits(name)
@@ -1645,6 +1692,34 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     debugPrint("ADDON:RX", "COMBAT_ACK", payload or "")
+    return true
+  end
+
+  if opcode == "POSITION_ACK" then
+    state.connected = true
+    state.lastError = nil
+    debugPrint("ADDON:RX", "POSITION_ACK", payload or "")
+
+    local scope, rest = splitOnce(payload or "", "~")
+    local encodedTarget, rest2 = splitOnce(rest, "~")
+    local token, rest3 = splitOnce(rest2, "~")
+    local executedText, encodedCommand = splitOnce(rest3, "~")
+    local executed = tonumber(executedText) or 0
+    local command = trim(urlDecodeField(encodedCommand))
+
+    if executed > 0 then
+      local distance = string.match(command, "^disperse set%s+(.+)$")
+
+      if distance then
+        systemMessage(string.format(
+          L("disperse.confirm.set", "Disperse set to %s yards."),
+          distance
+        ))
+      elseif command == "disperse disable" then
+        systemMessage(L("disperse.confirm.disable", "Disperse disabled."))
+      end
+    end
+
     return true
   end
 

@@ -5,6 +5,13 @@ end
 
 local enGBValues = {
   ["tips.units.rti"] = "RTI",
+  ["tips.disperse.main"] = "Disperse",
+  ["tips.disperse.set"] = "Set disperse distance",
+  ["tips.disperse.disable"] = "Disable disperse",
+  ["disperse.bridge.required"] = "Position bridge is not connected.",
+  ["disperse.invalid_distance"] = "Enter a distance between 1 and 100 yards.",
+  ["disperse.confirm.set"] = "Disperse set to %s yards.",
+  ["disperse.confirm.disable"] = "Disperse disabled.",
   ["rti.bridge.required"] = "RTI bridge is not connected.",
   ["info.rti.no_bot_selection"] = "No bot-specific RTI icon selected.",
   ["rti.icon.star"] = "Star",

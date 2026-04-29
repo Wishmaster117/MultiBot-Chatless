@@ -5,6 +5,13 @@ end
 
 local frFRValues = {
   ["tips.units.rti"] = "RTI",
+  ["tips.disperse.main"] = "Disperse",
+  ["tips.disperse.set"] = "Définir la distance de disperse",
+  ["tips.disperse.disable"] = "Désactiver disperse",
+  ["disperse.bridge.required"] = "Le bridge de position n’est pas connecté.",
+  ["disperse.invalid_distance"] = "Entre une distance entre 1 et 100 yards.",
+  ["disperse.confirm.set"] = "Disperse défini à %s yards.",
+  ["disperse.confirm.disable"] = "Disperse désactivé.",
   ["rti.bridge.required"] = "Le bridge RTI n'est pas connecté.",
   ["info.rti.no_bot_selection"] = "Aucun bot avec une icône RTI personnelle sélectionnée.",
   ["rti.icon.star"] = "Étoile",

@@ -5,6 +5,13 @@ end
 
 local deDEValues = {
   ["tips.units.rti"] = "RTI",
+  ["tips.disperse.main"] = "Disperse",
+  ["tips.disperse.set"] = "Disperse-Distanz setzen",
+  ["tips.disperse.disable"] = "Disperse deaktivieren",
+  ["disperse.bridge.required"] = "Position-Bridge ist nicht verbunden.",
+  ["disperse.invalid_distance"] = "Gib eine Distanz zwischen 1 und 100 Yards ein.",
+  ["disperse.confirm.set"] = "Disperse auf %s Yards gesetzt.",
+  ["disperse.confirm.disable"] = "Disperse deaktiviert.",
   ["rti.bridge.required"] = "Die RTI-Bridge ist nicht verbunden.",
   ["info.rti.no_bot_selection"] = "Kein botspezifisches RTI-Symbol ausgewählt.",
   ["rti.icon.star"] = "Stern",

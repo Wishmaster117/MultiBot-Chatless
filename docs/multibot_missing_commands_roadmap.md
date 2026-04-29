@@ -9,7 +9,7 @@ Ce document suit les commandes `mod-playerbots` encore intéressantes à intégr
 - les commandes serveur/admin à ne pas intégrer dans l'addon ;
 - les priorités d'intégration bridge-first/chatless.
 
-Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control et Combat Strategies :  
+Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies et Disperse :  
 **éviter le spam chat automatique**, utiliser le bridge quand c'est possible, et conserver les commandes manuelles utiles comme `who`, `co ?`, `nc ?`, `ss ?`.
 
 ---
@@ -32,10 +32,11 @@ Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats
 | RTI / Target Icons | Fait | UI complète + bridge `RUN~RTI`, scopes `ALL`, `GROUP`, `BOT`. |
 | Pull Control | Fait / à fignoler | Mini-frame MainBar + bridge `RUN~COMBAT`, séquences de commandes, scopes et presets. |
 | Combat Strategies | Fait / à tester large | Toggles individuels dans les EveryBars + mini-frame Party/Raid, via `RUN~COMBAT`. |
+| Disperse | Fait / à tester large | Mini-frame MainBar + bridge `RUN~POSITION`, distance 1-100 yards et disable. |
 
 ---
 
-## Derniers lots terminés : Pull Control + Combat Strategies
+## Derniers lots terminés : Pull Control + Combat Strategies + Disperse
 
 ### Pull Control
 
@@ -103,6 +104,34 @@ Notes fonctionnelles importantes :
 - Le fait qu'une stratégie apparaisse ou non dans `co ?` dépend du nom exact réellement reconnu côté playerbots.
 - `wait for attack time X` n'est pas une stratégie `co`, donc il ne faut pas attendre qu'elle apparaisse forcément dans `co ?`.
 - Pour les nouvelles stratégies, le test principal est le comportement réel du bot et la présence d'un `COMBAT_ACK` côté bridge, pas uniquement l'affichage dans `co ?`.
+
+### Disperse
+
+Le bloc `Disperse` a été ajouté pour contrôler rapidement l'espacement collectif des bots sans repasser par le chat.
+
+Fonctionnalités terminées :
+
+- bouton `Disperse` ajouté dans la MainBar ;
+- mini-frame compacte ouverte depuis le bouton `Disperse` ;
+- input distance configurable ;
+- validation addon des distances autorisées entre `1` et `100` yards ;
+- refus des valeurs invalides ou supérieures à `100`, sans clamp silencieux ;
+- bouton `Set` envoyant `disperse set <yards>` ;
+- bouton `Disable` envoyant `disperse disable` ;
+- clic droit sur le bouton principal pour désactiver rapidement `Disperse` ;
+- endpoint bridge `RUN~POSITION~<scope>~<target>~<token>~<command>` ;
+- whitelist serveur limitée aux commandes `disperse set <yards>` et `disperse disable` ;
+- application native côté serveur via les valeurs playerbots de dispersion, sans parser une réponse chat ;
+- ACK bridge `POSITION_ACK` ;
+- confirmation en message système après ACK : distance définie ou dispersion désactivée ;
+- état visuel normal au login : bouton principal grisé, input et boutons secondaires cachés ;
+- ouverture du menu dès le premier clic après login.
+
+À tester plus largement :
+
+- comportement en groupe complet et raid ;
+- interaction avec les mécaniques de déplacement existantes des bots ;
+- lisibilité/position exacte de la mini-frame selon les résolutions et skins UI.
 
 ---
 
@@ -315,31 +344,45 @@ Recommandation UX conservée :
 
 ### Statut
 
-**Prochaine étape logique.**
+**Terminé côté MultiBot + bridge, à tester en conditions réelles.**
 
 ### Pourquoi
 
 Très utile pour les mécaniques AoE ou les combats où les bots doivent s'espacer.
 
-### Commandes à couvrir
+### Commandes couvertes
 
-| Commande playerbots | Statut MultiBot | Priorité | Proposition UI |
+| Commande playerbots | Statut MultiBot | Priorité | UI actuelle |
 |---|---:|---:|---|
-| `disperse set <yards>` | Manquant | Moyenne | Champ distance + bouton Apply |
-| `disperse disable` | Manquant | Moyenne | Bouton Disable |
+| `disperse set <yards>` | Fait | Moyenne | Input distance + bouton Set |
+| `disperse disable` | Fait | Moyenne | Bouton Disable + clic droit sur le bouton principal |
 
-### Proposition UI
-
-Section simple :
+### UX actuelle
 
 ```text
-Disperse distance: [ 8 ] yards
-[Apply] [Disable]
+MainBar
+└─ Disperse
+   ├─ Distance: [ 10 ]
+   ├─ Set
+   └─ Disable
 ```
 
-### Note
+### Flux bridge final
 
-À faire après stabilisation RTI/Pull Control/Combat Strategies, sauf si un autre besoin gameplay devient prioritaire.
+```text
+RUN~POSITION~ALL~~<token>~disperse set 10
+RUN~POSITION~ALL~~<token>~disperse disable
+POSITION_ACK~ALL~~<token>~<executed>~disperse set 10
+POSITION_ACK~ALL~~<token>~<executed>~disperse disable
+```
+
+### Notes
+
+- `Disperse` utilise un endpoint séparé `RUN~POSITION` pour éviter de mélanger le positionnement collectif avec les stratégies combat `RUN~COMBAT`.
+- La distance est validée entre `1` et `100` yards côté addon et côté bridge.
+- Les valeurs invalides ou supérieures à `100` sont refusées avec un message d'erreur localisé.
+- La confirmation utilisateur est affichée seulement après réception du `POSITION_ACK`.
+- Aucun parsing automatique de réponse chat n'est nécessaire.
 
 ---
 
@@ -497,7 +540,7 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 | 1 | RTI bridge-first | UI + bridge command | Haute | Fait |
 | 2 | Pull Control avancé | Nouvelle UI + séquences commandes | Haute | Fait / à fignoler |
 | 3 | Advanced Combat Strategies | EveryBars + mini-frame Party/Raid via `RUN~COMBAT` | Haute/Moyenne | Fait / à tester |
-| 4 | Disperse | Petite UI + commande combat/mouvement | Moyenne | Prochaine étape |
+| 4 | Disperse | Petite UI + commande positionnement via `RUN~POSITION` | Moyenne | Fait / à tester |
 | 5 | Loot Rules | Petite UI profils | Moyenne | À faire |
 | 6 | Trainer / Maintenance extras | UI maintenance | Moyenne/Basse | À faire |
 | 7 | Items avancés | Extensions inventaire | Basse/Moyenne | À faire |
@@ -509,25 +552,26 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 - Toute nouvelle commande utilisée automatiquement par l'addon devrait passer par le bridge quand possible.
 - Les commandes manuelles informatives doivent rester fonctionnelles en whisper/party/raid.
 - Ne pas réintroduire de parsing chat automatique pour peupler l'UI.
-- Pour les commandes qui ne nécessitent aucun retour structuré, un endpoint générique de type `RUN~COMMAND` ou un endpoint spécialisé comme `RUN~RTI` / `RUN~COMBAT` peut suffire.
+- Pour les commandes qui ne nécessitent aucun retour structuré, un endpoint générique de type `RUN~COMMAND` ou un endpoint spécialisé comme `RUN~RTI` / `RUN~COMBAT` / `RUN~POSITION` peut suffire.
 - Pour les commandes qui doivent alimenter une frame, préférer un endpoint structuré dédié.
 - Les commandes serveur/admin ne doivent pas être exposées dans l'addon utilisateur.
 - Les boutons ajoutés dans les barres doivent conserver une position cohérente avec `MultiBotLeftCoreUI.lua` et la position par défaut de `MultiBar` dans `MultiBotInit.lua` / reset dans `MultiBotMainUI.lua`.
 - Les tooltips nouvellement ajoutés doivent passer par AceLocale, comme les tooltips RTI, Pull Control et Combat Strategies.
-- `RUN~COMBAT` doit rester whitelisté côté bridge : ne pas en faire un exécuteur libre de n'importe quelle commande chat.
+- `RUN~COMBAT` et `RUN~POSITION` doivent rester whitelistés côté bridge : ne pas en faire des exécuteurs libres de n'importe quelle commande chat.
 - Éviter les doublons UI : si une stratégie dispose déjà d'un bouton EveryBar dédié, ne pas la rajouter dans une nouvelle frame sauf besoin UX clairement identifié.
 
 ---
 
 ## Point logique suivant
 
-Le prochain bloc logique est **Disperse**.
+Le prochain bloc logique est **Loot Rules / Loot List**.
 
-Raison : les blocs RTI, Pull Control et Combat Strategies couvrent maintenant le ciblage, le pull et les stratégies combat de base. `Disperse` complète naturellement ce trio en ajoutant un contrôle de positionnement collectif très utile contre les AoE et les mécaniques de donjon/raid.
+Raison : les blocs RTI, Pull Control, Combat Strategies et Disperse couvrent maintenant le ciblage, le pull, les stratégies combat et le positionnement collectif. Le prochain manque gameplay utile est donc le contrôle du loot, idéalement via une petite UI de profils et des commandes bridge-first whitelistées.
 
 Proposition de prochaine itération :
 
-- vérifier d'abord la syntaxe exacte supportée par playerbots : `disperse set <yards>` et `disperse disable` ;
-- décider si l'action doit passer par `RUN~COMBAT` ou par un endpoint plus neutre, par exemple `RUN~MOVE` / `RUN~POSITION` si on veut garder `RUN~COMBAT` réservé aux stratégies combat ;
-- ajouter une mini-frame simple avec distance configurable et bouton disable ;
-- garder le fonctionnement chatless, sans parsing automatique de réponse.
+- vérifier la syntaxe exacte réellement supportée par playerbots pour `nc +loot`, `nc -loot` et les variantes `ll` ;
+- décider si le loot doit passer par un endpoint dédié, par exemple `RUN~LOOT`, ou par un endpoint générique whitelisté ;
+- ajouter une mini-frame simple avec profils `All`, `Normal`, `Gray`, `Quest`, `Skill` ;
+- garder les ajouts/retraits item par item pour une itération ultérieure depuis l'inventaire bridge ;
+- conserver le fonctionnement chatless, sans parsing automatique de réponse.
