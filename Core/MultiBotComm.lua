@@ -120,6 +120,7 @@ local function ensureBridgeState()
   state.rtiSeq = state.rtiSeq or 0
   state.combatSeq = state.combatSeq or 0
   state.positionSeq = state.positionSeq or 0
+  state.lootSeq = state.lootSeq or 0
   return state
 end
 
@@ -315,6 +316,31 @@ function Comm.RunCombatCommand(scope, target, command)
   local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.combatSeq)
 
   return Comm.Send("RUN", "COMBAT~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
+end
+
+function Comm.RunLootCommand(scope, target, command)
+  local state = ensureBridgeState()
+
+  if not state.connected then
+    return false
+  end
+
+  command = trim(command or "")
+  if command == "" then
+    return false
+  end
+
+  scope = string.upper(trim(scope or "ALL"))
+  target = trim(target or "")
+
+  if scope ~= "ALL" and scope ~= "GROUP" and scope ~= "BOT" then
+    return false
+  end
+
+  state.lootSeq = (tonumber(state.lootSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-loot-" .. tostring(state.lootSeq)
+
+  return Comm.Send("RUN", "LOOT~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
 end
 
 function Comm.RunPositionCommand(scope, target, command)
@@ -1718,6 +1744,53 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
       elseif command == "disperse disable" then
         systemMessage(L("disperse.confirm.disable", "Disperse disabled."))
       end
+    end
+
+    return true
+  end
+
+  if opcode == "LOOT_ACK" then
+    state.connected = true
+    state.lastError = nil
+    debugPrint("ADDON:RX", "LOOT_ACK", payload or "")
+
+    local scope, rest = splitOnce(payload or "", "~")
+    local encodedTarget, rest2 = splitOnce(rest, "~")
+    local token, rest3 = splitOnce(rest2, "~")
+    local executedText, encodedCommand = splitOnce(rest3, "~")
+    local executed = tonumber(executedText) or 0
+    local command = string.lower(trim(urlDecodeField(encodedCommand)))
+
+    if executed <= 0 then
+      systemMessage(L("loot.confirm.none", "Loot command was not applied to any bot."))
+      return true
+    end
+
+    if MultiBot.OnLootCommandApplied then
+      MultiBot.OnLootCommandApplied(command, executed)
+    end
+
+    if command == "nc +loot" then
+      systemMessage(string.format(L("loot.confirm.enable", "Loot enabled for %d bot(s)."), executed))
+      return true
+    end
+
+    if command == "nc -loot" then
+      systemMessage(string.format(L("loot.confirm.disable", "Loot disabled for %d bot(s)."), executed))
+      return true
+    end
+
+    local profile = command:match("^ll%s+([%w_%-]+)$")
+    if profile then
+      local profileName = ({
+        all = L("loot.profile.all", "All"),
+        normal = L("loot.profile.normal", "Normal"),
+        gray = L("loot.profile.gray", "Gray"),
+        quest = L("loot.profile.quest", "Quest"),
+        skill = L("loot.profile.skill", "Skill"),
+      })[profile] or profile
+
+      systemMessage(string.format(L("loot.confirm.profile", "Loot profile set to %s for %d bot(s)."), profileName, executed))
     end
 
     return true

@@ -9,7 +9,7 @@ Ce document suit les commandes `mod-playerbots` encore intéressantes à intégr
 - les commandes serveur/admin à ne pas intégrer dans l'addon ;
 - les priorités d'intégration bridge-first/chatless.
 
-Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies et Disperse :  
+Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies, Disperse et Loot Rules :  
 **éviter le spam chat automatique**, utiliser le bridge quand c'est possible, et conserver les commandes manuelles utiles comme `who`, `co ?`, `nc ?`, `ss ?`.
 
 ---
@@ -36,7 +36,7 @@ Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats
 
 ---
 
-## Derniers lots terminés : Pull Control + Combat Strategies + Disperse
+## Derniers lots terminés : Pull Control + Combat Strategies + Disperse + Loot Rules
 
 ### Pull Control
 
@@ -396,21 +396,28 @@ Le contrôle du loot est utile, mais moins prioritaire que RTI/pull/combat/dispe
 
 | Commande playerbots | Statut MultiBot | Priorité | Proposition UI |
 |---|---:|---:|---|
-| `nc +loot` | Partiel | Moyenne | Toggle Loot |
-| `nc -loot` | Partiel | Moyenne | Toggle Loot |
-| `ll all` | Manquant | Moyenne | Profil Loot All |
-| `ll normal` | Manquant | Moyenne | Profil Normal |
-| `ll gray` | Manquant | Moyenne | Profil Gray |
-| `ll quest` | Manquant | Moyenne | Profil Quest |
-| `ll skill` | Manquant | Moyenne | Profil Skill |
+| `nc +loot` | Fait | Moyenne | Bouton Enable Loot via `RUN~LOOT` |
+| `nc -loot` | Fait | Moyenne | Bouton Disable Loot via `RUN~LOOT` |
+| `ll all` | Fait | Moyenne | Profil Loot All via `RUN~LOOT` |
+| `ll normal` | Fait | Moyenne | Profil Normal via `RUN~LOOT` |
+| `ll gray` | Fait | Moyenne | Profil Gray via `RUN~LOOT` |
+| `ll quest` | Fait | Moyenne | Profil Quest via `RUN~LOOT` |
+| `ll skill` | Fait | Moyenne | Profil Skill via `RUN~LOOT` |
 | `ll [item]` | Manquant | Basse | Ajouter item depuis inventaire |
 | `ll -[item]` | Manquant | Basse | Retirer item depuis inventaire |
 
 ### Proposition UI
 
-Créer une section `Loot Rules` avec profils prédéfinis.
+Loot Rules` est désormais exposé par une mini-frame de profils prédéfinis.
 
 Les commandes `ll [item]` et `ll -[item]` peuvent être ajoutées plus tard via clic droit sur item dans l'inventaire bridge.
+
+Note à conserver pour une itération ultérieure :
+
+- après vérification du code `mod-playerbots`, `ll quest` et `ll skill` ne correspondent pas à de vrais profils natifs distincts ;
+- il faudra soit remplacer les boutons/profils `Quest` et `Skill` par le profil réellement supporté `Disenchant` ;
+- soit ajouter de vraies stratégies `quest` et `skill` côté `mod-playerbots` avant de les exposer proprement dans MultiBot ;
+- en attendant, éviter de considérer `Quest` et `Skill` comme des profils `ll` fiables côté UI.
 
 ---
 
@@ -541,7 +548,7 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 | 2 | Pull Control avancé | Nouvelle UI + séquences commandes | Haute | Fait / à fignoler |
 | 3 | Advanced Combat Strategies | EveryBars + mini-frame Party/Raid via `RUN~COMBAT` | Haute/Moyenne | Fait / à tester |
 | 4 | Disperse | Petite UI + commande positionnement via `RUN~POSITION` | Moyenne | Fait / à tester |
-| 5 | Loot Rules | Petite UI profils | Moyenne | À faire |
+| 5 | Loot Rules | Petite UI profils + bridge `RUN~LOOT` | Moyenne | Fait / à tester |
 | 6 | Trainer / Maintenance extras | UI maintenance | Moyenne/Basse | À faire |
 | 7 | Items avancés | Extensions inventaire | Basse/Moyenne | À faire |
 
@@ -557,21 +564,21 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 - Les commandes serveur/admin ne doivent pas être exposées dans l'addon utilisateur.
 - Les boutons ajoutés dans les barres doivent conserver une position cohérente avec `MultiBotLeftCoreUI.lua` et la position par défaut de `MultiBar` dans `MultiBotInit.lua` / reset dans `MultiBotMainUI.lua`.
 - Les tooltips nouvellement ajoutés doivent passer par AceLocale, comme les tooltips RTI, Pull Control et Combat Strategies.
-- `RUN~COMBAT` et `RUN~POSITION` doivent rester whitelistés côté bridge : ne pas en faire des exécuteurs libres de n'importe quelle commande chat.
+- `RUN~COMBAT`, `RUN~POSITION` et `RUN~LOOT` doivent rester whitelistés côté bridge : ne pas en faire des exécuteurs libres de n'importe quelle commande chat.
 - Éviter les doublons UI : si une stratégie dispose déjà d'un bouton EveryBar dédié, ne pas la rajouter dans une nouvelle frame sauf besoin UX clairement identifié.
 
 ---
 
 ## Point logique suivant
 
-Le prochain bloc logique est **Loot Rules / Loot List**.
+Le prochain bloc logique conseillé est **Vente / Roll / Vendor**.
 
-Raison : les blocs RTI, Pull Control, Combat Strategies et Disperse couvrent maintenant le ciblage, le pull, les stratégies combat et le positionnement collectif. Le prochain manque gameplay utile est donc le contrôle du loot, idéalement via une petite UI de profils et des commandes bridge-first whitelistées.
+Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse et Loot Rules couvrent maintenant le ciblage, le pull, les stratégies combat, le positionnement collectif et les profils de loot. Le prochain manque gameplay utile concerne donc les actions ponctuelles autour du loot : roll, vente vendor et vente grise.
 
 Proposition de prochaine itération :
 
-- vérifier la syntaxe exacte réellement supportée par playerbots pour `nc +loot`, `nc -loot` et les variantes `ll` ;
-- décider si le loot doit passer par un endpoint dédié, par exemple `RUN~LOOT`, ou par un endpoint générique whitelisté ;
-- ajouter une mini-frame simple avec profils `All`, `Normal`, `Gray`, `Quest`, `Skill` ;
-- garder les ajouts/retraits item par item pour une itération ultérieure depuis l'inventaire bridge ;
-- conserver le fonctionnement chatless, sans parsing automatique de réponse.
+- vérifier les commandes réellement utiles pour `roll`, `roll [item]`, `s vendor` et `s *` ;
+- décider si ces actions doivent passer par un endpoint dédié ou par un endpoint existant whitelisté ;
+- éviter toute vente automatique dangereuse sans action explicite de l'utilisateur ;
+- garder les commandes informatives manuelles inchangées.
+- A noter que `Quest` et `Skill` devront être remplacés plus tard par `Disenchant`, ou devenir de vrais profils ajoutés côté `mod-playerbots` avant exposition définitive ;
