@@ -17,6 +17,24 @@
 * Menus déroulants de la main bar : fermer automatiquement les autres menus quand on en ouvre un nouveau.
 * J'ai l'impression que le disperse ne fait rien
 
+## Frame Loot
+
+* Tri intelligent des bots : afficher en haut les bots qui peuvent réellement utiliser l’objet selon classe, spé, type d’armure, arme, rôle.
+* Filtre par rôle : boutons Tous, Tank, Heal, DPS, Caster, Mêlée, ou par classe.
+* Suggestion automatique : préselectionner le bot le plus pertinent au lieu du premier candidat.
+* Tooltip enrichi : survol du bot = classe, spé, rôle, niveau, équipement actuel comparable si l’addon connaît l’inventaire.
+* Indicateur de pertinence : par exemple Excellent, Possible, Mauvais choix, avec couleur verte/orange/rouge.
+* Avertissement avant erreur : confirmer si tu attribues une plaque à un mage, une arme inutilisable, ou un item épique à un bot non adapté.
+* Bouton “Attribuer recommandé” : un seul clic pour donner l’objet au meilleur candidat.
+* Historique des loots : petite liste “objet donné à X” pendant la session, utile en raid.
+* Mémorisation des préférences : par exemple toujours donner tissu spell à tel bot, plaques tank à tel autre, etc.
+* Masquer les bots non pertinents : option pour ne voir que ceux qui peuvent équiper/utiliser l’objet.
+* Lien avec MultiBotInventoryFrame : clic droit sur un bot dans la dropdown = ouvrir son inventaire/équipement.
+* Mode compact : pour les combats, n’afficher que icône item + nom + dropdown + bouton.
+* Bouton refresh transformé en icône : garder la sécurité manuelle sans prendre autant de place.
+* Attribution rapide par raccourcis : Alt+clic attribue au bot recommandé, Shift+clic ouvre détails.
+* Debug discret : une option /mb lootdebug au lieu de spam chat permanent.
+
 ## Améliorations UI encore ouvertes
 
 * Passer les gobject dans la bridge.
