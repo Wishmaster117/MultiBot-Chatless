@@ -2,6 +2,8 @@
 
 ## Bugs / corrections à vérifier
 
+* Il semble y'avoir une regression, quand je me déconnecte et reconnecte l'UI du groupe nblizzard n'est pas refresh les bots restent en inconne je suis obligé de faire un reload
+* Quand je fais addclass bots on m'envoi que des bots level 1 même si je suis level 80
 * Nouveau outfit par bridge : vérifier le cas de deux armes à deux mains, le bot ne les équipe pas.
 * Inventaire bridge : vérifier qu'il n'y a plus de limite visuelle ou logique à 16 emplacements.
 * Recentrer les icônes des glyphes.
