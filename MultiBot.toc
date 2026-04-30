@@ -94,6 +94,7 @@ UI\MultiBotFleeUI.lua
 UI\MultiBotUnitsFilterUI.lua
 UI\MultiBotUnitsRosterUI.lua
 UI\MultiBotUnitsRootUI.lua
+UI\MultiBotLootMasterUI.lua
 UI\MultiBotBeastUI.lua
 UI\MultiBotCreatorUI.lua
 UI\MultiBotMainUI.lua

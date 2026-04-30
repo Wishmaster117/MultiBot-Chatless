@@ -4,6 +4,23 @@ if type(register) ~= "function" then
 end
 
 local frFRValues = {
+  ["lootmaster.title"] = "MultiBot Responsable du butin",
+  ["lootmaster.refresh"] = "Rafraîchir",
+  ["lootmaster.assign_to"] = "Attribuer à :",
+  ["lootmaster.unknown_item"] = "Objet inconnu",
+  ["lootmaster.unknown_candidate"] = "inconnu",
+  ["lootmaster.status.ready"] = "Sélectionne le destinataire de l'objet.",
+  ["lootmaster.status.not_master"] = "Le butin n'est pas en responsable du butin, ou tu n'es pas le responsable.",
+  ["lootmaster.status.no_loot"] = "Aucun butin disponible.",
+  ["lootmaster.status.no_candidates"] = "Aucun candidat de butin trouvé pour le loot actuel.",
+  ["lootmaster.error.not_master"] = "Tu n'es pas le responsable du butin.",
+  ["lootmaster.error.invalid_candidate"] = "Candidat de butin invalide.",
+  ["lootmaster.assigned"] = "%s attribué à %s.",
+  ["lootmaster.no_candidates_for_item"] = "Aucun candidat pour cet objet.",
+  ["lootmaster.assign"] = "Attribuer",
+  ["lootmaster.select_bot"] = "Choisir un bot",
+  ["lootmaster.no_candidates_for_item"] = "Aucun candidat pour cet objet.",
+  ["lootmaster.unknown_spec"] = "Spec inconnue.",
   ["tips.units.rti"] = "RTI",
   ["tips.disperse.main"] = "Disperse",
   ["tips.disperse.set"] = "Définir la distance de disperse",
