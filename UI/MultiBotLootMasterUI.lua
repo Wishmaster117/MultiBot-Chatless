@@ -990,15 +990,15 @@ local function SetClassIconTooltip(button, candidate)
         if not current then
             return
         end
-    
+
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(current.name or MBLocal("lootmaster.unknown_candidate", "unknown"), 1, 1, 1)
-    
+
         local className = current.className or GetLocalizedClassName(current.classFile)
         if className then
             GameTooltip:AddLine(className, 0.75, 0.75, 0.75)
         end
-    
+
         GameTooltip:AddLine(GetCandidateSpecText(current), 0.6, 0.8, 1)
         if current.lootScore then
             GameTooltip:AddLine(MBLocal("lootmaster.priority_score", "Priorite:") .. " " .. GetCandidateScoreColor(current.lootScore) .. current.lootScore .. "%|r", 0.9, 0.9, 0.9)
@@ -1114,7 +1114,7 @@ local function BuildCandidateList(slot)
             }
 
             ScoreCandidateForItem(candidate, itemProfile)
-            ApplyLootPreferenceScore(candidate, itemProfile)			
+            ApplyLootPreferenceScore(candidate, itemProfile)		
             candidates[#candidates + 1] = candidate
         end
     end
@@ -1218,7 +1218,7 @@ local function UpdateLootHistoryFrame(frame)
         frame.historyLines[i]:Hide()
     end
 
-    frame.historyContent:SetHeight(math.max(LOOT_HISTORY_HEIGHT, (#lootHistory * LOOT_HISTORY_LINE_HEIGHT) + 8))	
+    frame.historyContent:SetHeight(math.max(LOOT_HISTORY_HEIGHT, (#lootHistory * LOOT_HISTORY_LINE_HEIGHT) + 8))
 end
 
 local function AddLootHistory(itemText, candidateName)
@@ -1417,7 +1417,7 @@ local function CreateBasicFrame()
     frame.content:SetPoint("BOTTOMRIGHT", frame.history, "TOPRIGHT", 0, 8)
 
     frame.rows = {}
-    UpdateLootHistoryFrame(frame)	
+    UpdateLootHistoryFrame(frame)
 
     frame:Hide()
 
@@ -1619,7 +1619,7 @@ local function AcquireRow(frame, index)
         row.assignButton:SetWidth(90)
         row.assignButton:SetHeight(22)
         row.assignButton:SetPoint("LEFT", row.selectButton, "RIGHT", 8, 0)
-        row.assignButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")		
+        row.assignButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         row.assignButton:SetText(MBLocal("lootmaster.assign", "Assign"))
         row.assignButton:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1774,7 +1774,7 @@ AssignLoot = function(slot, candidateIndex, candidateName)
     MarkLootSlotAssigned(slot)
     MarkCandidateRecentLoot(candidateName)
     GiveMasterLoot(slot, candidateIndex)
-    AddLootHistory(itemText, candidateName)	
+    AddLootHistory(itemText, candidateName)
 
     if LootMasterUI.frame and LootMasterUI.frame:IsShown() then
         LootMasterUI:Refresh()
