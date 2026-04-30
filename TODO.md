@@ -62,13 +62,6 @@ Raccourcis Alt/Shift clic	**Non**	Pas encore implémenté.
 /mb lootdebug discret	**Non**	Il reste au moins un message debug chat direct quand aucun candidat n’est retourné.
 
 **Ajouter en variables:
- 'lootmaster.history_title'
- 'lootmaster.history_empty'
- 'lootmaster.preference_hint'
- 'lootmaster.preference_saved'
- 'lootmaster.history_title'
- 'lootmaster.preference_saved'
- 'lootmaster.preference_cleared'
 
 ## Améliorations UI encore ouvertes
 
