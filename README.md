@@ -12,12 +12,8 @@
 
 <br>
 
-<a href="https://github.com/Wishmaster117/MultiBot-Chatless">
-  <img alt="Repository" src="https://img.shields.io/badge/repository-MultiBot--Chatless-blue" />
-</a>
-<a href="https://github.com/Wishmaster117/mod-multibot-bridge">
-  <img alt="Bridge Module" src="https://img.shields.io/badge/requires-mod--multibot--bridge-orange" />
-</a>
+<img alt="Repository" src="https://img.shields.io/badge/repository-MultiBot--Chatless-blue" />
+<img alt="Bridge Module" src="https://img.shields.io/badge/requires-mod--multibot--bridge-orange" />
 <img alt="WoW Version" src="https://img.shields.io/badge/client-WotLK%203.3.5a-lightgrey" />
 <img alt="Architecture" src="https://img.shields.io/badge/architecture-bridge--first-success" />
 
