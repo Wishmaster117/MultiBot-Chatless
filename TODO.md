@@ -35,34 +35,6 @@
 * Attribution rapide par raccourcis : Alt+clic attribue au bot recommandé, Shift+clic ouvre détails.
 * Debug discret : une option /mb lootdebug au lieu de spam chat permanent.
 
--- Avancement:
-
-Fonction	Statut	Détail
-Tri intelligent des bots	**oui / oui**	Score calculé selon armure, arme utilisable, profil principal des stats, rôle/spé estimé, et pénalité loot récent. !!! Je garderais juste une petite réserve mentale : ce n’est pas encore un simulateur BiS ou comparaison d’équipement, mais pour classer correctement les bots selon “qui peut vraiment utiliser l’objet”, la base est maintenant bonne.
-Classe compatible	**oui**	Compatibilité évaluée via les tables de classe pour l’armure maximale, les boucliers et les armes utilisables. !!! La seule limite : ça vérifie la compatibilité “peut porter/utiliser”, pas encore la pertinence fine type “ce paladin peut porter cette masse caster mais ce n’est pas pour Vindicte”. Cette pertinence-là est couverte par le scoring stats/rôle.
-Type d’armure compatible	**Oui**	cloth/leather/mail/plate/shield sont scorés.
-Arme utilisable	**Oui**	Table d’armes par classe utilisée dans le score.
-Stats utiles à la spé	**oui**	Le tooltip est scanné pour déterminer un profil principal d’objet : tank, physical, caster ou healer, puis comparé au rôle/spé estimé du bot. !!! Réserve : ça reste une lecture par grandes familles de stats. Ça ne compare pas encore les caps, le BiS, l’équipement actuel, ni les besoins exacts de chaque spé.
-Rôle compatible	**Oui**	Le rôle du bot est estimé depuis sa classe et son arbre de talents/build, puis comparé au profil principal de l’objet dans le score. !!! Même réserve que les autres : c’est une compatibilité de rôle “logique” tank/heal/caster/physical, pas une évaluation ultra fine de chaque spécialisation.
-Objet déjà attribué récemment	**Oui**	Pénalité temporaire via recentLootByCandidate, 120 sec.
-Classe/spé non pertinente	**Partiel**	Malus de score, mais pas encore masquage ni avertissement clair.
-Dropdown Nom Spé 92%	**Oui**	Présent dans BuildCandidateDropdownText.
-Suggestion automatique	**Oui**	Les candidats sont triés par score, puis le premier est présélectionné.
-Tooltip enrichi	**Partiel**	Nom, classe localisée, spé/build, score. Pas encore niveau ni équipement comparable.
-Indicateur Excellent/Possible/Mauvais	**Partiel**	Il y a un % coloré, mais pas encore de libellé texte.
-Avertissement avant mauvais choix	**Non**	Pas de confirmation si mage/plaque, arme inutilisable, etc.
-Bouton “Attribuer recommandé”	**Partiel**	Le bouton actuel attribue le candidat présélectionné, donc le meilleur par défaut, mais pas de bouton dédié.
-Historique des loots visible	**Oui**	Les derniers loots attribués apparaissent en bas de la frame pendant la session.
-Mémorisation des préférences	**Oui**	Clic droit sur Attribuer mémorise le bot choisi pour les objets similaires et lui donne un bonus de score ensuite.
-Masquer bots non pertinents	**Non**	Les mauvais choix restent visibles, seulement avec score bas.
-Lien avec MultiBotInventoryFrame	**Oui**	clic droit pour ouvrir inventaire/équipement.
-Mode compact	**Non**	Frame réduite/assombrie, mais pas de vrai mode compact.
-Refresh en icône	**Non**	Le bouton texte Rafraîchir est encore là.
-Raccourcis Alt/Shift clic	**Non**	Pas encore implémenté.
-/mb lootdebug discret	**Non**	Il reste au moins un message debug chat direct quand aucun candidat n’est retourné.
-
-**Ajouter en variables:
-
 ## Améliorations UI encore ouvertes
 
 * Passer les gobject dans la bridge.
