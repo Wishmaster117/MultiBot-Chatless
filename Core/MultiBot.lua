@@ -517,6 +517,35 @@ function MultiBot.SetMainUIVisibleConfig(value)
   return visible
 end
 
+local LOOT_MASTER_UI_ENABLED_DEFAULT = true
+
+function MultiBot.GetLootMasterUIEnabled()
+  local value = MultiBot.Store and MultiBot.Store.GetUIValue and MultiBot.Store.GetUIValue("lootMasterUIEnabled")
+  if type(value) == "boolean" then
+    return value
+  end
+
+  local save = ensureSavedVariables()
+  if type(save.LootMasterUIEnabled) == "boolean" then
+    return save.LootMasterUIEnabled
+  end
+
+  return LOOT_MASTER_UI_ENABLED_DEFAULT
+end
+
+function MultiBot.SetLootMasterUIEnabled(value)
+  local enabled = not not value
+
+  if MultiBot.Store and MultiBot.Store.SetUIValue then
+    MultiBot.Store.SetUIValue("lootMasterUIEnabled", enabled)
+  else
+    local save = ensureSavedVariables()
+    save.LootMasterUIEnabled = enabled
+  end
+
+  return enabled
+end
+
 local function getLegacyCharacterStateRoot(createIfMissing)
   local saved = _G.MultiBotSaved
   if type(saved) ~= "table" then
