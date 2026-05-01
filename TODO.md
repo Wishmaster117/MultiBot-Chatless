@@ -19,6 +19,9 @@
 
 ## Informations bot
 ** Faire une frame qui affiche les infos du bot comme la profession ou peut être ajouter la profession à la frame inventaire?
+* Y afficher proffeions et niveau
+* Monnaies (emblemes etc..)
+* Réputations
 
 ## Frame Loot
 

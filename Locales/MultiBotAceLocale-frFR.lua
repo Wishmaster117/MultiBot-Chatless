@@ -19,7 +19,6 @@ local frFRValues = {
   ["lootmaster.no_candidates_for_item"] = "Aucun candidat pour cet objet.",
   ["lootmaster.assign"] = "Attribuer",
   ["lootmaster.select_bot"] = "Choisir un bot",
-  ["lootmaster.unknown_spec"] = "Spec inconnue.",
   ["lootmaster.inventory_unavailable"] = "Inventaire indisponible.",
   ["lootmaster.priority_score"] = "Priorite:",
   ["lootmaster.inventory_hint"] = "Click-droit: ouvre inventaire/équipment.",

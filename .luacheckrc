@@ -32,7 +32,7 @@ globals = {
 	"ChatFontNormal", "UnitIsDead", "ShowPrompt", "GameFontHighlightSmall", "GameFontNormalSmall", "SEARCH", "UnitIsUnit", "MB_INVENTORY_LABEL", "INVENTORY_TOOLTIP", "BAGSLOT", "GetItemInfoInstant",
 	"sendInventoryItemCommand", "LE_ITEM_CLASS_QUESTITEM", "ITEMS", "LOADING", "QUEST_LOG", "INSPECT", "SPELLBOOK", "MB_TAB_TITLE_DEFAULT", "ensureHiddenTooltip", "IsInGuild", "GetGuildInfo", "GetGuildRosterShowOffline",
 	"SetGuildRosterShowOffline", "PLAYER","Ambiguate", "ChatFrame_AddMessageEventFilter", "ChatTypeInfo", "x", "y", "CLASS_ICON_TCOORDS", "GetLootSlotLink", "GetLootSlotInfo", "GetLootMethod", "GetMasterLootCandidate",
-	"LOCALIZED_CLASS_NAMES_MALE", "LOCALIZED_CLASS_NAMES_FEMALE", "date", "LootSlotIsCoin", "LootSlotIsItem", "classColor", "GetNumLootItems"
+	"LOCALIZED_CLASS_NAMES_MALE", "LOCALIZED_CLASS_NAMES_FEMALE", "date", "LootSlotIsCoin", "LootSlotIsItem", "classColor", "GetNumLootItems", "GetItemQualityColor", "GiveMasterLoot", "GetLootThreshold"
 	
 }
 

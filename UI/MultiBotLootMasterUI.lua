@@ -301,30 +301,6 @@ GuessSpecFromBuild = function(classToken, build)
     return treeNames and treeNames[treeIndex] or nil
 end
 
-local function BuildCandidateSpecText(candidate)
-    if not candidate then
-        return MBLocal("lootmaster.unknown_spec", "Unknown spec")
-    end
-
-    local build = candidate.build
-    local knownSpecName = FindKnownSpecNameFromBuild(candidate.name, build)
-    local guessed = GuessSpecFromBuild(candidate.classToken, build)
-
-    if knownSpecName and build then
-        return knownSpecName .. " (" .. build .. ")"
-    end
-
-    if guessed and build then
-        return guessed .. " (" .. build .. ")"
-    end
-
-    if build then
-        return build
-    end
-
-    return MBLocal("lootmaster.unknown_spec", "Unknown spec")
-end
-
 local function GetCandidateSpecLabel(candidate)
     if not candidate then return MBLocal("lootmaster.unknown_spec", "Unknown spec") end
 
@@ -690,10 +666,10 @@ local function GetItemStatFlags(itemLink, tooltipText)
     local hasIntellect = TextHasAny(text, { "intellect", "intelligence" })
     local hasHit = TextHasAny(text, { "hit rating", "score de toucher" })
     local hasCrit = TextHasAny(text, { "critical strike", "coup critique", "critique" })
-    local hasHaste = TextHasAny(text, { "haste", "h.te" })	
+    local hasHaste = TextHasAny(text, { "haste", "h.te" })
 
     local hasPhysicalPower = hasAgility or hasStrength or hasAttackPower or hasExpertise or hasArmorPen
-    local hasTankPrimary = hasDefense or hasDodge or hasParry or hasBlock	
+    local hasTankPrimary = hasDefense or hasDodge or hasParry or hasBlock
     local hasHealerHint = hasHealing or hasMp5 or hasSpirit
     local primary
 
@@ -747,7 +723,7 @@ local function BuildLootItemProfile(slot)
     local _, itemName = GetLootSlotInfo(slot)
     local query = itemLink or itemName
     local _, _, _, _, _, itemType, itemSubType, _, equipLoc = GetItemInfo(query or "")
-    local tooltipText = GetLootTooltipText(itemLink)	
+    local tooltipText = GetLootTooltipText(itemLink)
 
     return {
         link = itemLink,
@@ -2601,7 +2577,6 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "LOOT_OPENED" then
         CancelQueuedLootClose()
         assignedLootKeys = {}
-        assignedLootSlots = {}
         LootMasterUI:OnLootOpened(...)
         return
     end
