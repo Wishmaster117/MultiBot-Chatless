@@ -243,17 +243,6 @@ local function GetKnownBuildForCandidate(name)
         or builds[name]
 end
 
-local function GetCachedTalentSpecList(name)
-    local bridge = MultiBot and MultiBot.bridge
-    local specs = bridge and bridge.talentSpecs
-
-    if type(specs) ~= "table" then
-        return nil
-    end
-
-    return specs[NormalizeName(name)] or specs[string.lower(ShortName(name) or "")] or specs[name]
-end
-
 GuessSpecFromBuild = function(classToken, build)
     if type(build) ~= "string" then
         return nil
