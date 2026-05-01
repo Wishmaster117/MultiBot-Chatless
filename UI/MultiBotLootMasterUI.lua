@@ -1,7 +1,5 @@
 -- MultiBotLootMasterUI.lua
 
-local addonName = ...
-
 local AceLocale = LibStub and LibStub("AceLocale-3.0", true)
 local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
 local L = AceLocale and AceLocale:GetLocale("MultiBot", true)
@@ -16,19 +14,20 @@ end
 
 local LootMasterUI = {}
 local assignedLootKeys = {}
-local assignedLootSlots = {}
 local recentLootByCandidate = {}
 local lootHistory = {}
 
-local FRAME_WIDTH = 500
-local FRAME_HEIGHT = 420
+local FRAME_WIDTH = 480
+local FRAME_HEIGHT = 460
 local ITEM_ROW_HEIGHT = 64
 local DROPDOWN_WIDTH = 220
 local MAX_MASTER_LOOT_CANDIDATES = 40
 local RECENT_LOOT_PENALTY_SECONDS = 120
 local LOOT_HISTORY_LINE_HEIGHT = 14
-local LOOT_HISTORY_HEIGHT = 62
+local LOOT_HISTORY_HEIGHT = 96
 local LOOT_PREFERENCE_BONUS = 18
+local LOOT_PROFESSION_BONUS = 55
+local LOOT_PROFESSION_MISMATCH_PENALTY = 35
 local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 local AssignLoot
 local QueueRefresh
@@ -77,6 +76,14 @@ local function AddSystemMessage(message)
     end
 end
 
+local function IsLootMasterUIEnabled()
+    if MultiBot and type(MultiBot.GetLootMasterUIEnabled) == "function" then
+        return MultiBot.GetLootMasterUIEnabled()
+    end
+
+    return true
+end
+
 local function OpenCandidateInventory(candidate)
     local botName = candidate and candidate.name
 
@@ -114,6 +121,40 @@ local function RunLater(delay, callback)
     end
 
     callback()
+end
+
+local pendingLootCloseToken = 0
+
+local function CancelQueuedLootClose()
+    pendingLootCloseToken = pendingLootCloseToken + 1
+end
+
+local function IsNativeLootFrameStillOpen()
+    if _G.LootFrame and _G.LootFrame:IsShown() then
+        return true
+    end
+
+    return GetNumLootItems and (GetNumLootItems() or 0) > 0
+end
+
+local function QueueLootClose()
+    CancelQueuedLootClose()
+    local token = pendingLootCloseToken
+
+    RunLater(0.20, function()
+        if token ~= pendingLootCloseToken then
+            return
+        end
+
+        if IsNativeLootFrameStillOpen() then
+            if LootMasterUI.frame and LootMasterUI.frame:IsShown() and QueueRefresh then
+                QueueRefresh(0.05)
+            end
+            return
+        end
+
+        LootMasterUI:Close()
+    end)
 end
 
 local function ShortName(name)
@@ -284,36 +325,6 @@ local function BuildCandidateSpecText(candidate)
     return MBLocal("lootmaster.unknown_spec", "Unknown spec")
 end
 
-local function GetCandidateDisplayName(candidate)
-    local name = candidate and candidate.name or ""
-    local classToken = candidate and candidate.classToken
-    local color = classToken and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classToken]
-
-    if color and color.colorStr then
-        return "|c" .. color.colorStr .. name .. "|r"
-    end
-
-    return name
-end
-
-local function ApplyClassIcon(texture, classToken)
-    if not texture then
-        return
-    end
-
-    if classToken and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[classToken] then
-        local coords = CLASS_ICON_TCOORDS[classToken]
-        texture:SetTexture(CLASS_ICON_TEXTURE)
-        texture:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
-        texture:Show()
-        return
-    end
-
-    texture:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-    texture:SetTexCoord(0, 1, 0, 1)
-    texture:Show()
-end
-
 local function GetCandidateSpecLabel(candidate)
     if not candidate then return MBLocal("lootmaster.unknown_spec", "Unknown spec") end
 
@@ -345,6 +356,173 @@ local function TextHasAny(text, patterns)
     end
 
     return false
+end
+
+local PROFESSION_DISPLAY_KEYS = {
+    alchemy = { key = "lootmaster.profession.alchemy", fallback = "Alchemy" },
+    blacksmithing = { key = "lootmaster.profession.blacksmithing", fallback = "Blacksmithing" },
+    enchanting = { key = "lootmaster.profession.enchanting", fallback = "Enchanting" },
+    engineering = { key = "lootmaster.profession.engineering", fallback = "Engineering" },
+    herbalism = { key = "lootmaster.profession.herbalism", fallback = "Herbalism" },
+    inscription = { key = "lootmaster.profession.inscription", fallback = "Inscription" },
+    jewelcrafting = { key = "lootmaster.profession.jewelcrafting", fallback = "Jewelcrafting" },
+    leatherworking = { key = "lootmaster.profession.leatherworking", fallback = "Leatherworking" },
+    mining = { key = "lootmaster.profession.mining", fallback = "Mining" },
+    skinning = { key = "lootmaster.profession.skinning", fallback = "Skinning" },
+    tailoring = { key = "lootmaster.profession.tailoring", fallback = "Tailoring" },
+    cooking = { key = "lootmaster.profession.cooking", fallback = "Cooking" },
+    firstaid = { key = "lootmaster.profession.firstaid", fallback = "First Aid" },
+    fishing = { key = "lootmaster.profession.fishing", fallback = "Fishing" },
+}
+
+local PROFESSION_SPELL_IDS = {
+    alchemy = 2259,
+    blacksmithing = 2018,
+    enchanting = 7411,
+    engineering = 4036,
+    herbalism = 2366,
+    inscription = 45357,
+    jewelcrafting = 25229,
+    leatherworking = 2108,
+    mining = 2575,
+    skinning = 8613,
+    tailoring = 3908,
+    cooking = 2550,
+    firstaid = 3273,
+    fishing = 7620,
+}
+
+local PROFESSION_MATCH_PATTERNS = {
+    alchemy = { "alchemy", "alchimie" },
+    blacksmithing = { "blacksmithing", "blacksmith", "forge" },
+    enchanting = { "enchanting", "enchantement", "enchant" },
+    engineering = { "engineering", "engineer", "ingenier", "ing.nier" },
+    inscription = { "inscription", "calligraphie", "scribe" },
+    jewelcrafting = { "jewelcrafting", "jewelcraft", "joaillerie" },
+    leatherworking = { "leatherworking", "leatherwork", "travail du cuir" },
+    tailoring = { "tailoring", "couture" },
+    cooking = { "cooking", "cuisine" },
+    firstaid = { "first aid", "firstaid", "secourisme", "premiers soins" },
+    fishing = { "fishing", "peche", "p.che" },
+}
+
+local function GetProfessionKeyFromText(text)
+    if type(text) ~= "string" or text == "" then
+        return nil
+    end
+
+    text = string.lower(text)
+    for profession, patterns in pairs(PROFESSION_MATCH_PATTERNS) do
+        if TextHasAny(text, patterns) then
+            return profession
+        end
+    end
+
+    return nil
+end
+
+local function GetProfessionDisplayName(profession)
+    local spellId = PROFESSION_SPELL_IDS[profession or ""]
+    if spellId and GetSpellInfo then
+        local spellName = GetSpellInfo(spellId)
+        if spellName and spellName ~= "" then
+            return spellName
+        end
+    end
+
+    local entry = PROFESSION_DISPLAY_KEYS[profession or ""]
+    if entry then
+        return MBLocal(entry.key, entry.fallback)
+    end
+
+    return profession
+end
+
+local function GetRequiredProfessionForLoot(itemName, itemType, itemSubType, tooltipText)
+    local text = table.concat({
+        itemName or "",
+        itemType or "",
+        itemSubType or "",
+        tooltipText or "",
+    }, " ")
+
+    if not TextHasAny(text, {
+        "recipe", "recette", "pattern", "patron", "design", "dessin",
+        "formula", "formule", "plans", "plan", "schematic", "sch.ma",
+        "manual", "manuel", "technique",
+    }) then
+        return nil
+    end
+
+    return GetProfessionKeyFromText(text)
+end
+
+local function AddProfessionKeysFromValue(professions, value)
+    if type(value) == "string" then
+        local key = GetProfessionKeyFromText(value)
+        if key then
+            professions[key] = true
+        end
+        return
+    end
+
+    if type(value) ~= "table" then
+        return
+    end
+
+    for key, entry in pairs(value) do
+        if entry == true then
+            AddProfessionKeysFromValue(professions, tostring(key))
+        else
+            AddProfessionKeysFromValue(professions, entry)
+            AddProfessionKeysFromValue(professions, tostring(key))
+        end
+    end
+end
+
+local function GetCandidateProfessionKeys(candidate)
+    local professions = {}
+    local detail = candidate and GetBridgeDetail(candidate.name)
+
+    if type(detail) == "table" then
+        AddProfessionKeysFromValue(professions, detail.professions)
+        AddProfessionKeysFromValue(professions, detail.profession)
+        AddProfessionKeysFromValue(professions, detail.profession1)
+        AddProfessionKeysFromValue(professions, detail.profession2)
+        AddProfessionKeysFromValue(professions, detail.primaryProfession)
+        AddProfessionKeysFromValue(professions, detail.secondaryProfession)
+    end
+
+    local cache = _G.MultiBotLootMasterProfessionCache
+    if type(cache) == "table" and candidate and candidate.name then
+        AddProfessionKeysFromValue(professions, cache[NormalizeName(candidate.name)])
+        AddProfessionKeysFromValue(professions, cache[ShortName(candidate.name)])
+        AddProfessionKeysFromValue(professions, cache[candidate.name])
+    end
+
+    return professions
+end
+
+local function CandidateHasProfession(candidate, profession)
+    if not profession then
+        return nil
+    end
+
+    local professions = GetCandidateProfessionKeys(candidate)
+    local hasKnownProfession = false
+
+    for key in pairs(professions) do
+        hasKnownProfession = true
+        if key == profession then
+            return true
+        end
+    end
+
+    if hasKnownProfession then
+        return false
+    end
+
+    return nil
 end
 
 local ARMOR_RANK = { CLOTH = 1, LEATHER = 2, MAIL = 3, PLATE = 4 }
@@ -391,6 +569,28 @@ local function GetCandidateTreeIndex(candidate)
     return 1
 end
 
+local function GetCandidateSpecRoleHint(candidate)
+    local parts = {}
+    local spec = GetSpecFromBridgeDetail(candidate)
+    local savedSpec = GetSavedBotSpec(candidate and candidate.name)
+
+    if spec and spec ~= "" then parts[#parts + 1] = spec end
+    if savedSpec and savedSpec ~= "" then parts[#parts + 1] = savedSpec end
+
+    local label = table.concat(parts, " "):lower()
+    if label == "" then return nil end
+
+    if label:find("bear") or label:find("ours") or label:find("tank") then
+        return "bear"
+    end
+
+    if label:find("cat") or label:find("chat") or label:find("dps") or label:find("feral") or label:find("farouche") then
+        return "feral"
+    end
+
+    return nil
+end
+
 local function GetCandidateRole(candidate)
     local classFile = candidate and (candidate.classFile or candidate.classToken)
     local tree = GetCandidateTreeIndex(candidate)
@@ -399,8 +599,17 @@ local function GetCandidateRole(candidate)
     if classFile == "PALADIN" then return tree == 1 and "healer" or (tree == 2 and "tank" or "physical") end
     if classFile == "PRIEST" then return tree == 3 and "caster" or "healer" end
     if classFile == "DEATHKNIGHT" then return tree == 1 and "tank" or "physical" end
-    if classFile == "SHAMAN" then return tree == 1 and "caster" or (tree == 2 and "physical" or "healer") end
-    if classFile == "DRUID" then return tree == 1 and "caster" or (tree == 2 and "feral" or "healer") end
+    if classFile == "SHAMAN" then
+        if tree == 1 then return "caster" end
+        if tree == 2 then return "physical" end
+        if tree == 3 then return "healer" end
+        return "unknown"
+    end
+    if classFile == "DRUID" then
+        if tree == 1 then return "caster" end
+        if tree == 2 then return GetCandidateSpecRoleHint(candidate) or "feral" end
+        return "healer"
+    end
     if classFile == "MAGE" or classFile == "WARLOCK" then return "caster" end
     if classFile == "HUNTER" or classFile == "ROGUE" then return "physical" end
 
@@ -462,9 +671,13 @@ local function GetLootTooltipText(itemLink)
     return table.concat(lines, " ")
 end
 
-local function GetItemStatFlags(itemLink)
-    local text = GetLootTooltipText(itemLink)
-    local hasDefense = TextHasAny(text, { "defense", "d.fense", "dodge", "esquive", "parry", "parade", "block", "blocage" })
+local function GetItemStatFlags(itemLink, tooltipText)
+    local text = tooltipText or GetLootTooltipText(itemLink)
+    local hasDefense = TextHasAny(text, { "defense", "d.fense" })
+    local hasDodge = TextHasAny(text, { "dodge", "esquive" })
+    local hasParry = TextHasAny(text, { "parry", "parade" })
+    local hasBlock = TextHasAny(text, { "block", "blocage" })
+    local hasStamina = TextHasAny(text, { "stamina", "endurance" })
     local hasAgility = TextHasAny(text, { "agility", "agilit" })
     local hasStrength = TextHasAny(text, { "strength", "force" })
     local hasAttackPower = TextHasAny(text, { "attack power", "puissance d.attaque" })
@@ -477,13 +690,14 @@ local function GetItemStatFlags(itemLink)
     local hasIntellect = TextHasAny(text, { "intellect", "intelligence" })
     local hasHit = TextHasAny(text, { "hit rating", "score de toucher" })
     local hasCrit = TextHasAny(text, { "critical strike", "coup critique", "critique" })
-    local hasHaste = TextHasAny(text, { "haste", "h.te" })
+    local hasHaste = TextHasAny(text, { "haste", "h.te" })	
 
     local hasPhysicalPower = hasAgility or hasStrength or hasAttackPower or hasExpertise or hasArmorPen
+    local hasTankPrimary = hasDefense or hasDodge or hasParry or hasBlock	
     local hasHealerHint = hasHealing or hasMp5 or hasSpirit
     local primary
 
-    if hasDefense then
+    if hasTankPrimary then
         primary = "tank"
     elseif hasPhysicalPower and not hasSpellPower and not hasHealing then
         primary = "physical"
@@ -507,6 +721,24 @@ local function GetItemStatFlags(itemLink)
         healer = primary == "healer",
         caster = primary == "caster",
         physical = primary == "physical",
+        defense = hasDefense,
+        dodge = hasDodge,
+        parry = hasParry,
+        block = hasBlock,
+        stamina = hasStamina,
+        agility = hasAgility,
+        strength = hasStrength,
+        attackPower = hasAttackPower,
+        expertise = hasExpertise,
+        armorPen = hasArmorPen,
+        spellPower = hasSpellPower,
+        healing = hasHealing,
+        mp5 = hasMp5,
+        spirit = hasSpirit,
+        intellect = hasIntellect,
+        hit = hasHit,
+        crit = hasCrit,
+        haste = hasHaste,
     }
 end
 
@@ -515,6 +747,7 @@ local function BuildLootItemProfile(slot)
     local _, itemName = GetLootSlotInfo(slot)
     local query = itemLink or itemName
     local _, _, _, _, _, itemType, itemSubType, _, equipLoc = GetItemInfo(query or "")
+    local tooltipText = GetLootTooltipText(itemLink)	
 
     return {
         link = itemLink,
@@ -523,7 +756,8 @@ local function BuildLootItemProfile(slot)
         equipLoc = equipLoc,
         armorType = GetArmorType(itemSubType, equipLoc),
         weaponType = GetWeaponType(itemSubType, equipLoc),
-        statFlags = GetItemStatFlags(itemLink),
+        statFlags = GetItemStatFlags(itemLink, tooltipText),
+        requiredProfession = GetRequiredProfessionForLoot(itemName, itemType, itemSubType, tooltipText),
     }
 end
 
@@ -535,6 +769,7 @@ local function BuildLootPreferenceKey(profile)
     local flags = profile.statFlags or {}
     return table.concat({
         flags.primary or "any",
+        profile.requiredProfession or "noprofession",
         profile.armorType or "noarmor",
         profile.weaponType or "noweapon",
         profile.equipLoc or "noequip",
@@ -627,9 +862,8 @@ end
 local function RoleMatchesStats(role, flags)
     if not flags then return false end
     if flags.primary then
-        if role == "feral" then
-            return flags.primary == "tank" or flags.primary == "physical"
-        end
+        if role == "feral" then return flags.primary == "physical" end
+        if role == "bear" then return flags.primary == "tank" end
 
         return role == flags.primary
     end
@@ -641,10 +875,273 @@ local function GetRoleStatScore(role, flags)
     if not flags or not flags.primary then return 0 end
     if RoleMatchesStats(role, flags) then return 42 end
     if flags.primary == "physical" and (role == "healer" or role == "caster") then return -45 end
-    if flags.primary == "caster" and (role == "physical" or role == "tank" or role == "feral") then return -45 end
+    if flags.primary == "physical" and role == "bear" then return -45 end
+    if flags.primary == "caster" and (role == "physical" or role == "tank" or role == "feral" or role == "bear") then return -45 end
     if flags.primary == "healer" and role ~= "healer" then return -45 end
-    if flags.primary == "tank" and role ~= "tank" and role ~= "feral" then return -35 end
+    if flags.primary == "tank" and role ~= "tank" and role ~= "bear" then return -35 end
     return -25
+end
+
+local STAT_SCORE_KEYS = {
+    "defense", "dodge", "parry", "block", "stamina",
+    "agility", "strength", "attackPower", "expertise", "armorPen",
+    "spellPower", "healing", "mp5", "spirit", "intellect",
+    "hit", "crit", "haste",
+}
+
+local ROLE_STAT_WEIGHTS = {
+    physical = {
+        agility = 10, strength = 10, attackPower = 12, expertise = 10, armorPen = 10,
+        hit = 8, crit = 8, haste = 5, stamina = 1,
+        spellPower = -25, healing = -30, mp5 = -15, spirit = -15, intellect = -4,
+        defense = -18, dodge = -12, parry = -12, block = -12,
+    },
+    caster = {
+        spellPower = 16, intellect = 8, hit = 10, crit = 8, haste = 8, spirit = 4,
+        mp5 = -6, healing = -4,
+        agility = -22, strength = -28, attackPower = -28, expertise = -35, armorPen = -28,
+        defense = -20, dodge = -15, parry = -15, block = -15,
+    },
+    healer = {
+        healing = 18, spellPower = 12, intellect = 10, mp5 = 12, spirit = 10, crit = 6, haste = 8,
+        hit = -20,
+        agility = -22, strength = -28, attackPower = -28, expertise = -35, armorPen = -28,
+        defense = -12, dodge = -8, parry = -8, block = -8,
+    },
+    tank = {
+        defense = 18, dodge = 14, parry = 14, block = 12, stamina = 10,
+        strength = 6, expertise = 8, hit = 6, agility = 3,
+        spellPower = -25, healing = -25, mp5 = -10, spirit = -10, armorPen = -5,
+    },
+    feral = {
+        agility = 16, attackPower = 12, armorPen = 12, expertise = 10,
+        hit = 9, crit = 10, haste = 4, stamina = 2, strength = 4,
+        defense = -25, dodge = -10, parry = -30, block = -30,
+        spellPower = -25, healing = -25, mp5 = -10, spirit = -8,
+    },
+    bear = {
+        stamina = 14, dodge = 16, defense = 12, agility = 10,
+        expertise = 8, hit = 6, strength = 4, attackPower = 4,
+        armorPen = 2, crit = 4,
+        parry = -30, block = -30,
+        spellPower = -25, healing = -25, mp5 = -10, spirit = -8,
+    },
+}
+
+local CLASS_ROLE_STAT_WEIGHTS = {
+    SHAMAN = {
+        caster = {
+            spellPower = 18, hit = 10, haste = 9, crit = 8, intellect = 8, mp5 = 2,
+            agility = -25, strength = -25, attackPower = -30, expertise = -30,
+            armorPen = -30, healing = -18, spirit = -8,
+        },
+        physical = {
+            agility = 12, attackPower = 12, hit = 10, expertise = 10, crit = 9,
+            haste = 8, intellect = 4, strength = 4, armorPen = 2,
+            spellPower = -18, healing = -25, mp5 = -8, spirit = -12,
+            defense = -25, dodge = -18, parry = -18, block = -18,
+        },
+        healer = {
+            healing = 18, spellPower = 14, intellect = 12, haste = 10,
+            crit = 8, mp5 = 8,
+            hit = -20, agility = -25, strength = -25, attackPower = -30,
+            expertise = -30, armorPen = -30, spirit = -8,
+        },
+    },
+
+    DRUID = {
+        caster = {
+            spellPower = 16, intellect = 8, hit = 10, crit = 8, haste = 8, spirit = 6,
+            agility = -25, strength = -25, attackPower = -30, expertise = -35, armorPen = -30,
+        },
+        healer = {
+            healing = 18, spellPower = 12, intellect = 10, spirit = 12, haste = 8, crit = 6, mp5 = 6,
+            hit = -20, agility = -25, strength = -25, attackPower = -30, expertise = -35, armorPen = -30,
+        },
+        feral = {
+            agility = 16, attackPower = 12, armorPen = 12, expertise = 10, hit = 9, crit = 10,
+            stamina = 2, defense = -25, dodge = -10, block = -30, parry = -30,
+            spellPower = -25, healing = -25,
+        },
+        bear = {
+            stamina = 14, dodge = 16, defense = 12, agility = 10, expertise = 8, hit = 6,
+            attackPower = 4, armorPen = 2, crit = 4,
+            block = -30, parry = -30, spellPower = -25, healing = -25,
+        },
+    },
+
+    HUNTER = {
+        physical = {
+            agility = 16, attackPower = 14, armorPen = 16, hit = 12, crit = 10, haste = 4, intellect = 2,
+            strength = -35, expertise = -45,
+            spellPower = -35, healing = -35, mp5 = -20, spirit = -20,
+        },
+    },
+    ROGUE = {
+        physical = { agility = 16, attackPower = 12, expertise = 14, armorPen = 12, hit = 12, crit = 10, haste = 6, strength = -15 },
+    },
+    PALADIN = {
+        physical = { strength = 16, expertise = 12, hit = 10, crit = 10, haste = 8, attackPower = 8, agility = -8, spellPower = -25 },
+        healer = { healing = 18, spellPower = 14, intellect = 12, mp5 = 10, crit = 8, haste = 8, spirit = -8 },
+        tank = { defense = 18, dodge = 12, parry = 12, block = 14, stamina = 10, strength = 8, expertise = 8, hit = 6 },
+    },
+    WARRIOR = {
+        physical = { strength = 16, expertise = 14, armorPen = 12, hit = 10, crit = 10, haste = 6, agility = -5, spellPower = -35 },
+        tank = { defense = 18, dodge = 12, parry = 12, block = 12, stamina = 10, strength = 8, expertise = 8, hit = 6 },
+    },
+    DEATHKNIGHT = {
+        physical = { strength = 16, expertise = 14, armorPen = 10, hit = 10, crit = 10, haste = 6, agility = -8, spellPower = -35 },
+        tank = { defense = 18, dodge = 12, parry = 12, stamina = 10, strength = 8, expertise = 8, hit = 6, block = -20 },
+    },
+}
+
+local CLASS_ROLE_STAT_RULES = {
+    SHAMAN = {
+        caster = {
+            requiredAny = { "spellPower", "hit", "crit", "haste", "intellect" },
+            badPrimary = {
+                agility = true, strength = true, attackPower = true,
+                expertise = true, armorPen = true, healing = true,
+            },
+            badPrimaryCap = 49,
+        },
+        physical = {
+            requiredAny = { "agility", "attackPower", "expertise", "hit", "crit", "haste" },
+            badPrimary = {
+                spellPower = true, healing = true, mp5 = true, spirit = true,
+                defense = true, dodge = true, parry = true, block = true,
+            },
+            badPrimaryCap = 49,
+        },
+        healer = {
+            requiredAny = { "healing", "spellPower", "intellect", "haste", "crit", "mp5" },
+            badPrimary = {
+                hit = true, agility = true, strength = true, attackPower = true,
+                expertise = true, armorPen = true,
+            },
+            badPrimaryCap = 49,
+        },
+    },
+
+    DRUID = {
+        feral = {
+            requiredAny = { "agility", "attackPower", "armorPen", "expertise", "hit", "crit" },
+            badPrimary = {
+                defense = true, dodge = true, parry = true, block = true,
+                spellPower = true, healing = true, intellect = true, spirit = true, mp5 = true,
+            },
+            badPrimaryCap = 49,
+        },
+        bear = {
+            requiredAny = { "stamina", "dodge", "defense", "agility" },
+            badPrimary = {
+                spellPower = true, healing = true, intellect = true, spirit = true, mp5 = true,
+                block = true, parry = true,
+            },
+            badPrimaryCap = 49,
+        },
+    },
+
+    HUNTER = {
+        physical = {
+            requiredAny = { "agility", "attackPower", "armorPen" },
+            badPrimary = { strength = true, expertise = true },
+            badPrimaryCap = 49,
+        },
+    },
+    WARRIOR = {
+        physical = {
+            requiredAny = { "strength", "attackPower", "armorPen" },
+            badPrimary = { spellPower = true, healing = true, intellect = true, spirit = true, mp5 = true },
+            badPrimaryCap = 45,
+        },
+    },
+    PALADIN = {
+        physical = {
+            requiredAny = { "strength", "attackPower" },
+            badPrimary = { spellPower = true, healing = true, spirit = true, mp5 = true },
+            badPrimaryCap = 45,
+        },
+        healer = {
+            requiredAny = { "spellPower", "healing", "intellect", "mp5", "crit", "haste" },
+            badPrimary = { strength = true, agility = true, attackPower = true, armorPen = true, expertise = true },
+            badPrimaryCap = 45,
+        },
+    },
+    DEATHKNIGHT = {
+        physical = {
+            requiredAny = { "strength", "attackPower", "armorPen" },
+            badPrimary = { spellPower = true, healing = true, intellect = true, spirit = true, mp5 = true, block = true },
+            badPrimaryCap = 45,
+        },
+    },
+}
+
+local function HasAnyStat(flags, statList)
+    if type(flags) ~= "table" or type(statList) ~= "table" then return false end
+
+    for _, statKey in ipairs(statList) do
+        if flags[statKey] then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function GetCandidateStatRule(candidate)
+    local classFile = candidate and (candidate.classFile or candidate.classToken)
+    local role = candidate and candidate.lootRole
+    local classRules = classFile and CLASS_ROLE_STAT_RULES[classFile]
+    return classRules and role and classRules[role] or nil
+end
+
+local function GetCandidateStatWeight(candidate, statKey)
+    local classFile = candidate and (candidate.classFile or candidate.classToken)
+    local role = candidate and candidate.lootRole
+    local classWeights = classFile and CLASS_ROLE_STAT_WEIGHTS[classFile]
+    local classRoleWeights = classWeights and role and classWeights[role]
+
+    if classRoleWeights and classRoleWeights[statKey] ~= nil then
+        return classRoleWeights[statKey]
+    end
+
+    local roleWeights = role and ROLE_STAT_WEIGHTS[role]
+    return roleWeights and roleWeights[statKey] or 0
+end
+
+local function GetCandidateStatScore(candidate, flags)
+    local score = 0
+    if type(flags) ~= "table" then return 0 end
+
+    for _, statKey in ipairs(STAT_SCORE_KEYS) do
+        if flags[statKey] then
+            score = score + GetCandidateStatWeight(candidate, statKey)
+        end
+    end
+
+    return Clamp(score, -55, 35)
+end
+
+local function GetCandidateStatScoreCap(candidate, flags)
+    local rule = GetCandidateStatRule(candidate)
+
+    if not rule or type(flags) ~= "table" or type(rule.badPrimary) ~= "table" then
+        return nil
+    end
+
+    local hasBadPrimary = false
+    for statKey in pairs(rule.badPrimary) do
+        if flags[statKey] then
+            hasBadPrimary = true
+            break
+        end
+    end
+
+    if not hasBadPrimary then return nil end
+    if HasAnyStat(flags, rule.requiredAny) then return nil end
+
+    return rule.badPrimaryCap or 49
 end
 
 local function CandidateHadRecentLoot(candidate)
@@ -658,6 +1155,17 @@ local function ScoreCandidateForItem(candidate, profile)
     local flags = profile.statFlags
     local hasKnownStats = flags and (flags.primary or flags.tank or flags.healer or flags.caster or flags.physical)
     candidate.lootRole = GetCandidateRole(candidate)
+    candidate.lootProfession = profile.requiredProfession
+    candidate.lootProfessionMatch = nil
+
+    if profile.requiredProfession then
+        candidate.lootProfessionMatch = CandidateHasProfession(candidate, profile.requiredProfession)
+        if candidate.lootProfessionMatch == true then
+            score = score + LOOT_PROFESSION_BONUS
+        elseif candidate.lootProfessionMatch == false then
+            score = score - LOOT_PROFESSION_MISMATCH_PENALTY
+        end
+    end
 
     if profile.armorType == "SHIELD" then
         score = score + ((CLASS_WEAPONS[classFile] and CLASS_WEAPONS[classFile].SHIELD) and 18 or -35)
@@ -683,13 +1191,15 @@ local function ScoreCandidateForItem(candidate, profile)
 
     if hasKnownStats then
         score = score + GetRoleStatScore(candidate.lootRole, flags)
+        score = score + GetCandidateStatScore(candidate, flags)
     end
 
     if CandidateHadRecentLoot(candidate) then
         score = score - 15
     end
 
-    candidate.lootScore = Clamp(score, 1, 99)
+    candidate.lootScoreCap = GetCandidateStatScoreCap(candidate, flags)
+    candidate.lootScore = Clamp(score, 1, candidate.lootScoreCap or 99)
 end
 
 local function ApplyLootPreferenceScore(candidate, profile)
@@ -699,7 +1209,7 @@ local function ApplyLootPreferenceScore(candidate, profile)
 
     if preferredName and NormalizeName(candidate.name) == NormalizeName(preferredName) then
         candidate.lootPreference = true
-        candidate.lootScore = Clamp((candidate.lootScore or 0) + LOOT_PREFERENCE_BONUS, 1, 99)
+        candidate.lootScore = Clamp((candidate.lootScore or 0) + LOOT_PREFERENCE_BONUS, 1, candidate.lootScoreCap or 99)
     end
 end
 
@@ -720,30 +1230,20 @@ end
 local function BuildCandidateDropdownText(candidate)
     local score = candidate.lootScore or 0
     local prefText = candidate.lootPreference and " |cffffcc00Pref|r" or ""
-    return GetClassColorCode(candidate.classFile) .. candidate.name .. "|r  " .. GetCandidateSpecLabel(candidate) .. "  " .. GetCandidateScoreColor(score) .. score .. "%|r" .. prefText
-end
+    local professionText = ""
 
-local function SetClassIconTooltip(button, candidate)
-    if not button then
-        return
+    if candidate.lootProfession then
+        local professionName = GetProfessionDisplayName(candidate.lootProfession)
+        if candidate.lootProfessionMatch == true then
+            professionText = " |cff66ccff" .. professionName .. "|r"
+        elseif candidate.lootProfessionMatch == false then
+            professionText = " |cff777777-" .. professionName .. "|r"
+        else
+            professionText = " |cffaaaaaa" .. professionName .. "?|r"
+        end
     end
 
-    button.candidate = candidate
-    button:SetScript("OnEnter", function(self)
-        local activeCandidate = self.candidate
-        if not activeCandidate then
-            return
-        end
-
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(activeCandidate.name or MBLocal("lootmaster.unknown_candidate", "unknown"), 1, 1, 1)
-        GameTooltip:AddLine(activeCandidate.className or MBLocal("lootmaster.unknown_class", "Unknown class"), 0.8, 0.8, 0.8)
-        GameTooltip:AddLine(BuildCandidateSpecText(activeCandidate), 0.6, 0.8, 1)
-        GameTooltip:Show()
-    end)
-    button:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
+    return GetClassColorCode(candidate.classFile) .. candidate.name .. "|r  " .. GetCandidateSpecLabel(candidate) .. "  " .. GetCandidateScoreColor(score) .. score .. "%|r" .. prefText .. professionText
 end
 
 local function IsPlayerMasterLooter()
@@ -858,7 +1358,7 @@ local function GetClassIconTexture(classFile)
         return nil
     end
 
-    return "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
+    return CLASS_ICON_TEXTURE
 end
 
 local function GetClassIconCoords(classFile)
@@ -979,6 +1479,43 @@ local function GetCandidateSpecText(candidate)
     return MBLocal("lootmaster.unknown_spec", "Unknown spec")
 end
 
+local function GetCandidateGearScore(candidate)
+    if type(candidate) ~= "table" then
+        return nil
+    end
+
+    local score = tonumber(candidate.gearScore or candidate.itemLevelScore or candidate.score)
+    if score and score > 0 then
+        return score
+    end
+
+    local detail = GetBridgeDetail and GetBridgeDetail(candidate.name)
+    if type(detail) == "table" then
+        score = tonumber(detail.gearScore or detail.itemLevelScore or detail.score)
+        if score and score > 0 then
+            return score
+        end
+    end
+
+    if candidate.name and _G.MultiBotGlobalSave then
+        local shortName = NormalizeUnitName(candidate.name) or candidate.name
+        local value = _G.MultiBotGlobalSave[shortName] or _G.MultiBotGlobalSave[candidate.name]
+        if type(value) == "string" then
+            local fields = {}
+            for field in string.gmatch(value, "([^,]+)") do
+                fields[#fields + 1] = field
+            end
+
+            score = tonumber(fields[7])
+            if score and score > 0 then
+                return score
+            end
+        end
+    end
+
+    return nil
+end
+
 local function SetClassIconTooltip(button, candidate)
     if not button then
         return
@@ -1000,6 +1537,44 @@ local function SetClassIconTooltip(button, candidate)
         end
 
         GameTooltip:AddLine(GetCandidateSpecText(current), 0.6, 0.8, 1)
+
+        local gearScore = GetCandidateGearScore(current)
+        if gearScore then
+            GameTooltip:AddLine(string.format(MBLocal("lootmaster.gear_score", "GearScore: %d"), gearScore), 0.95, 0.82, 0.35)
+        end
+
+        local professions = GetCandidateProfessionKeys and GetCandidateProfessionKeys(current)
+        if type(professions) == "table" then
+            local professionNames = {}
+            for profession in pairs(professions) do
+                professionNames[#professionNames + 1] = GetProfessionDisplayName(profession)
+            end
+
+            table.sort(professionNames)
+
+            if #professionNames > 0 then
+                GameTooltip:AddLine(
+                    string.format(
+                        MBLocal("lootmaster.professions", "Professions: %s"),
+                        table.concat(professionNames, ", ")
+                    ),
+                    0.4, 1, 0.7
+                )
+            else
+                GameTooltip:AddLine(MBLocal("lootmaster.professions_unknown", "Professions: unknown"), 0.65, 0.65, 0.65)
+            end
+        end
+
+        if current.lootProfession then
+            local professionName = GetProfessionDisplayName(current.lootProfession)
+            if current.lootProfessionMatch == true then
+                GameTooltip:AddLine(string.format(MBLocal("lootmaster.profession_known", "Profession: %s"), professionName), 0.4, 1, 0.7)
+            elseif current.lootProfessionMatch == false then
+                GameTooltip:AddLine(string.format(MBLocal("lootmaster.profession_missing", "Required profession: %s (not known)"), professionName), 1, 0.45, 0.35)
+            else
+                GameTooltip:AddLine(string.format(MBLocal("lootmaster.profession_unknown", "Required profession: %s (unknown)"), professionName), 0.9, 0.9, 0.5)
+            end
+        end
         if current.lootScore then
             GameTooltip:AddLine(MBLocal("lootmaster.priority_score", "Priorite:") .. " " .. GetCandidateScoreColor(current.lootScore) .. current.lootScore .. "%|r", 0.9, 0.9, 0.9)
         end
@@ -1114,7 +1689,7 @@ local function BuildCandidateList(slot)
             }
 
             ScoreCandidateForItem(candidate, itemProfile)
-            ApplyLootPreferenceScore(candidate, itemProfile)		
+            ApplyLootPreferenceScore(candidate, itemProfile)
             candidates[#candidates + 1] = candidate
         end
     end
@@ -1136,7 +1711,7 @@ local function SafeItemText(slot)
         return link
     end
 
-    local texture, itemName, quantity = GetLootSlotInfo(slot)
+    local _, itemName, quantity = GetLootSlotInfo(slot)
 
     if itemName and itemName ~= "" then
         if quantity and quantity > 1 then
@@ -1147,16 +1722,6 @@ local function SafeItemText(slot)
     end
 
     return MBLocal("lootmaster.unknown_item", "Unknown item")
-end
-
-local function BuildLootSlotKey(slot)
-    local link = GetLootSlotLink(slot)
-    if link and link ~= "" then
-        return link
-    end
-
-    local _, itemName, quantity = GetLootSlotInfo(slot)
-    return tostring(slot) .. ":" .. tostring(itemName or "") .. ":" .. tostring(quantity or 1)
 end
 
 local function EnsureLootHistoryLine(frame, index)
@@ -1231,15 +1796,6 @@ local function AddLootHistory(itemText, candidateName)
     UpdateLootHistoryFrame()
 end
 
-local function MarkLootSlotAssigned(slot)
-    assignedLootKeys[BuildLootSlotKey(slot)] = GetTime and GetTime() or time()
-    assignedLootSlots[slot] = GetTime and GetTime() or time()
-end
-
-local function IsLootSlotAssignedLocally(slot)
-    return assignedLootSlots[slot] ~= nil or assignedLootKeys[BuildLootSlotKey(slot)] ~= nil
-end
-
 local function IsLootSlotMoney(slot)
     return LootSlotIsCoin and LootSlotIsCoin(slot)
 end
@@ -1256,6 +1812,30 @@ local function IsLootSlotEmpty(slot)
 
     local _, itemName = GetLootSlotInfo(slot)
     return not itemName or itemName == ""
+end
+
+local function IsLootSlotIgnoredQuality(slot)
+    local _, itemName, _, quality = GetLootSlotInfo(slot)
+
+    if not itemName or itemName == "" then
+        return false
+    end
+
+    local threshold = GetLootThreshold and (GetLootThreshold() or 2) or 2
+
+    if threshold < 2 then
+        threshold = 2
+    end
+
+    return not quality or quality < threshold
+end
+
+local function IsLootSlotRelevant(slot)
+    if IsLootSlotMoney(slot) then return false end
+    if IsLootSlotEmpty(slot) then return false end
+    if IsLootSlotIgnoredQuality(slot) then return false end
+
+    return true
 end
 
 local function GetLootSlotHideKey(slot)
@@ -1390,7 +1970,7 @@ local function CreateBasicFrame()
     frame.historyTitle:SetPoint("TOPLEFT", frame.history, "TOPLEFT", 0, 0)
     frame.historyTitle:SetText(MBLocal("lootmaster.history_title", "Recent loot"))
 
-    frame.historyScroll = CreateFrame("ScrollFrame", nil, frame.history, "UIPanelScrollFrameTemplate")
+    frame.historyScroll = CreateFrame("ScrollFrame", "MultiBotLootMasterHistoryScrollFrame", frame.history, "UIPanelScrollFrameTemplate")
     frame.historyScroll:SetPoint("TOPLEFT", frame.historyTitle, "BOTTOMLEFT", 0, -2)
     frame.historyScroll:SetPoint("BOTTOMRIGHT", frame.history, "BOTTOMRIGHT", -24, 0)
     frame.historyScroll:EnableMouseWheel(true)
@@ -1559,7 +2139,6 @@ local function AcquireRow(frame, index)
                     button:SetPoint("TOPRIGHT", dropdown.buttons[i - 1], "BOTTOMRIGHT", 0, -2)
                 end
 
-                local classColor = GetClassColorCode(candidate.classFile)
                 local classIcon = GetClassIconTexture(candidate.classFile)
                 local classIconCoords = GetClassIconCoords(candidate.classFile)
 
@@ -1840,10 +2419,8 @@ function LootMasterUI:Refresh()
     frame.status:SetText(MBLocal("lootmaster.status.ready", "Select an item recipient."))
 
     for slot = 1, numSlots do
-        local isMoney = IsLootSlotMoney(slot)
-
-        if not isMoney and not IsLootSlotEmpty(slot) and not IsLootSlotAssignedLocally(slot) then
-            local texture, itemName, quantity, quality, locked = GetLootSlotInfo(slot)
+        if IsLootSlotRelevant(slot) and not IsLootSlotAssignedLocally(slot) then
+            local texture, itemName, quantity, quality = GetLootSlotInfo(slot)
             local itemLink = GetLootSlotLink(slot)
             local candidates = BuildCandidateList(slot)
 
@@ -1894,6 +2471,11 @@ function LootMasterUI:Refresh()
 end
 
 function LootMasterUI:Open()
+    if not IsLootMasterUIEnabled() then
+        self:Close()
+        return
+    end
+
     local frame = self:EnsureFrame()
 
     frame:Show()
@@ -1921,7 +2503,27 @@ function LootMasterUI:Close()
     end
 end
 
+function LootMasterUI:RegisterProfessionCandidate(botName, profession)
+    local professionKey = GetProfessionKeyFromText(profession)
+    if not botName or botName == "" or not professionKey then
+        return false
+    end
+
+    _G.MultiBotLootMasterProfessionCache = _G.MultiBotLootMasterProfessionCache or {}
+
+    local nameKey = NormalizeName(botName)
+    _G.MultiBotLootMasterProfessionCache[nameKey] = _G.MultiBotLootMasterProfessionCache[nameKey] or {}
+    _G.MultiBotLootMasterProfessionCache[nameKey][professionKey] = true
+
+    return true
+end
+
 function LootMasterUI:OnLootOpened(autoLoot)
+    if not IsLootMasterUIEnabled() then
+        self:Close()
+        return
+    end
+
     local numSlots = GetNumLootItems() or 0
     local method, partyIndex, raidIndex = GetLootMethod()
 
@@ -1961,6 +2563,19 @@ function LootMasterUI:OnLootOpened(autoLoot)
         return
     end
 
+    local hasRelevantLoot = false
+    for slot = 1, numSlots do
+        if IsLootSlotRelevant(slot) then
+            hasRelevantLoot = true
+            break
+        end
+    end
+
+    if not hasRelevantLoot then
+        self:Close()
+        return
+    end
+
     self:Open()
 
     if MultiBot and MultiBot.Comm and type(MultiBot.Comm.RequestBotDetails) == "function" then
@@ -1976,7 +2591,15 @@ eventFrame:RegisterEvent("LOOT_CLOSED")
 eventFrame:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
+    if not IsLootMasterUIEnabled() then
+        if event == "LOOT_CLOSED" then
+            LootMasterUI:Close()
+        end
+        return
+    end
+
     if event == "LOOT_OPENED" then
+        CancelQueuedLootClose()
         assignedLootKeys = {}
         assignedLootSlots = {}
         LootMasterUI:OnLootOpened(...)
@@ -1998,7 +2621,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     end
 
     if event == "LOOT_CLOSED" then
-        LootMasterUI:Close()
+        QueueLootClose()
     end
 end)
 

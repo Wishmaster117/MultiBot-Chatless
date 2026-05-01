@@ -97,6 +97,7 @@ local function ensureBridgeState()
   state.roster = state.roster or {}
   state.states = state.states or {}
   state.details = state.details or {}
+  state.professions = state.professions or {}
   state.pvpStats = state.pvpStats or {}
   state.stats = state.stats or {}
   state.quests = state.quests or {}
@@ -577,6 +578,33 @@ local function parseBridgeDetailPayload(payload)
   }
 end
 
+local function parseBridgeProfessionPayload(payload)
+  local name, professionPayload = splitOnce(payload or "", "~")
+
+  name = trim(urlDecodeField(name))
+  if name == "" then
+    return nil
+  end
+
+  local professions = {}
+  for token in string.gmatch(professionPayload or "", "([^;]+)") do
+    token = trim(urlDecodeField(token))
+
+    local profession, value = splitOnce(token, ":")
+    profession = string.lower(trim(profession or ""))
+
+    if profession ~= "" then
+      professions[profession] = value ~= "" and value or true
+    end
+  end
+
+  return {
+    name = name,
+    professions = professions,
+    lastUpdateAt = safeNow(),
+  }
+end
+
 local function parseRosterEntry(entry)
   local fields = {}
   for value in string.gmatch(entry or "", "([^,]+)") do
@@ -667,7 +695,19 @@ function Comm.ApplyBotDetailPayload(payload)
     return nil
   end
 
-  state.details[string.lower(detail.name)] = detail
+  local key = string.lower(detail.name)
+  local existing = state.details[key]
+  local professionEntry = state.professions[key]
+
+  if type(existing) == "table" and type(existing.professions) == "table" then
+    detail.professions = existing.professions
+  end
+
+  if type(professionEntry) == "table" and type(professionEntry.professions) == "table" then
+    detail.professions = professionEntry.professions
+  end
+
+  state.details[key] = detail
 
   if MultiBot.ApplyBridgeBotDetail then
     MultiBot.ApplyBridgeBotDetail(detail)
@@ -675,6 +715,45 @@ function Comm.ApplyBotDetailPayload(payload)
 
   debugPrint("ADDON:RX", "DETAIL", detail.name, detail.className or "", tostring(detail.level or 0), tostring(detail.score or 0))
   return detail
+end
+
+function Comm.ApplyBotProfessionPayload(payload)
+  local state = ensureBridgeState()
+  local entry = parseBridgeProfessionPayload(payload)
+  if not entry then
+    return nil
+  end
+
+  local key = string.lower(entry.name)
+  state.professions[key] = entry
+
+  local detail = state.details[key]
+  if type(detail) == "table" then
+    detail.professions = entry.professions
+    detail.lastProfessionUpdateAt = entry.lastUpdateAt
+  end
+
+  if MultiBot.ApplyBridgeBotProfession then
+    MultiBot.ApplyBridgeBotProfession(entry.name, entry.professions)
+  end
+
+  debugPrint("ADDON:RX", "PROFESSION", entry.name)
+  return entry
+end
+
+function Comm.ApplyBotProfessionsPayload(payload)
+  local applied = 0
+
+  if type(payload) == "string" and payload ~= "" then
+    for entryPayload in string.gmatch(payload, "([^|]+)") do
+      if Comm.ApplyBotProfessionPayload(entryPayload) then
+        applied = applied + 1
+      end
+    end
+  end
+
+  debugPrint("ADDON:RX", "PROFESSIONS", tostring(applied))
+  return applied
 end
 
 function Comm.ApplyBotDetailsPayload(payload)
@@ -1450,6 +1529,20 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     Comm.ApplyBotDetailsPayload(payload)
+    return true
+  end
+
+  if opcode == "PROFESSION" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyBotProfessionPayload(payload)
+    return true
+  end
+
+  if opcode == "PROFESSIONS" then
+    state.connected = true
+    state.lastError = nil
+    Comm.ApplyBotProfessionsPayload(payload)
     return true
   end
 

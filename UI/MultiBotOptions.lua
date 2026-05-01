@@ -9,6 +9,14 @@ local function optL(key)
   return MultiBot.L(key)
 end
 
+local function optLF(key, fallback)
+  local value = optL(key)
+  if not value or value == "" or value == key then
+    return fallback
+  end
+  return value
+end
+
 local function secondsLabel(value)
   local suffix = MultiBot.L("options.seconds_suffix")
   return string.format("%.1f %s", value, suffix)
@@ -160,6 +168,7 @@ local function buildLegacyOptionsContent(panel)
   local disableAutoCollapse = MultiBot.GetDisableAutoCollapse and MultiBot.GetDisableAutoCollapse() or false
   local mainBarAutoHideEnabled = MultiBot.GetMainBarAutoHideEnabled and MultiBot.GetMainBarAutoHideEnabled() or false
   local mainBarAutoHideDelay = MultiBot.GetMainBarAutoHideDelay and MultiBot.GetMainBarAutoHideDelay() or 60
+  local lootMasterUIEnabled = MultiBot.GetLootMasterUIEnabled and MultiBot.GetLootMasterUIEnabled() or true
 
   local strataDropDown = CreateFrame("Frame", "MultiBotStrataDropDown", scrollChild, "UIDropDownMenuTemplate")
 
@@ -205,8 +214,23 @@ local function buildLegacyOptionsContent(panel)
     end
   end)
 
+  local chkLootMasterUI = CreateFrame("CheckButton", "MultiBot_LootMasterUICheck", scrollChild, "InterfaceOptionsCheckButtonTemplate")
+  chkLootMasterUI:SetPoint("TOPLEFT", chkDisableAutoCollapse, "BOTTOMLEFT", 0, -8)
+  _G[chkLootMasterUI:GetName() .. "Text"]:SetText(optLF("options.lootmaster.enable", "Activer la fenêtre de loot"))
+  chkLootMasterUI.tooltipText = optLF("options.lootmaster.enable_desc", "Affiche automatiquement la fenêtre MultiBot de responsable du butin pendant les loots.")
+  chkLootMasterUI:SetChecked(lootMasterUIEnabled and true or false)
+  chkLootMasterUI:SetScript("OnClick", function(btn)
+    local enabled = btn:GetChecked() and true or false
+    if MultiBot.SetLootMasterUIEnabled then
+      MultiBot.SetLootMasterUIEnabled(enabled)
+    end
+    if not enabled and _G.MultiBotLootMasterUI and _G.MultiBotLootMasterUI.Close then
+      _G.MultiBotLootMasterUI:Close()
+    end
+  end)
+
   local chkMainBarAutoHide = CreateFrame("CheckButton", "MultiBot_MainBarAutoHideCheck", scrollChild, "InterfaceOptionsCheckButtonTemplate")
-  chkMainBarAutoHide:SetPoint("TOPLEFT", chkDisableAutoCollapse, "BOTTOMLEFT", 0, -8)
+  chkMainBarAutoHide:SetPoint("TOPLEFT", chkLootMasterUI, "BOTTOMLEFT", 0, -8)
   _G[chkMainBarAutoHide:GetName() .. "Text"]:SetText(optL("options.layout.mainbar_autohide"))
   chkMainBarAutoHide.tooltipText = optL("options.layout.mainbar_autohide_desc")
   chkMainBarAutoHide:SetChecked(mainBarAutoHideEnabled and true or false)
@@ -262,6 +286,7 @@ local function buildLegacyOptionsContent(panel)
   panel.chkMinimapHide = chkMinimapHide
   panel.chkMainBarMoveLocked = chkMainBarMoveLocked
   panel.chkDisableAutoCollapse = chkDisableAutoCollapse
+  panel.chkLootMasterUI = chkLootMasterUI
   panel.chkMainBarAutoHide = chkMainBarAutoHide
   panel.mainBarAutoHideDelaySlider = mainBarAutoHideDelaySlider
 
@@ -594,6 +619,7 @@ function MultiBot.BuildOptionsPanel()
       local disableAutoCollapse = MultiBot.GetDisableAutoCollapse and MultiBot.GetDisableAutoCollapse() or false
       local mainBarAutoHideEnabled = MultiBot.GetMainBarAutoHideEnabled and MultiBot.GetMainBarAutoHideEnabled() or false
       local mainBarAutoHideDelay = MultiBot.GetMainBarAutoHideDelay and MultiBot.GetMainBarAutoHideDelay() or 60
+      local lootMasterUIEnabled = MultiBot.GetLootMasterUIEnabled and MultiBot.GetLootMasterUIEnabled() or true
 
       local chkMainBarMoveLocked = AceGUI:Create("CheckBox")
       chkMainBarMoveLocked:SetLabel(mainBarMoveLockLabel)
@@ -624,6 +650,25 @@ function MultiBot.BuildOptionsPanel()
       end)
       scroll:AddChild(chkDisableAutoCollapse)
       panel.chkDisableAutoCollapse = chkDisableAutoCollapse
+
+      local chkLootMasterUI = AceGUI:Create("CheckBox")
+      chkLootMasterUI:SetLabel(optLF("options.lootmaster.enable", "Enable Advanced loot window"))
+      if chkLootMasterUI.SetDescription then
+        chkLootMasterUI:SetDescription(optLF("options.lootmaster.enable_desc", "Automatically shows the MultiBot loot master window during looting."))
+      end
+      chkLootMasterUI:SetValue(lootMasterUIEnabled and true or false)
+      chkLootMasterUI:SetFullWidth(true)
+      chkLootMasterUI:SetCallback("OnValueChanged", function(_, _, value)
+        local enabled = value and true or false
+        if MultiBot.SetLootMasterUIEnabled then
+          MultiBot.SetLootMasterUIEnabled(enabled)
+        end
+        if not enabled and _G.MultiBotLootMasterUI and _G.MultiBotLootMasterUI.Close then
+          _G.MultiBotLootMasterUI:Close()
+        end
+      end)
+      scroll:AddChild(chkLootMasterUI)
+      panel.chkLootMasterUI = chkLootMasterUI
 
       local autoHideDelaySlider = AceGUI:Create("Slider")
       autoHideDelaySlider:SetLabel(optL("options.layout.mainbar_autohide_delay"))

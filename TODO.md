@@ -17,6 +17,9 @@
 * Menus déroulants de la main bar : fermer automatiquement les autres menus quand on en ouvre un nouveau.
 * J'ai l'impression que le disperse ne fait rien
 
+## Informations bot
+** Faire une frame qui affiche les infos du bot comme la profession ou peut être ajouter la profession à la frame inventaire?
+
 ## Frame Loot
 
 * Tri intelligent des bots : afficher en haut les bots qui peuvent réellement utiliser l’objet selon classe, spé, type d’armure, arme, rôle.
