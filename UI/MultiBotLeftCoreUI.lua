@@ -3,7 +3,7 @@ if not MultiBot then return end
 local MODE_FRAME_NAME = "Mode"
 local MODE_BUTTON_NAME = "Mode"
 local MODE_BUTTON_ICON = "Interface\\AddOns\\MultiBot\\Icons\\mode_passive.blp"
-local MODE_FRAME_X = -104
+local MODE_FRAME_X = -172
 local MODE_FRAME_Y = 34
 
 local function bindModeToggleAction(modeButton, enableCommand, disableCommand)
@@ -17,7 +17,7 @@ local function bindModeToggleAction(modeButton, enableCommand, disableCommand)
 end
 
 local function createModeUI(tLeft)
-    local modeButton = tLeft.addButton(MODE_BUTTON_NAME, -102, 0, MODE_BUTTON_ICON, MultiBot.L("tips.mode.master")).setDisable()
+    local modeButton = tLeft.addButton(MODE_BUTTON_NAME, -170, 0, MODE_BUTTON_ICON, MultiBot.L("tips.mode.master")).setDisable()
 
     modeButton.doRight = function(button)
         MultiBot.ShowHideSwitch(button.parent.frames[MODE_FRAME_NAME])
@@ -48,7 +48,7 @@ local function createModeUI(tLeft)
 end
 
 local function createStayFollowUI(tLeft)
-    tLeft.addButton("Stay", -68, 0, "Interface\\AddOns\\MultiBot\\Icons\\command_follow.blp", MultiBot.L("tips.stallow.stay")).doLeft = function(button)
+    tLeft.addButton("Stay", -136, 0, "Interface\\AddOns\\MultiBot\\Icons\\command_follow.blp", MultiBot.L("tips.stallow.stay")).doLeft = function(button)
         if MultiBot.ActionToGroup("stay") then
             button.parent.buttons["Follow"].doShow()
             button.parent.buttons["ExpandFollow"].setDisable()
@@ -57,7 +57,7 @@ local function createStayFollowUI(tLeft)
         end
     end
 
-    tLeft.addButton("Follow", -68, 0, "Interface\\AddOns\\MultiBot\\Icons\\command_stay.blp", MultiBot.L("tips.stallow.follow")).doHide().doLeft = function(button)
+    tLeft.addButton("Follow", -136, 0, "Interface\\AddOns\\MultiBot\\Icons\\command_stay.blp", MultiBot.L("tips.stallow.follow")).doHide().doLeft = function(button)
         if MultiBot.ActionToGroup("follow") then
             button.parent.buttons["Stay"].doShow()
             button.parent.buttons["ExpandFollow"].setEnable()
@@ -66,13 +66,13 @@ local function createStayFollowUI(tLeft)
         end
     end
 
-    tLeft.addButton("ExpandStay", -68, 0, "Interface\\AddOns\\MultiBot\\Icons\\command_stay.blp", MultiBot.tips.expand.stay).doHide().setDisable().doLeft = function(button)
+    tLeft.addButton("ExpandStay", -136, 0, "Interface\\AddOns\\MultiBot\\Icons\\command_stay.blp", MultiBot.tips.expand.stay).doHide().setDisable().doLeft = function(button)
         MultiBot.ActionToGroup("stay")
         button.parent.buttons["ExpandFollow"].setDisable()
         button.setEnable()
     end
 
-    tLeft.addButton("ExpandFollow", -102, 0, "Interface\\AddOns\\MultiBot\\Icons\\command_follow.blp", MultiBot.tips.expand.follow).doHide().doLeft = function(button)
+    tLeft.addButton("ExpandFollow", -170, 0, "Interface\\AddOns\\MultiBot\\Icons\\command_follow.blp", MultiBot.tips.expand.follow).doHide().doLeft = function(button)
         MultiBot.ActionToGroup("follow")
         button.parent.buttons["ExpandStay"].setDisable()
         button.setEnable()
@@ -85,7 +85,7 @@ function MultiBot.InitializeLeftCoreUI(tLeft)
     end
 
     if MultiBot.BuildBotRTIActionUI then
-        MultiBot.BuildBotRTIActionUI(tLeft, -238, 0)
+        MultiBot.BuildBotRTIActionUI(tLeft, -306, 0)
     end
 
     if MultiBot.BuildDisperseUI then
@@ -96,7 +96,7 @@ function MultiBot.InitializeLeftCoreUI(tLeft)
         MultiBot.BuildLootUI(tLeft)
     end
 
-    tLeft.addButton("Tanker", -170, 0, "ability_warrior_shieldbash", MultiBot.L("tips.tanker.master")).doLeft = function()
+    tLeft.addButton("Tanker", -238, 0, "ability_warrior_shieldbash", MultiBot.L("tips.tanker.master")).doLeft = function()
         if MultiBot.isTarget() then
             MultiBot.ActionToGroup("@tank do attack my target")
         end

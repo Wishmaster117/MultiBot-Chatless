@@ -53,7 +53,7 @@ function MultiBot.BuildLootUI(tLeft)
     end
 
     local button
-    local menu = tLeft.addFrame("LootMenu", -277, 34, 24, 24, 170).doHide()
+    local menu = tLeft.addFrame("LootMenu", -73, 34, 24, 24, 170).doHide()
     local menuOpen = false
     local menuButtons = {}
     local menuButtonsByKey = {}
@@ -158,7 +158,7 @@ function MultiBot.BuildLootUI(tLeft)
 
     MultiBot.frames.lootMenu = menu
 
-    button = tLeft.addButton("Loot", -272, 0, "inv_misc_bag_10", L("tips.loot.main", "Loot rules")).setDisable()
+    button = tLeft.addButton("Loot", -68, 0, "inv_misc_bag_10", L("tips.loot.main", "Loot rules")).setDisable()
     button.doLeft = function()
         if menuOpen then
             hideLootMenu()
