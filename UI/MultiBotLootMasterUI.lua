@@ -254,25 +254,6 @@ local function GetCachedTalentSpecList(name)
     return specs[NormalizeName(name)] or specs[string.lower(ShortName(name) or "")] or specs[name]
 end
 
-local function FindKnownSpecNameFromBuild(name, build)
-    if type(build) ~= "string" or build == "" then
-        return nil
-    end
-
-    local specs = GetCachedTalentSpecList(name)
-    if type(specs) ~= "table" then
-        return nil
-    end
-
-    for _, entry in ipairs(specs) do
-        if type(entry) == "table" and entry.build == build and type(entry.name) == "string" and entry.name ~= "" then
-            return entry.name
-        end
-    end
-
-    return nil
-end
-
 GuessSpecFromBuild = function(classToken, build)
     if type(build) ~= "string" then
         return nil
