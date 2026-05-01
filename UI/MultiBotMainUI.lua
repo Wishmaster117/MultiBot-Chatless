@@ -13,6 +13,9 @@ local MAINBAR_AUTOHIDE_HOTSPOT_SIZE = 42
 local MAINBAR_AUTOHIDE_UPDATE_INTERVAL = 0.2
 
 local LEFT_LAYOUT_NAMES = {
+    "BotRTI",
+    "Disperse",
+    "Loot",
     "Tanker",
     "Attack",
     "Mode",
@@ -23,6 +26,12 @@ local LEFT_LAYOUT_NAMES = {
     "Flee",
     "Format",
     "Beast",
+}
+
+local LEFT_LAYOUT_FRAME_NAMES = {
+    BotRTI = "BotRTIAction",
+    Disperse = "DisperseMenu",
+    Loot = "LootMenu",
 }
 
 local leftLayoutBase = nil
@@ -60,9 +69,10 @@ local function captureLeftLayoutBase(leftRoot)
             leftLayoutBase.buttons[name] = { x = button.x, y = button.y }
         end
 
-        local frame = leftRoot.frames and leftRoot.frames[name]
+        local frameName = LEFT_LAYOUT_FRAME_NAMES[name] or name
+        local frame = leftRoot.frames and leftRoot.frames[frameName]
         if frame then
-            leftLayoutBase.frames[name] = { x = frame.x, y = frame.y }
+            leftLayoutBase.frames[frameName] = { x = frame.x, y = frame.y }
         end
     end
 end
@@ -73,10 +83,11 @@ local function setLeftElementX(leftRoot, name, x)
         button.setPoint(x, button.y)
     end
 
-    local frame = leftRoot.frames and leftRoot.frames[name]
+    local frameName = LEFT_LAYOUT_FRAME_NAMES[name] or name
+    local frame = leftRoot.frames and leftRoot.frames[frameName]
     if frame then
         local baseButton = leftLayoutBase and leftLayoutBase.buttons and leftLayoutBase.buttons[name]
-        local baseFrame = leftLayoutBase and leftLayoutBase.frames and leftLayoutBase.frames[name]
+        local baseFrame = leftLayoutBase and leftLayoutBase.frames and leftLayoutBase.frames[frameName]
         local frameOffset = -2
         if baseButton and baseFrame then
             frameOffset = baseFrame.x - baseButton.x
@@ -124,6 +135,7 @@ local function refreshLeftLayout()
             heavyShift = heavyShift - LEFT_LAYOUT_SHIFT
         end
 
+        setLeftElementX(leftRoot, "BotRTI", getLeftBaseX(leftRoot, "BotRTI") + heavyShift)
         setLeftElementX(leftRoot, "Tanker", getLeftBaseX(leftRoot, "Tanker") + heavyShift)
         setLeftElementX(leftRoot, "Attack", getLeftBaseX(leftRoot, "Attack") + heavyShift)
         setLeftElementX(leftRoot, "Mode", getLeftBaseX(leftRoot, "Mode") + heavyShift)
@@ -133,6 +145,8 @@ local function refreshLeftLayout()
         setLeftElementX(leftRoot, "ExpandStay", getLeftBaseX(leftRoot, "ExpandStay") + commonShift)
         setLeftElementX(leftRoot, "ExpandFollow", getLeftBaseX(leftRoot, "ExpandFollow") + commonShift)
         setLeftElementX(leftRoot, "Flee", getLeftBaseX(leftRoot, "Flee") + commonShift)
+        setLeftElementX(leftRoot, "Loot", getLeftBaseX(leftRoot, "Loot") + commonShift)
+        setLeftElementX(leftRoot, "Disperse", getLeftBaseX(leftRoot, "Disperse") + commonShift)
         setLeftElementX(leftRoot, "Format", getLeftBaseX(leftRoot, "Format") + commonShift)
 
         setLeftElementX(leftRoot, "Beast", getLeftBaseX(leftRoot, "Beast") + (creatorEnabled and -LEFT_LAYOUT_SHIFT or 0))

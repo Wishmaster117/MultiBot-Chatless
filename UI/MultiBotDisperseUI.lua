@@ -53,7 +53,7 @@ function MultiBot.BuildDisperseUI(tLeft)
 
     local lastDistance = "10"
     local button
-    local menu = tLeft.addFrame("DisperseMenu", -238, 34, 24, 56, 96).doHide()
+    local menu = tLeft.addFrame("DisperseMenu", -34, 34, 24, 56, 96).doHide()
     local menuOpen = false
     menu._mbDropdownManaged = true
     menu:SetWidth(56)
@@ -146,7 +146,7 @@ function MultiBot.BuildDisperseUI(tLeft)
 
     MultiBot.frames.disperseMenu = menu
 
-    button = tLeft.addButton("Disperse", -238, 0, "spell_nature_wispsplode", L("tips.disperse.main", "Disperse")).setDisable()
+    button = tLeft.addButton("Disperse", -34, 0, "spell_nature_wispsplode", L("tips.disperse.main", "Disperse")).setDisable()
     button.doLeft = function()
         if menuOpen then
             hideDisperseMenu()

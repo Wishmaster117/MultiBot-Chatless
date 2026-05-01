@@ -12,8 +12,8 @@ local FLEE_BUTTONS = {
 
 local FLEE_ICON = "Interface\\AddOns\\MultiBot\\Icons\\flee.blp"
 local FLEE_FRAME_NAME = "Flee"
-local FLEE_MAIN_X = -34
-local FLEE_FRAME_X = -36
+local FLEE_MAIN_X = -102
+local FLEE_FRAME_X = -104
 local FLEE_FRAME_Y = 34
 local FLEE_CELL_HEIGHT = 30
 

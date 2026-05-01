@@ -473,12 +473,12 @@ function MultiBot.RunStoredBotRTISelections(command)
     return true
 end
 
-function MultiBot.BuildBotRTIActionUI(tLeft)
+function MultiBot.BuildBotRTIActionUI(tLeft, x, y)
     if not tLeft or not tLeft.addButton or not tLeft.addFrame then
         return nil
     end
 
-    local buttonX = x or -238
+    local buttonX = x or -306
     local buttonY = y or 0
 
     local button = tLeft.addButton(

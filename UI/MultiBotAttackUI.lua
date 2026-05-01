@@ -11,8 +11,8 @@ local ATTACK_BUTTONS = {
 
 local ATTACK_ICON = "Interface\\AddOns\\MultiBot\\Icons\\attack.blp"
 local ATTACK_FRAME_NAME = "Attack"
-local ATTACK_MAIN_X = -136
-local ATTACK_FRAME_X = -138
+local ATTACK_MAIN_X = -204
+local ATTACK_FRAME_X = -206
 local ATTACK_FRAME_Y = 34
 local ATTACK_CELL_HEIGHT = 30
 
