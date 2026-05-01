@@ -195,6 +195,9 @@
   * gray ;
   * quest ;
   * skill.
+* Loot Master Frame :
+  * automatically shown when the player is the loot master ;
+  * assigns loot to bots from a dedicated window.
 
 ### Quick bars / classes
 
