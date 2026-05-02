@@ -18,6 +18,9 @@
 * J'ai l'impression que le disperse ne fait rien
 * Quand on fait apparaitre les boutons creator ou/et Maitre des bêtes, les deux boutons Disperse et Règles de buttin ne bougent pas
 ce qui fait que quand on ajoute Creator + maitre des betes le bouton attaque tank se retrouve caché par le bouton disperse
+* Les tooltips du spellbook sont derrière la frale.
+* Refaire uns passe pour que toutes les frames respectent le strata de la config.
+* Le SpellBook remonte encore quelques spells des métier cuisine et first aid
 
 ## Informations bot
 ** Frame faite
