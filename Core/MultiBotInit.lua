@@ -69,6 +69,10 @@ MultiBot.InitializeIconosFrame()
 
 MultiBot.InitializeSpellBookFrame()
 
+if MultiBot.InitializeCharacterInfoFrame then
+	MultiBot.InitializeCharacterInfoFrame()
+end
+
 if MultiBot.InitializeRewardFrame then
 	MultiBot.InitializeRewardFrame()
 end

@@ -126,6 +126,12 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
             end
           end
         },
+        { "CharacterInfo", "inv_misc_note_05", MultiBot.L("tips.every.characterinfo", "Infos personnage"), function(b)
+            if MultiBot.OpenCharacterInfo then
+                MultiBot.OpenCharacterInfo(b.getName())
+            end
+        end
+        },
 		{ "Maintenance", "Achievement_Halloween_Smiley_01", MultiBot.L("tips.every.maintenance"), function(b)
             SendChatMessage("maintenance", "WHISPER", nil, b.getName())
         end

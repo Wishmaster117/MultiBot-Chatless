@@ -487,7 +487,7 @@ function MultiBot.InitializeQuestsMenu(tRight)
     gobSearchButton.doLeft = function()
         if MultiBot.RequestGameObjectResults and MultiBot.RequestGameObjectResults() then
             return
-        end	
+        end
         MultiBot.ActionToGroup("los")
     end
     tRight.buttons["BotUseGOB"] = gobButton

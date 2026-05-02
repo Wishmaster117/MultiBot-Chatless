@@ -16,12 +16,15 @@
 * Talents / glyphes : revoir `UI/MultiBotTalent`, car il y a eu des modifications dans le fichier `.conf` de MultiBot.
 * Menus déroulants de la main bar : fermer automatiquement les autres menus quand on en ouvre un nouveau.
 * J'ai l'impression que le disperse ne fait rien
-* Voir pouquoi quand on se groupe avec un randombot il ne montre pas ses spell ni son inventaire
+* Quand on fait apparaitre les boutons creator ou/et Maitre des bêtes, les deux boutons Disperse et Règles de buttin ne bougent pas
+ce qui fait que quand on ajoute Creator + maitre des betes le bouton attaque tank se retrouve caché par le bouton disperse
 
 ## Informations bot
-** Faire une frame qui affiche les infos du bot comme la profession ou peut être ajouter la profession à la frame inventaire?
-* Y afficher proffeions et niveau
-* Monnaies (emblemes etc..)
+** Frame faite
+* Retravailler l'ergonomie et le design
+* Mettre les niveaux en barre de progression
+* Il y'a encore des spell des professions qui fuitent vers le spellbook
+* y ajouter Monnaies (emblemes etc..)
 * Réputations
 
 ## Frame Loot
@@ -196,9 +199,6 @@
   * gray ;
   * quest ;
   * skill.
-* Loot Master Frame :
-  * automatically shown when the player is the loot master ;
-  * assigns loot to bots from a dedicated window.
 
 ### Quick bars / classes
 
