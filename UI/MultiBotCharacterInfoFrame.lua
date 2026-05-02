@@ -28,6 +28,17 @@ local SKILL_BAR_BACKGROUND = "Interface\\Buttons\\WHITE8X8"
 local TOGGLE_PLUS_TEXTURE = "Interface\\Buttons\\UI-PlusButton-Up"
 local TOGGLE_MINUS_TEXTURE = "Interface\\Buttons\\UI-MinusButton-Up"
 local TOGGLE_DISABLED_TEXTURE = "Interface\\Buttons\\UI-PlusButton-Disabled"
+local CHARACTER_FRAME_WIDTH = 300
+local CHARACTER_FRAME_X = -150
+local CHARACTER_SKILL_ROW_WIDTH = 240
+local CHARACTER_SKILL_HEADER_WIDTH = CHARACTER_SKILL_ROW_WIDTH - 20
+local CHARACTER_SKILL_NAME_WIDTH = 132
+local CHARACTER_SKILL_VALUE_X = 142
+local CHARACTER_SKILL_VALUE_WIDTH = 72
+local RECIPE_FRAME_WIDTH = 340
+local RECIPE_FRAME_X = 145
+local RECIPE_ROW_WIDTH = 302
+local RECIPE_TEXT_WIDTH = 270
 
 local SKILL_DISPLAY_SPELL_IDS = {
     [171] = 2259, -- Alchemy
@@ -315,7 +326,7 @@ local function ensureRecipeFrame()
         return MultiBot.professionRecipeFrame
     end
 
-    local frame = createAceWindow("MultiBotProfessionRecipeFrame", L("profession.recipes", "Recipes"), 430, 450, 130)
+    local frame = createAceWindow("MultiBotProfessionRecipeFrame", L("profession.recipes", "Recipes"), RECIPE_FRAME_WIDTH, 450, RECIPE_FRAME_X)
     if not frame then
         return nil
     end
@@ -330,14 +341,14 @@ local function ensureRecipeFrame()
     for i = 1, frame.pageSize do
         local row = CreateFrame("Button", nil, content)
         row:SetPoint("TOPLEFT", content, "TOPLEFT", 18, -30 - ((i - 1) * 25))
-        row:SetWidth(392)
+        row:SetWidth(RECIPE_ROW_WIDTH)
         row:SetHeight(22)
         row.icon = row:CreateTexture(nil, "ARTWORK")
         row.icon:SetPoint("LEFT", row, "LEFT", 0, 0)
         row.icon:SetWidth(20)
         row.icon:SetHeight(20)
         row.text = createText(row, "GameFontHighlightSmall", "LEFT", 26, 0)
-        row.text:SetWidth(360)
+        row.text:SetWidth(RECIPE_TEXT_WIDTH)
         row.text:SetHeight(20)
         row:SetScript("OnEnter", function(self)
             if not self.recipe or not GameTooltip then return end
@@ -430,7 +441,7 @@ local function ensureCharacterFrame()
         return MultiBot.characterInfoFrame
     end
 
-    local frame = createAceWindow("MultiBotCharacterInfoFrame", L("character.info", "Character info"), 340, 450, -130)
+    local frame = createAceWindow("MultiBotCharacterInfoFrame", L("character.info", "Character info"), CHARACTER_FRAME_WIDTH, 450, CHARACTER_FRAME_X)
     if not frame then
         return nil
     end
@@ -447,7 +458,7 @@ local function ensureCharacterFrame()
     frame.scrollFrame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -28, 36)
 
     frame.scrollChild = CreateFrame("Frame", "MultiBotCharacterInfoFrameSkillScrollChild", frame.scrollFrame)
-    frame.scrollChild:SetWidth(280)
+    frame.scrollChild:SetWidth(CHARACTER_SKILL_ROW_WIDTH)
     frame.scrollChild:SetHeight(1)
     frame.scrollFrame:SetScrollChild(frame.scrollChild)
 
@@ -458,7 +469,7 @@ local function ensureCharacterFrame()
 
         local row = CreateFrame("Button", nil, frame.scrollChild)
         row:SetPoint("TOPLEFT", frame.scrollChild, "TOPLEFT", 0, 0)
-        row:SetWidth(280)
+        row:SetWidth(CHARACTER_SKILL_ROW_WIDTH)
         row:SetHeight(SKILL_ROW_HEIGHT)
 
         row.toggle = row:CreateTexture(nil, "ARTWORK")
@@ -468,7 +479,7 @@ local function ensureCharacterFrame()
         row.toggle:Hide()
 
         row.headerText = createText(row, "GameFontNormal", "LEFT", 20, 0)
-        row.headerText:SetWidth(300)
+        row.headerText:SetWidth(CHARACTER_SKILL_HEADER_WIDTH)
         row.headerText:SetHeight(18)
         row.headerText:Hide()
 
@@ -492,11 +503,11 @@ local function ensureCharacterFrame()
         row.bar:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
 
         row.nameText = createText(row.bar, "GameFontNormalSmall", "LEFT", 8, 0)
-        row.nameText:SetWidth(170)
+        row.nameText:SetWidth(CHARACTER_SKILL_NAME_WIDTH)
         row.nameText:SetHeight(18)
 
-        row.valueText = createText(row.bar, "GameFontHighlightSmall", "LEFT", 102, 0)
-        row.valueText:SetWidth(90)
+        row.valueText = createText(row.bar, "GameFontHighlightSmall", "LEFT", CHARACTER_SKILL_VALUE_X, 0)
+        row.valueText:SetWidth(CHARACTER_SKILL_VALUE_WIDTH)
         row.valueText:SetHeight(18)
 
         row:SetScript("OnClick", function(self)
