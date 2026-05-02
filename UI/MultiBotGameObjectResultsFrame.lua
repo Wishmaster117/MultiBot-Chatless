@@ -4,6 +4,23 @@ local Shared = MultiBot.QuestUIShared or {}
 local ResultsFrame = MultiBot.GameObjectResultsFrame or {}
 MultiBot.GameObjectResultsFrame = ResultsFrame
 
+local function ensureGameObjectStore()
+    if MultiBot.Store and MultiBot.Store.EnsureRuntimeTable then
+        return MultiBot.Store.EnsureRuntimeTable("LastGameObjectSearch")
+    end
+    MultiBot.LastGameObjectSearch = type(MultiBot.LastGameObjectSearch) == "table" and MultiBot.LastGameObjectSearch or {}
+    return MultiBot.LastGameObjectSearch
+end
+
+local function clearTableInPlace(tbl)
+    if type(tbl) ~= "table" then return end
+    if MultiBot.Store and MultiBot.Store.ClearTable then
+        MultiBot.Store.ClearTable(tbl)
+        return
+    end
+    for key in pairs(tbl) do tbl[key] = nil end
+end
+
 local function clearResults(frame)
     if frame and frame.scroll then
         frame.scroll:ReleaseChildren()
@@ -49,8 +66,47 @@ function MultiBot.ShowGameObjectPopup()
         return
     end
 
-    renderGameObjectResults(frame)
-    frame.window:Show()
+    frame:Refresh()
+    frame:Show()
+end
+
+function ResultsFrame:Show()
+    if self.window then self.window:Show() end
+end
+
+function ResultsFrame:Refresh()
+    renderGameObjectResults(self)
+end
+
+function ResultsFrame:SetLoading()
+    clearResults(self)
+    addLabel(self.aceGUI, self.scroll, LOADING or "Loading...")
+end
+
+function MultiBot.RequestGameObjectResults()
+    local bridge = MultiBot.bridge or nil
+    local comm = MultiBot.Comm or nil
+    if not (bridge and (bridge.connected or bridge.bootstrapPending) and comm and comm.RequestGameObjects) then
+        return false
+    end
+
+    local frame = MultiBot.InitializeGameObjectResultsFrame()
+    if not frame then
+        return false
+    end
+
+    clearTableInPlace(ensureGameObjectStore())
+    frame:SetLoading()
+    frame:Show()
+    return comm.RequestGameObjects() and true or false
+end
+
+function MultiBot.OnBridgeGameObjectsDone()
+    local frame = MultiBot.InitializeGameObjectResultsFrame()
+    if frame then
+        frame:Refresh()
+        frame:Show()
+    end
 end
 
 function MultiBot.InitializeGameObjectResultsFrame()
