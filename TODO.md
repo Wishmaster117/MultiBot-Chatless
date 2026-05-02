@@ -48,7 +48,6 @@ ce qui fait que quand on ajoute Creator + maitre des betes le bouton attaque tan
 
 ## Améliorations UI encore ouvertes
 
-* Passer les gobject dans la bridge.
 * Uniformiser le template des frames de quêtes avec le style d'Itemus.
 * Uniformiser le template de la frame reward avec le style d'Itemus.
 * Ajouter une option pour choisir la taille des icônes de la main bar et des Quick Shaman / Quick Hunter.
