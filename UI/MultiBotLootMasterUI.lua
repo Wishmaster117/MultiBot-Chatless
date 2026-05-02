@@ -76,6 +76,20 @@ local function AddSystemMessage(message)
     end
 end
 
+local function IsLootMasterDebugEnabled()
+    if MultiBot and MultiBot.lootMasterDebug == true then
+        return true
+    end
+
+    return _G.MultiBotLootMasterDebug == true
+end
+
+local function AddDebugMessage(message)
+    if IsLootMasterDebugEnabled() then
+        AddSystemMessage(message)
+    end
+end
+
 local function IsLootMasterUIEnabled()
     if MultiBot and type(MultiBot.GetLootMasterUIEnabled) == "function" then
         return MultiBot.GetLootMasterUIEnabled()
@@ -2411,7 +2425,7 @@ function LootMasterUI:Refresh()
 
     if totalCandidates == 0 and rowIndex > 1 then
         frame.status:SetText(MBLocal("lootmaster.status.no_candidates", "Loot found, but no master-loot candidates were returned by the client."))
-        AddSystemMessage("Loot master debug: loot exists, but GetMasterLootCandidate returned no candidates.")
+        AddDebugMessage("Loot master debug: loot exists, but GetMasterLootCandidate returned no candidates.")
         return
     end
 end
@@ -2430,7 +2444,7 @@ function LootMasterUI:Open()
         frame:Raise()
     end
 
-    AddSystemMessage("Loot master UI opening frame.")
+    AddDebugMessage("Loot master UI opening frame.")
 
     self:Refresh()
 
@@ -2473,7 +2487,7 @@ function LootMasterUI:OnLootOpened(autoLoot)
     local numSlots = GetNumLootItems() or 0
     local method, partyIndex, raidIndex = GetLootMethod()
 
-    AddSystemMessage(
+    AddDebugMessage(
         string.format(
             "LOOT_OPENED debug: autoLoot=%s, method=%s, partyMaster=%s, raidMaster=%s, slots=%d",
             tostring(autoLoot),
@@ -2485,7 +2499,7 @@ function LootMasterUI:OnLootOpened(autoLoot)
     )
 
     if raidIndex and raidIndex > 0 then
-        AddSystemMessage(
+        AddDebugMessage(
             string.format(
                 "Loot master debug: raid master unit=raid%d, name=%s, isPlayer=%s",
                 raidIndex,
@@ -2494,18 +2508,18 @@ function LootMasterUI:OnLootOpened(autoLoot)
             )
         )
     elseif partyIndex then
-        AddSystemMessage(
+        AddDebugMessage(
             string.format("Loot master debug: partyMaster=%s, isPlayerMaster=%s", tostring(partyIndex), tostring(partyIndex == 0))
         )
     end
 
     if not IsPlayerMasterLooter() then
-        AddSystemMessage("Loot master UI skipped: you are not detected as master looter.")
+        AddDebugMessage("Loot master UI skipped: you are not detected as master looter.")
         return
     end
 
     if numSlots <= 0 then
-        AddSystemMessage("Loot master UI skipped: no visible loot slots.")
+        AddDebugMessage("Loot master UI skipped: no visible loot slots.")
         return
     end
 
