@@ -105,7 +105,7 @@ local function ensureBridgeState()
   state.questActive = state.questActive or {}
   state.gameObjects = state.gameObjects or {}
   state.gameObjectSeq = state.gameObjectSeq or 0
-  state.gameObjectActive = state.gameObjectActive or {}  
+  state.gameObjectActive = state.gameObjectActive or {}
   state.talentSpecs = state.talentSpecs or {}
   state.talentSpecSeq = state.talentSpecSeq or 0
   state.talentSpecActive = state.talentSpecActive or nil
@@ -115,6 +115,12 @@ local function ensureBridgeState()
   state.inventoryActive = state.inventoryActive or nil
   state.spellbookSeq = state.spellbookSeq or 0
   state.spellbookActive = state.spellbookActive or nil
+  state.botSkills = state.botSkills or {}
+  state.botSkillSeq = state.botSkillSeq or 0
+  state.botSkillActive = state.botSkillActive or nil
+  state.professionRecipes = state.professionRecipes or {}
+  state.professionRecipeSeq = state.professionRecipeSeq or 0
+  state.professionRecipeActive = state.professionRecipeActive or nil
   state.outfitSeq = state.outfitSeq or 0
   state.outfitActive = state.outfitActive or nil
   state.outfitCommands = state.outfitCommands or {}
@@ -564,6 +570,58 @@ function Comm.RequestSpellbook(name)
   return true
 end
 
+function Comm.RequestBotSkills(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.botSkillSeq = (tonumber(state.botSkillSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.botSkillSeq)
+  state.botSkillActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+    items = {},
+  }
+
+  if not Comm.Send("GET", "BOT_SKILLS~" .. name .. "~" .. token) then
+    state.botSkillActive = nil
+    return false
+  end
+
+  return true
+end
+
+function Comm.RequestProfessionRecipes(name, skillId)
+  local state = ensureBridgeState()
+  name = trim(name)
+  skillId = tonumber(skillId or 0) or 0
+  if name == "" or skillId <= 0 or not state.connected then
+    return false
+  end
+
+  state.professionRecipeSeq = (tonumber(state.professionRecipeSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.professionRecipeSeq)
+  state.professionRecipeActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    skillId = skillId,
+    token = token,
+    startedAt = safeNow(),
+    recipes = {},
+  }
+
+  if not Comm.Send("GET", "PROFESSION_RECIPES~" .. name .. "~" .. skillId .. "~" .. token) then
+    state.professionRecipeActive = nil
+    return false
+  end
+
+  return true
+end
+
 function Comm.MarkDisconnected(reason)
   local state = ensureBridgeState()
   state.connected = false
@@ -572,6 +630,8 @@ function Comm.MarkDisconnected(reason)
   state.lastError = reason or nil
   state.inventoryActive = nil
   state.spellbookActive = nil
+  state.botSkillActive = nil
+  state.professionRecipeActive = nil
   state.outfitActive = nil
   state.outfitCommands = {}
 end
@@ -1533,6 +1593,60 @@ local function getSpellbookFrame()
   return MultiBot and MultiBot.spellbook or nil
 end
 
+local function getActiveBotSkillRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.botSkillActive
+  if type(active) ~= "table" then
+    return nil
+  end
+
+  if botName and botName ~= "" and string.lower(trim(botName)) ~= trim(active.botNameKey or "") then
+    return nil
+  end
+
+  if token and token ~= "" and tostring(token) ~= tostring(active.token or "") then
+    return nil
+  end
+
+  return active
+end
+
+local function getActiveProfessionRecipeRequest(botName, token, skillId)
+  local state = ensureBridgeState()
+  local active = state.professionRecipeActive
+  if type(active) ~= "table" then
+    return nil
+  end
+
+  if botName and botName ~= "" and string.lower(trim(botName)) ~= trim(active.botNameKey or "") then
+    return nil
+  end
+
+  if token and token ~= "" and tostring(token) ~= tostring(active.token or "") then
+    return nil
+  end
+
+  if skillId and tonumber(skillId or 0) ~= tonumber(active.skillId or 0) then
+    return nil
+  end
+
+  return active
+end
+
+local function parseRecipeMaterials(raw)
+  local materials = {}
+  for token in string.gmatch(raw or "", "([^;]+)") do
+    local itemId, rest = splitOnce(token, ":")
+    local required, available = splitOnce(rest or "", ":")
+    table.insert(materials, {
+      itemId = tonumber(itemId or "0") or 0,
+      required = tonumber(required or "0") or 0,
+      available = tonumber(available or "0") or 0,
+    })
+  end
+  return materials
+end
+
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   if prefix ~= Comm.prefix then
     return false
@@ -1913,6 +2027,139 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "BOT_SKILLS_BEGIN" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotSkillRequest(botName, token)
+    if active then
+      active.items = {}
+    end
+
+    return true
+  end
+
+  if opcode == "BOT_SKILLS_ITEM" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, rest2 = splitOnce(rest or "", "~")
+    local category, rest3 = splitOnce(rest2 or "", "~")
+    local skillId, rest4 = splitOnce(rest3 or "", "~")
+    local key, rest5 = splitOnce(rest4 or "", "~")
+    local skillName, rest6 = splitOnce(rest5 or "", "~")
+    local value, maxValue = splitOnce(rest6 or "", "~")
+
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotSkillRequest(botName, token)
+    if active then
+      table.insert(active.items, {
+        category = trim(urlDecodeField(category)),
+        skillId = tonumber(skillId or "0") or 0,
+        key = trim(urlDecodeField(key)),
+        name = trim(urlDecodeField(skillName)),
+        value = tonumber(value or "0") or 0,
+        max = tonumber(maxValue or "0") or 0,
+      })
+    end
+
+    return true
+  end
+
+  if opcode == "BOT_SKILLS_END" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotSkillRequest(botName, token)
+    if active then
+      local key = string.lower(botName)
+      state.botSkills[key] = active.items or {}
+      if MultiBot.OnBridgeBotSkills then
+        MultiBot.OnBridgeBotSkills(botName, state.botSkills[key], token)
+      end
+      state.botSkillActive = nil
+    end
+
+    return true
+  end
+
+  if opcode == "PROFESSION_RECIPES_BEGIN" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, skillId = splitOnce(rest or "", "~")
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    skillId = tonumber(skillId or "0") or 0
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveProfessionRecipeRequest(botName, token, skillId)
+    if active then
+      active.recipes = {}
+    end
+
+    return true
+  end
+
+  if opcode == "PROFESSION_RECIPES_ITEM" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, rest2 = splitOnce(rest or "", "~")
+    local skillId, rest3 = splitOnce(rest2 or "", "~")
+    local spellId, rest4 = splitOnce(rest3 or "", "~")
+    local itemId, rest5 = splitOnce(rest4 or "", "~")
+    local difficulty, rest6 = splitOnce(rest5 or "", "~")
+    local craftable, materials = splitOnce(rest6 or "", "~")
+
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    skillId = tonumber(skillId or "0") or 0
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveProfessionRecipeRequest(botName, token, skillId)
+    if active then
+      table.insert(active.recipes, {
+        skillId = skillId,
+        spellId = tonumber(spellId or "0") or 0,
+        itemId = tonumber(itemId or "0") or 0,
+        difficulty = trim(urlDecodeField(difficulty)),
+        craftable = tonumber(craftable or "0") or 0,
+        materials = parseRecipeMaterials(urlDecodeField(materials)),
+      })
+    end
+
+    return true
+  end
+
+  if opcode == "PROFESSION_RECIPES_END" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, skillId = splitOnce(rest or "", "~")
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    skillId = tonumber(skillId or "0") or 0
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveProfessionRecipeRequest(botName, token, skillId)
+    if active then
+      local key = string.lower(botName) .. ":" .. tostring(skillId)
+      state.professionRecipes[key] = active.recipes or {}
+      if MultiBot.OnBridgeProfessionRecipes then
+        MultiBot.OnBridgeProfessionRecipes(botName, skillId, state.professionRecipes[key], token)
+      end
+      state.professionRecipeActive = nil
+    end
+
+    return true
+  end
+
   if opcode == "RTI_ACK" then
     state.connected = true
     state.lastError = nil
@@ -2038,6 +2285,10 @@ function Comm.OnPlayerEnteringWorld()
   state.talentSpecActive = nil
   state.inventoryActive = nil
   state.spellbookActive = nil
+  state.botSkills = {}
+  state.botSkillActive = nil
+  state.professionRecipes = {}
+  state.professionRecipeActive = nil
   state.outfitActive = nil
   state.outfitCommands = {}
   Comm.MarkDisconnected(nil)
