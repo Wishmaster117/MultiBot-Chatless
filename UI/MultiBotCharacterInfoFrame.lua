@@ -5,6 +5,7 @@ end
 local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
 
 local CATEGORY_ORDER = { "class", "profession", "secondary", "weapon", "armor" }
+
 local CATEGORY_TITLES = {
     class = "Compétences de classe",
     profession = "Métiers",
@@ -13,12 +14,21 @@ local CATEGORY_TITLES = {
     armor = "Armures",
 }
 
+
 local DIFFICULTY_COLORS = {
     orange = "|cffff8040",
     yellow = "|cffffff00",
     green = "|cff80be80",
     gray = "|cff808080",
 }
+
+local HEADER_ROW_HEIGHT = 22
+local SKILL_ROW_HEIGHT = 24
+local SKILL_BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
+local SKILL_BAR_BACKGROUND = "Interface\\Buttons\\WHITE8X8"
+local TOGGLE_PLUS_TEXTURE = "Interface\\Buttons\\UI-PlusButton-Up"
+local TOGGLE_MINUS_TEXTURE = "Interface\\Buttons\\UI-MinusButton-Up"
+local TOGGLE_DISABLED_TEXTURE = "Interface\\Buttons\\UI-PlusButton-Disabled"
 
 local function L(key, fallback)
     if MultiBot.L then
@@ -28,16 +38,43 @@ local function L(key, fallback)
     return fallback or key
 end
 
+local function addSimpleBackdrop(frame, bgAlpha)
+    if not frame or not frame.SetBackdrop then
+        return
+    end
+
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+
+    if frame.SetBackdropColor then
+        frame:SetBackdropColor(0.06, 0.06, 0.08, bgAlpha or 0.92)
+    end
+
+    if frame.SetBackdropBorderColor then
+        frame:SetBackdropBorderColor(0.35, 0.35, 0.35, 0.95)
+    end
+end
+
 local function createAceWindow(name, title, width, height, x)
     if not AceGUI then
         return nil
     end
 
-    local widget = AceGUI:Create("Frame")
+    local widget = AceGUI:Create("Window")
     widget:SetTitle(title or "")
     widget:SetWidth(width)
     widget:SetHeight(height)
     widget:SetLayout("Absolute")
+
+    if widget.SetLayout then
+        widget:SetLayout("Manual")
+    end
 
     if widget.EnableResize then
         widget:EnableResize(false)
@@ -46,8 +83,27 @@ local function createAceWindow(name, title, width, height, x)
     local frame = widget.frame
     frame.aceWidget = widget
     frame.content = widget.content or frame
+
+    if frame.SetClampedToScreen then
+        frame:SetClampedToScreen(true)
+    end
+
+    if frame.content and frame.content.ClearAllPoints then
+        frame.content:ClearAllPoints()
+        frame.content:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -30)
+        frame.content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 10)
+        addSimpleBackdrop(frame.content, 0.90)
+    end
+
     frame:SetPoint("CENTER", UIParent, "CENTER", x or 0, 0)
-    frame:SetFrameStrata("DIALOG")
+
+    local strataLevel = MultiBot.GetGlobalStrataLevel and MultiBot.GetGlobalStrataLevel()
+    if strataLevel then
+        frame:SetFrameStrata(strataLevel)
+    else
+        frame:SetFrameStrata("DIALOG")
+    end
+
     _G[name] = frame
 
     return frame
@@ -120,6 +176,12 @@ local function getSkillBarText(skill)
     end
 
     return value .. "/" .. max
+end
+
+local function getSkillBarValues(skill)
+    local value = tonumber(skill and skill.value or 0) or 0
+    local max = tonumber(skill and skill.max or 0) or 0
+    return value, math.max(1, max)
 end
 
 local function getItemName(itemId)
@@ -276,7 +338,7 @@ local function ensureCharacterFrame()
         return MultiBot.characterInfoFrame
     end
 
-    local frame = createAceWindow("MultiBotCharacterInfoFrame", L("character.info", "Character info"), 390, 450, -130)
+    local frame = createAceWindow("MultiBotCharacterInfoFrame", L("character.info", "Character info"), 340, 450, -130)
     if not frame then
         return nil
     end
@@ -288,13 +350,14 @@ local function ensureCharacterFrame()
     frame.status = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, -36)
     frame.rows = {}
     frame.skills = {}
+    frame.collapsedCategories = frame.collapsedCategories or {}	
 
     frame.scrollFrame = CreateFrame("ScrollFrame", "MultiBotCharacterInfoFrameSkillScrollFrame", content, "UIPanelScrollFrameTemplate")
     frame.scrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, -58)
-    frame.scrollFrame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -32, 36)
+    frame.scrollFrame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -28, 36)
 
     frame.scrollChild = CreateFrame("Frame", "MultiBotCharacterInfoFrameSkillScrollChild", frame.scrollFrame)
-    frame.scrollChild:SetWidth(330)
+    frame.scrollChild:SetWidth(280)
     frame.scrollChild:SetHeight(1)
     frame.scrollFrame:SetScrollChild(frame.scrollChild)
 
@@ -304,12 +367,55 @@ local function ensureCharacterFrame()
         end
 
         local row = CreateFrame("Button", nil, frame.scrollChild)
-        row:SetPoint("TOPLEFT", frame.scrollChild, "TOPLEFT", 0, -((index - 1) * 19))
-        row:SetWidth(330)
-        row:SetHeight(18)
-        row.text = createText(row, "GameFontHighlightSmall", "LEFT", 0, 0)
-        row.text:SetWidth(320)
+        row:SetPoint("TOPLEFT", frame.scrollChild, "TOPLEFT", 0, 0)
+        row:SetWidth(280)
+        row:SetHeight(SKILL_ROW_HEIGHT)
+
+        row.toggle = row:CreateTexture(nil, "ARTWORK")
+        row.toggle:SetPoint("LEFT", row, "LEFT", 0, 0)
+        row.toggle:SetWidth(16)
+        row.toggle:SetHeight(16)
+        row.toggle:Hide()
+
+        row.headerText = createText(row, "GameFontNormal", "LEFT", 20, 0)
+        row.headerText:SetWidth(300)
+        row.headerText:SetHeight(18)
+        row.headerText:Hide()
+
+        row.bar = CreateFrame("StatusBar", nil, row)
+        row.bar:SetPoint("LEFT", row, "LEFT", 20, 0)
+        row.bar:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row.bar:SetHeight(18)
+        row.bar:SetStatusBarTexture(SKILL_BAR_TEXTURE)
+        row.bar:SetStatusBarColor(0.05, 0.12, 0.70, 0.85)
+        row.bar:SetMinMaxValues(0, 1)
+        row.bar:SetValue(0)
+        row.bar:SetBackdrop({
+            bgFile = SKILL_BAR_BACKGROUND,
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = false,
+            tileSize = 0,
+            edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        })
+        row.bar:SetBackdropColor(0.02, 0.02, 0.10, 0.75)
+        row.bar:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+
+        row.nameText = createText(row.bar, "GameFontNormalSmall", "LEFT", 8, 0)
+        row.nameText:SetWidth(170)
+        row.nameText:SetHeight(18)
+
+        row.valueText = createText(row.bar, "GameFontHighlightSmall", "LEFT", 102, 0)
+        row.valueText:SetWidth(90)
+        row.valueText:SetHeight(18)
+
         row:SetScript("OnClick", function(self)
+            if self.categoryHeader then
+                frame.collapsedCategories[self.categoryHeader] = not frame.collapsedCategories[self.categoryHeader]
+                frame:renderSkills()
+                return
+            end
+		
             if not self.skill then return end
             if self.skill.category ~= "profession" and self.skill.category ~= "secondary" then return end
             if MultiBot.Comm and MultiBot.Comm.RequestProfessionRecipes then
@@ -327,6 +433,53 @@ local function ensureCharacterFrame()
         return row
     end
 
+    local function showHeaderRow(row, item, y)
+        row:SetPoint("TOPLEFT", frame.scrollChild, "TOPLEFT", 0, -y)
+        row:SetHeight(HEADER_ROW_HEIGHT)
+        row.skill = nil
+        row.categoryHeader = item.category
+
+        row.bar:Hide()
+        row.nameText:Hide()
+        row.valueText:Hide()
+
+        row.toggle:SetTexture(MultiBot.SafeTexturePath(frame.collapsedCategories[item.category] and TOGGLE_PLUS_TEXTURE or TOGGLE_MINUS_TEXTURE))
+        row.toggle:Show()
+
+        row.headerText:SetText("|cffffcc00" .. item.header .. "|r")
+        row.headerText:Show()
+
+        row:Show()
+        return HEADER_ROW_HEIGHT
+    end
+
+    local function showSkillRow(row, item, y)
+        local skill = item.skill
+        local value, max = getSkillBarValues(skill)
+        local clickable = skill.category == "profession" or skill.category == "secondary"
+
+        row:SetPoint("TOPLEFT", frame.scrollChild, "TOPLEFT", 0, -y)
+        row:SetHeight(SKILL_ROW_HEIGHT)
+        row.skill = skill
+        row.categoryHeader = nil
+
+        row.toggle:Hide()
+        row.headerText:Hide()
+
+        row.bar:SetMinMaxValues(0, max)
+        row.bar:SetValue(math.min(value, max))
+        row.bar:Show()
+
+        row.nameText:SetText((clickable and "|cffffcc00" or "|cffffffff") .. (skill.name or skill.key or ("Skill " .. tostring(skill.skillId))) .. "|r")
+        row.nameText:Show()
+
+        row.valueText:SetText("|cffffffff" .. getSkillBarText(skill) .. "|r")
+        row.valueText:Show()
+
+        row:Show()
+        return SKILL_ROW_HEIGHT
+    end
+
     frame.renderSkills = function(self)
         local ordered = {}
 
@@ -340,43 +493,42 @@ local function ensureCharacterFrame()
             end
 
             if #categoryItems > 0 then
-                table.insert(ordered, { header = CATEGORY_TITLES[category] or category })
+                table.insert(ordered, { header = CATEGORY_TITLES[category] or category, category = category })
                 table.sort(categoryItems, function(a, b) return tostring(a.name or "") < tostring(b.name or "") end)
 
-                for _, skill in ipairs(categoryItems) do
-                    table.insert(ordered, { skill = skill })
+                if not self.collapsedCategories[category] then
+                    for _, skill in ipairs(categoryItems) do
+                        table.insert(ordered, { skill = skill })
+                    end
                 end
             end
         end
 
         self.status:SetText(#(self.skills or {}) .. " " .. L("character.skills.count", "skill(s)"))
 
-        self.scrollChild:SetHeight(math.max(1, #ordered * 19))
+        local contentHeight = 0
 
         for i = 1, #ordered do
             local row = ensureSkillRow(i)
             local item = ordered[i]
-            row.skill = item and item.skill or nil
 
             if not item then
                 row:Hide()
             elseif item.header then
-                row.text:SetText("|cffffcc00" .. item.header .. "|r")
-                row:Show()
+                contentHeight = contentHeight + showHeaderRow(row, item, contentHeight)
             else
-                local skill = item.skill
-                local clickable = (skill.category == "profession" or skill.category == "secondary") and "|cff80d0ff" or "|cffffffff"
-                row.text:SetText(clickable .. (skill.name or skill.key or ("Skill " .. tostring(skill.skillId))) .. "|r |cff999999" .. getSkillBarText(skill) .. "|r")
-                row:Show()
+                contentHeight = contentHeight + showSkillRow(row, item, contentHeight)
             end
         end
 
         for i = #ordered + 1, #self.rows do
             local row = self.rows[i]
             row.skill = nil
+            row.categoryHeader = nil
             row:Hide()
         end
 
+        self.scrollChild:SetHeight(math.max(1, contentHeight))
         self.scrollFrame:SetVerticalScroll(0)
     end
 
