@@ -21,8 +21,6 @@ ce qui fait que quand on ajoute Creator + maitre des betes le bouton attaque tan
 
 ## Informations bot
 ** Frame faite
-* Retravailler l'ergonomie et le design
-* Mettre les niveaux en barre de progression
 * Il y'a encore des spell des professions qui fuitent vers le spellbook
 * y ajouter Monnaies (emblemes etc..)
 * Réputations
