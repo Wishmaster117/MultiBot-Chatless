@@ -27,7 +27,6 @@ local SKILL_BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 local SKILL_BAR_BACKGROUND = "Interface\\Buttons\\WHITE8X8"
 local TOGGLE_PLUS_TEXTURE = "Interface\\Buttons\\UI-PlusButton-Up"
 local TOGGLE_MINUS_TEXTURE = "Interface\\Buttons\\UI-MinusButton-Up"
-local TOGGLE_DISABLED_TEXTURE = "Interface\\Buttons\\UI-PlusButton-Disabled"
 local CHARACTER_FRAME_WIDTH = 300
 local CHARACTER_FRAME_X = -150
 local CHARACTER_SKILL_ROW_WIDTH = 240
@@ -224,25 +223,6 @@ local function getFrameContent(frame)
     return (frame and frame.content) or frame
 end
 
-local function setBackdrop(frame)
-    frame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true,
-        tileSize = 16,
-        edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 },
-    })
-    frame:SetBackdropColor(0.06, 0.06, 0.06, 0.96)
-    frame:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
-end
-
-local function createCloseButton(parent)
-    local button = CreateFrame("Button", nil, parent, "UIPanelCloseButton")
-    button:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -4)
-    return button
-end
-
 local function setButtonEnabled(button, enabled)
     if not button then
         return
@@ -253,15 +233,6 @@ local function setButtonEnabled(button, enabled)
     else
         button:Disable()
     end
-end
-
-local function createTabButton(parent, text, x)
-    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -28)
-    button:SetWidth(112)
-    button:SetHeight(20)
-    button:SetText(text)
-    return button
 end
 
 local function createText(parent, template, point, x, y)
@@ -451,7 +422,7 @@ local function ensureCharacterFrame()
     frame.status = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, -10)
     frame.rows = {}
     frame.skills = {}
-    frame.collapsedCategories = frame.collapsedCategories or {}	
+    frame.collapsedCategories = frame.collapsedCategories or {}
 
     frame.scrollFrame = CreateFrame("ScrollFrame", "MultiBotCharacterInfoFrameSkillScrollFrame", content, "UIPanelScrollFrameTemplate")
     frame.scrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, -32)
@@ -516,7 +487,7 @@ local function ensureCharacterFrame()
                 frame:renderSkills()
                 return
             end
-		
+
             if not self.skill then return end
             if self.skill.category ~= "profession" and self.skill.category ~= "secondary" then return end
             if MultiBot.Comm and MultiBot.Comm.RequestProfessionRecipes then
