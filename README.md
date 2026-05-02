@@ -86,10 +86,17 @@ GET~ROSTER
 GET~STATES
 GET~DETAILS
 GET~STATS
+GET~PVP_STATS
+GET~TALENT_SPEC_LIST
 GET~INVENTORY
 GET~SPELLBOOK
+GET~BOT_SKILLS
+GET~PROFESSION_RECIPES
 GET~GLYPHS
 GET~OUTFITS
+GET~QUESTS
+GET~GAMEOBJECTS
+RUN~OUTFIT
 RUN~RTI
 RUN~COMBAT
 RUN~POSITION
@@ -142,20 +149,63 @@ The goal is to remove automatic UI-refresh spam.
     <td><strong>Bridge-first</strong></td>
   </tr>
   <tr>
+    <td>PvP stats</td>
+    <td><strong>Bridge-first</strong></td>
+  </tr>
+  <tr>
+    <td>Talent spec lists</td>
+    <td><strong>Bridge-first</strong> template listing without automatic <code>talents spec list</code> chat spam</td>
+  </tr>
+  <tr>
     <td>Inventory</td>
     <td><strong>Bridge-first</strong> with icons and item tooltips</td>
   </tr>
   <tr>
     <td>Spellbook</td>
-    <td><strong>Bridge-first</strong></td>
+    <td><strong>Bridge-first</strong> combat spell listing separated from profession recipe data</td>
+  </tr>
+  <tr>
+    <td>Character Info frame</td>
+    <td><strong>Bridge-first</strong> class skills, professions, secondary skills, weapon skills and armor skills</td>
+  </tr>
+  <tr>
+    <td>Profession recipe frame</td>
+    <td><strong>Bridge-first</strong> recipe listing opened from Character Info profession and secondary skill rows</td>
   </tr>
   <tr>
     <td>Glyphs</td>
     <td><strong>Bridge-first</strong> with glyph icons and tooltips</td>
+  </tr>  <tr>
+    <td>Loot rules</td>
+    <td><strong>Bridge-first</strong> loot enable/disable and loot list profiles through <code>RUN~LOOT</code></td>
+  </tr>
+  <tr>
+    <td>Loot Master frame</td>
+    <td><strong>Implemented</strong> optional auto-opening master-loot UI with candidate scoring, preferences and recent loot history</td>
+  </tr>
+  <tr>
+    <td>Units / EveryBars</td>
+    <td><strong>Improved</strong> login, reload and AddClass refresh behavior</td>
+  </tr>
+  <tr>
+    <td>Random bot visibility</td>
+    <td><strong>Improved</strong> bridge-visible grouped randombots alongside AddClass bots and altbots</td>
+  </tr>
+  <tr>
+    <td>Legacy automatic chat fallback</td>
+    <td><strong>Disabled by default</strong></td>
   </tr>
   <tr>
     <td>Outfits</td>
     <td><strong>Bridge-first</strong> listing, create/update, reset, equip and replace</td>
+  </tr>
+  <tr>
+    <td>Quests</td>
+    <td><strong>Bridge-first</strong> incompleted, completed and all quest lists</td>
+  </tr>
+  <tr>
+    <td>Game object search</td>
+    <td><strong>Bridge-first</strong> results and copy frame without localized chat parsing</td>
   </tr>
   <tr>
     <td>RTI controls</td>
@@ -178,8 +228,16 @@ The goal is to remove automatic UI-refresh spam.
     <td><strong>Bridge-first</strong> loot enable/disable and loot list profiles through <code>RUN~LOOT</code></td>
   </tr>
   <tr>
+    <td>Loot Master frame</td>
+    <td><strong>Implemented</strong> optional auto-opening master-loot UI with candidate scoring, preferences and recent loot history</td>
+  </tr>
+  <tr>
     <td>Units / EveryBars</td>
     <td><strong>Improved</strong> login, reload and AddClass refresh behavior</td>
+  </tr>
+  <tr>
+    <td>Random bot visibility</td>
+    <td><strong>Improved</strong> bridge-visible grouped randombots alongside AddClass bots and altbots</td>
   </tr>
   <tr>
     <td>Legacy automatic chat fallback</td>
@@ -398,16 +456,24 @@ Implemented bridge-first / chatless areas:
 - Bot states refresh.
 - Bot details refresh.
 - Stats refresh.
+- PvP stats refresh.
+- Talent spec list refresh.
 - Inventory refresh with icons and item tooltips.
-- Spellbook refresh.
+- Spellbook refresh, with profession/crafting spells separated from the combat spellbook path.
+- Character Info frame through the bridge with class, profession, secondary, weapon and armor skills.
+- Profession recipe frame through the bridge, opened from profession and secondary skill rows.
 - Glyph refresh with icons and glyph tooltips.
 - Outfits refresh and actions through the bridge.
 - Outfit equip/replace without detailed `Equipping [item] ...` chat spam.
+- Quest list refresh through the bridge.
+- Game object search results and copy frame through the bridge.
 - RTI controls through the bridge.
 - Pull Control frame through the bridge.
 - Combat strategy fine tuning through the bridge.
 - Disperse controls through the bridge with `disperse set <yards>` and `disperse disable`.
 - Loot rules through the bridge with `nc +loot`, `nc -loot` and `ll all|normal|gray|quest|skill`.
+- Loot Master UI for master-loot distribution with item tooltips, candidate scoring, profession/spec hints, saved preferences and recent loot history.
+- Bridge-visible bot discovery for AddClass bots, altbots and grouped randombots.
 - Custom glyph socket mapping and apply order.
 - Talent tab navigation stability after switching between tabs.
 - Automatic bot reconnect on login/reload for bots already present in the group or raid.
@@ -424,11 +490,11 @@ Kept intentionally:
 
 # Remaining Work
 
-The Outfits, RTI, Pull Control, Combat Strategy, Disperse and Loot Rules migrations are implemented. The next step is final stabilization and cleanup.
+The Outfits, RTI, Pull Control, Combat Strategy, Disperse, Loot Rules, Quest, Game Object, Character Info and Profession Recipe migrations are implemented. The Loot Master UI is also implemented as an optional client-side master-loot helper. The next step is final stabilization and cleanup.
 
 Planned follow-up work:
 
-- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, Inventory, Spellbook, Talents, Glyphs, Outfits, RTI, Pull Control, Combat Strategies, Disperse and Loot Rules.
+- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, PvP Stats, Inventory, Spellbook, Character Info, Profession Recipes, Talents, Glyphs, Outfits, Quests, Game Objects, RTI, Pull Control, Combat Strategies, Disperse, Loot Rules and Loot Master.
 - Verify that `MultiBot.allowLegacyChatFallback = false` prevents automatic legacy refresh spam on all migrated UI paths.
 - Keep manual diagnostic commands documented and functional.
 - Remove obsolete debug prints.
@@ -496,9 +562,41 @@ GET~INVENTORY
 GET~SPELLBOOK
 GET~GLYPHS
 GET~OUTFITS
+GET~BOT_SKILLS
+GET~PROFESSION_RECIPES
+GET~QUESTS
+GET~GAMEOBJECTS
 ```
 
 If these requests do not appear, the addon may not be connected to the bridge.
+
+</details>
+
+<details>
+<summary><strong>The Loot Master frame does not open</strong></summary>
+
+Check that:
+
+- The Loot Master UI option is enabled in the addon options.
+- The group loot method is set to Master Loot.
+- Your character is the detected master looter.
+- The opened loot contains relevant loot slots.
+
+The frame uses the client master-loot candidate API and enriches candidates with cached bridge details when available.
+
+</details>
+
+<details>
+<summary><strong>The Loot Master frame does not open</strong></summary>
+
+Check that:
+
+- The Loot Master UI option is enabled in the addon options.
+- The group loot method is set to Master Loot.
+- Your character is the detected master looter.
+- The opened loot contains relevant loot slots.
+
+The frame uses the client master-loot candidate API and enriches candidates with cached bridge details when available.
 
 </details>
 
