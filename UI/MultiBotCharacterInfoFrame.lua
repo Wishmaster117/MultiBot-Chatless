@@ -2,6 +2,8 @@ if not MultiBot then
     return
 end
 
+local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
+
 local CATEGORY_ORDER = { "class", "profession", "secondary", "weapon", "armor" }
 local CATEGORY_TITLES = {
     class = "Compétences de classe",
@@ -26,6 +28,43 @@ local function L(key, fallback)
     return fallback or key
 end
 
+local function createAceWindow(name, title, width, height, x)
+    if not AceGUI then
+        return nil
+    end
+
+    local widget = AceGUI:Create("Frame")
+    widget:SetTitle(title or "")
+    widget:SetWidth(width)
+    widget:SetHeight(height)
+    widget:SetLayout("Absolute")
+
+    if widget.EnableResize then
+        widget:EnableResize(false)
+    end
+
+    local frame = widget.frame
+    frame.aceWidget = widget
+    frame.content = widget.content or frame
+    frame:SetPoint("CENTER", UIParent, "CENTER", x or 0, 0)
+    frame:SetFrameStrata("DIALOG")
+    _G[name] = frame
+
+    return frame
+end
+
+local function setWindowTitle(frame, title)
+    if frame and frame.aceWidget and frame.aceWidget.SetTitle then
+        frame.aceWidget:SetTitle(title or "")
+    elseif frame and frame.title then
+        frame.title:SetText(title or "")
+    end
+end
+
+local function getFrameContent(frame)
+    return (frame and frame.content) or frame
+end
+
 local function setBackdrop(frame)
     frame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -45,15 +84,6 @@ local function createCloseButton(parent)
     return button
 end
 
-local function createTabButton(parent, text, x)
-    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -28)
-    button:SetWidth(112)
-    button:SetHeight(20)
-    button:SetText(text)
-    return button
-end
-
 local function setButtonEnabled(button, enabled)
     if not button then
         return
@@ -64,6 +94,15 @@ local function setButtonEnabled(button, enabled)
     else
         button:Disable()
     end
+end
+
+local function createTabButton(parent, text, x)
+    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -28)
+    button:SetWidth(112)
+    button:SetHeight(20)
+    button:SetText(text)
+    return button
 end
 
 local function createText(parent, template, point, x, y)
@@ -122,30 +161,21 @@ local function ensureRecipeFrame()
         return MultiBot.professionRecipeFrame
     end
 
-    local frame = CreateFrame("Frame", "MultiBotProfessionRecipeFrame", UIParent)
-    frame:SetWidth(430)
-    frame:SetHeight(450)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 130, 0)
-    frame:SetFrameStrata("DIALOG")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    setBackdrop(frame)
+    local frame = createAceWindow("MultiBotProfessionRecipeFrame", L("profession.recipes", "Recipes"), 430, 450, 130)
+    if not frame then
+        return nil
+    end
 
-    frame.title = createText(frame, "GameFontNormalLarge", "TOPLEFT", 16, -14)
-    createCloseButton(frame)
-
-    frame.status = createText(frame, "GameFontHighlightSmall", "TOPLEFT", 18, -42)
+    local content = getFrameContent(frame)
+    frame.status = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, -10)
     frame.rows = {}
     frame.page = 1
     frame.pageSize = 14
     frame.recipes = {}
 
     for i = 1, frame.pageSize do
-        local row = CreateFrame("Button", nil, frame)
-        row:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -62 - ((i - 1) * 25))
+        local row = CreateFrame("Button", nil, content)
+        row:SetPoint("TOPLEFT", content, "TOPLEFT", 18, -30 - ((i - 1) * 25))
         row:SetWidth(392)
         row:SetHeight(22)
         row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -174,16 +204,16 @@ local function ensureRecipeFrame()
         frame.rows[i] = row
     end
 
-    frame.prev = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.prev:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 18, 14)
+    frame.prev = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+    frame.prev:SetPoint("BOTTOMLEFT", content, "BOTTOMLEFT", 18, 8)
     frame.prev:SetWidth(48)
     frame.prev:SetHeight(20)
     frame.prev:SetText("<")
 
-    frame.pageText = createText(frame, "GameFontNormalSmall", "BOTTOM", 0, 18)
+    frame.pageText = createText(content, "GameFontNormalSmall", "BOTTOM", 0, 12)
 
-    frame.next = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.next:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 14)
+    frame.next = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+    frame.next:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -18, 8)
     frame.next:SetWidth(48)
     frame.next:SetHeight(20)
     frame.next:SetText(">")
@@ -230,8 +260,8 @@ local function ensureRecipeFrame()
         self.skill = skill
         self.recipes = recipes or {}
         self.page = 1
-        self.title:SetText((skill and skill.name or L("profession.recipes", "Recettes")) .. " - " .. (botName or ""))
-        self.status:SetText(#self.recipes .. " " .. L("profession.recipes.count", "recette(s) connue(s)"))
+        setWindowTitle(self, (skill and skill.name or L("profession.recipes", "Recipes")) .. " - " .. (botName or ""))
+        self.status:SetText(#self.recipes .. " " .. L("profession.recipes.count", "unknown recipe(s)"))
         self:render()
         self:Show()
     end
@@ -246,74 +276,88 @@ local function ensureCharacterFrame()
         return MultiBot.characterInfoFrame
     end
 
-    local frame = CreateFrame("Frame", "MultiBotCharacterInfoFrame", UIParent)
-    frame:SetWidth(390)
-    frame:SetHeight(450)
-    frame:SetPoint("CENTER", UIParent, "CENTER", -130, 0)
-    frame:SetFrameStrata("DIALOG")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    setBackdrop(frame)
+    local frame = createAceWindow("MultiBotCharacterInfoFrame", L("character.info", "Character info"), 390, 450, -130)
+    if not frame then
+        return nil
+    end
 
-    frame.title = createText(frame, "GameFontNormalLarge", "TOPLEFT", 16, -14)
-    createCloseButton(frame)
-
-    frame.skillsTab = createTabButton(frame, L("character.skills", "Compétences"), 16)
+    local content = getFrameContent(frame)
+    frame.skillsTab = createTabButton(content, L("character.skills", "Skills"), 16)
     setButtonEnabled(frame.skillsTab, false)
 
-    frame.status = createText(frame, "GameFontHighlightSmall", "TOPLEFT", 18, -56)
+    frame.status = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, -36)
     frame.rows = {}
     frame.skills = {}
 
-    for i = 1, 18 do
-        local row = CreateFrame("Button", nil, frame)
-        row:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -80 - ((i - 1) * 19))
-        row:SetWidth(350)
+    frame.scrollFrame = CreateFrame("ScrollFrame", "MultiBotCharacterInfoFrameSkillScrollFrame", content, "UIPanelScrollFrameTemplate")
+    frame.scrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, -58)
+    frame.scrollFrame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -32, 36)
+
+    frame.scrollChild = CreateFrame("Frame", "MultiBotCharacterInfoFrameSkillScrollChild", frame.scrollFrame)
+    frame.scrollChild:SetWidth(330)
+    frame.scrollChild:SetHeight(1)
+    frame.scrollFrame:SetScrollChild(frame.scrollChild)
+
+    local function ensureSkillRow(index)
+        if frame.rows[index] then
+            return frame.rows[index]
+        end
+
+        local row = CreateFrame("Button", nil, frame.scrollChild)
+        row:SetPoint("TOPLEFT", frame.scrollChild, "TOPLEFT", 0, -((index - 1) * 19))
+        row:SetWidth(330)
         row:SetHeight(18)
         row.text = createText(row, "GameFontHighlightSmall", "LEFT", 0, 0)
-        row.text:SetWidth(340)
+        row.text:SetWidth(320)
         row:SetScript("OnClick", function(self)
             if not self.skill then return end
             if self.skill.category ~= "profession" and self.skill.category ~= "secondary" then return end
             if MultiBot.Comm and MultiBot.Comm.RequestProfessionRecipes then
                 ensureRecipeFrame()
-                MultiBot.professionRecipeFrame.title:SetText(self.skill.name .. " - " .. (frame.botName or ""))
-                MultiBot.professionRecipeFrame.status:SetText(L("profession.recipes.loading", "Chargement..."))
+                setWindowTitle(MultiBot.professionRecipeFrame, self.skill.name .. " - " .. (frame.botName or ""))
+                MultiBot.professionRecipeFrame.status:SetText(L("profession.recipes.loading", "Loading..."))
                 MultiBot.professionRecipeFrame.recipes = {}
                 MultiBot.professionRecipeFrame:render()
                 MultiBot.professionRecipeFrame:Show()
                 MultiBot.Comm.RequestProfessionRecipes(frame.botName, self.skill.skillId)
             end
         end)
-        frame.rows[i] = row
+
+        frame.rows[index] = row
+        return row
     end
 
     frame.renderSkills = function(self)
         local ordered = {}
+
         for _, category in ipairs(CATEGORY_ORDER) do
             local categoryItems = {}
+
             for _, skill in ipairs(self.skills or {}) do
                 if skill.category == category then
                     table.insert(categoryItems, skill)
                 end
             end
+
             if #categoryItems > 0 then
                 table.insert(ordered, { header = CATEGORY_TITLES[category] or category })
                 table.sort(categoryItems, function(a, b) return tostring(a.name or "") < tostring(b.name or "") end)
+
                 for _, skill in ipairs(categoryItems) do
                     table.insert(ordered, { skill = skill })
                 end
             end
         end
 
-        self.status:SetText(#(self.skills or {}) .. " " .. L("character.skills.count", "compétence(s)"))
-        for i = 1, #self.rows do
-            local row = self.rows[i]
+        self.status:SetText(#(self.skills or {}) .. " " .. L("character.skills.count", "skill(s)"))
+
+        self.scrollChild:SetHeight(math.max(1, #ordered * 19))
+
+        for i = 1, #ordered do
+            local row = ensureSkillRow(i)
             local item = ordered[i]
             row.skill = item and item.skill or nil
+
             if not item then
                 row:Hide()
             elseif item.header then
@@ -326,12 +370,20 @@ local function ensureCharacterFrame()
                 row:Show()
             end
         end
+
+        for i = #ordered + 1, #self.rows do
+            local row = self.rows[i]
+            row.skill = nil
+            row:Hide()
+        end
+
+        self.scrollFrame:SetVerticalScroll(0)
     end
 
     frame.setSkills = function(self, botName, skills)
         self.botName = botName
         self.skills = skills or {}
-        self.title:SetText(L("character.info", "Infos personnage") .. " - " .. (botName or ""))
+        setWindowTitle(self, L("character.info", "Character info") .. " - " .. (botName or ""))
         self:renderSkills()
         self:Show()
     end
@@ -349,10 +401,10 @@ function MultiBot.OpenCharacterInfo(botName)
 
     local frame = ensureCharacterFrame()
     frame.botName = botName
-    frame.title:SetText(L("character.info", "Infos personnage") .. " - " .. botName)
+    setWindowTitle(frame, L("character.info", "Character info") .. " - " .. botName)
     frame.skills = {}
     frame:renderSkills()
-    frame.status:SetText(L("character.skills.loading", "Chargement..."))
+    frame.status:SetText(L("character.skills.loading", "Loading..."))
     frame:Show()
 
     if MultiBot.Comm and MultiBot.Comm.RequestBotSkills then
