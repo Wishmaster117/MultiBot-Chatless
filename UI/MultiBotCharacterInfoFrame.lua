@@ -6,14 +6,13 @@ local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
 
 local CATEGORY_ORDER = { "class", "profession", "secondary", "weapon", "armor" }
 
-local CATEGORY_TITLES = {
-    class = "Compétences de classe",
-    profession = "Métiers",
-    secondary = "Compétences secondaires",
-    weapon = "Compétences d'arme",
-    armor = "Armures",
+local CATEGORY_TITLE_KEYS = {
+    class = "character.skills.category.class",
+    profession = "character.skills.category.profession",
+    secondary = "character.skills.category.secondary",
+    weapon = "character.skills.category.weapon",
+    armor = "character.skills.category.armor",
 }
-
 
 local DIFFICULTY_COLORS = {
     orange = "|cffff8040",
@@ -30,12 +29,105 @@ local TOGGLE_PLUS_TEXTURE = "Interface\\Buttons\\UI-PlusButton-Up"
 local TOGGLE_MINUS_TEXTURE = "Interface\\Buttons\\UI-MinusButton-Up"
 local TOGGLE_DISABLED_TEXTURE = "Interface\\Buttons\\UI-PlusButton-Disabled"
 
+local SKILL_DISPLAY_SPELL_IDS = {
+    [171] = 2259, -- Alchemy
+    [164] = 2018, -- Blacksmithing
+    [333] = 7411, -- Enchanting
+    [202] = 4036, -- Engineering
+    [182] = 2366, -- Herbalism
+    [773] = 45357, -- Inscription
+    [755] = 25229, -- Jewelcrafting
+    [165] = 2108, -- Leatherworking
+    [186] = 2575, -- Mining
+    [393] = 8613, -- Skinning
+    [197] = 3908, -- Tailoring
+    [185] = 2550, -- Cooking
+    [129] = 3273, -- First Aid
+    [356] = 7620, -- Fishing
+    [43] = 201, -- Swords
+    [44] = 196, -- Axes
+    [45] = 264, -- Bows
+    [46] = 266, -- Guns
+    [54] = 198, -- Maces
+    [55] = 202, -- Two-Handed Swords
+    [95] = 204, -- Defense
+    [118] = 674, -- Dual Wield
+    [136] = 227, -- Staves
+    [160] = 199, -- Two-Handed Maces
+    [162] = 203, -- Unarmed
+    [172] = 197, -- Two-Handed Axes
+    [173] = 1180, -- Daggers
+    [176] = 2567, -- Thrown
+    [226] = 5011, -- Crossbows
+    [228] = 5009, -- Wands
+    [229] = 200, -- Polearms
+    [473] = 15590, -- Fist Weapons
+    [293] = 750, -- Plate Mail
+    [413] = 8737, -- Mail
+    [414] = 9077, -- Leather
+    [415] = 9078, -- Cloth
+    [433] = 9116, -- Shield
+}
+
+local function getClientSkillName(skill)
+    local spellId = tonumber(skill and (skill.displaySpellId or SKILL_DISPLAY_SPELL_IDS[tonumber(skill.skillId or 0) or 0]) or 0) or 0
+    if spellId <= 0 or not GetSpellInfo then
+        return nil
+    end
+
+    local name = GetSpellInfo(spellId)
+    if type(name) == "string" and name ~= "" then
+        return name
+    end
+    return nil
+end
+
 local function L(key, fallback)
     if MultiBot.L then
         return MultiBot.L(key, fallback)
     end
 
     return fallback or key
+end
+
+local function getCategoryTitle(category)
+    return L(CATEGORY_TITLE_KEYS[category] or "", category)
+end
+
+local function localizedOrNil(key)
+    local value = L(key)
+    if value ~= key then
+        return value
+    end
+    return nil
+end
+
+local function getSkillDisplayName(skill)
+    if type(skill) ~= "table" then
+        return ""
+    end
+
+    local clientName = getClientSkillName(skill)
+    if clientName then
+        return clientName
+    end
+
+    local key = tostring(skill.key or "")
+    if key ~= "" then
+        if skill.category == "profession" or skill.category == "secondary" then
+            local professionName = localizedOrNil("lootmaster.profession." .. key)
+            if professionName then
+                return professionName
+            end
+        end
+
+        local skillName = localizedOrNil("character.skills.skill." .. key)
+        if skillName then
+            return skillName
+        end
+    end
+
+    return skill.name or skill.key or ("Skill " .. tostring(skill.skillId or 0))
 end
 
 local function addSimpleBackdrop(frame, bgAlpha)
@@ -322,7 +414,7 @@ local function ensureRecipeFrame()
         self.skill = skill
         self.recipes = recipes or {}
         self.page = 1
-        setWindowTitle(self, (skill and skill.name or L("profession.recipes", "Recipes")) .. " - " .. (botName or ""))
+        setWindowTitle(self, (skill and getSkillDisplayName(skill) or L("profession.recipes", "Recipes")) .. " - " .. (botName or ""))
         self.status:SetText(#self.recipes .. " " .. L("profession.recipes.count", "unknown recipe(s)"))
         self:render()
         self:Show()
@@ -344,16 +436,14 @@ local function ensureCharacterFrame()
     end
 
     local content = getFrameContent(frame)
-    frame.skillsTab = createTabButton(content, L("character.skills", "Skills"), 16)
-    setButtonEnabled(frame.skillsTab, false)
 
-    frame.status = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, -36)
+    frame.status = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, -10)
     frame.rows = {}
     frame.skills = {}
     frame.collapsedCategories = frame.collapsedCategories or {}	
 
     frame.scrollFrame = CreateFrame("ScrollFrame", "MultiBotCharacterInfoFrameSkillScrollFrame", content, "UIPanelScrollFrameTemplate")
-    frame.scrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, -58)
+    frame.scrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, -32)
     frame.scrollFrame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -28, 36)
 
     frame.scrollChild = CreateFrame("Frame", "MultiBotCharacterInfoFrameSkillScrollChild", frame.scrollFrame)
@@ -420,7 +510,7 @@ local function ensureCharacterFrame()
             if self.skill.category ~= "profession" and self.skill.category ~= "secondary" then return end
             if MultiBot.Comm and MultiBot.Comm.RequestProfessionRecipes then
                 ensureRecipeFrame()
-                setWindowTitle(MultiBot.professionRecipeFrame, self.skill.name .. " - " .. (frame.botName or ""))
+                setWindowTitle(MultiBot.professionRecipeFrame, getSkillDisplayName(self.skill) .. " - " .. (frame.botName or ""))
                 MultiBot.professionRecipeFrame.status:SetText(L("profession.recipes.loading", "Loading..."))
                 MultiBot.professionRecipeFrame.recipes = {}
                 MultiBot.professionRecipeFrame:render()
@@ -470,7 +560,7 @@ local function ensureCharacterFrame()
         row.bar:SetValue(math.min(value, max))
         row.bar:Show()
 
-        row.nameText:SetText((clickable and "|cffffcc00" or "|cffffffff") .. (skill.name or skill.key or ("Skill " .. tostring(skill.skillId))) .. "|r")
+        row.nameText:SetText((clickable and "|cffffcc00" or "|cffffffff") .. getSkillDisplayName(skill) .. "|r")
         row.nameText:Show()
 
         row.valueText:SetText("|cffffffff" .. getSkillBarText(skill) .. "|r")
@@ -493,8 +583,8 @@ local function ensureCharacterFrame()
             end
 
             if #categoryItems > 0 then
-                table.insert(ordered, { header = CATEGORY_TITLES[category] or category, category = category })
-                table.sort(categoryItems, function(a, b) return tostring(a.name or "") < tostring(b.name or "") end)
+                table.insert(ordered, { header = getCategoryTitle(category), category = category })
+                table.sort(categoryItems, function(a, b) return getSkillDisplayName(a) < getSkillDisplayName(b) end)
 
                 if not self.collapsedCategories[category] then
                     for _, skill in ipairs(categoryItems) do
