@@ -103,6 +103,9 @@ local function ensureBridgeState()
   state.quests = state.quests or {}
   state.questSeq = state.questSeq or 0
   state.questActive = state.questActive or {}
+  state.gameObjects = state.gameObjects or {}
+  state.gameObjectSeq = state.gameObjectSeq or 0
+  state.gameObjectActive = state.gameObjectActive or {}  
   state.talentSpecs = state.talentSpecs or {}
   state.talentSpecSeq = state.talentSpecSeq or 0
   state.talentSpecActive = state.talentSpecActive or nil
@@ -472,6 +475,30 @@ function Comm.RequestQuests(mode, name)
 
   if not Comm.Send("GET", "QUESTS~" .. mode .. "~" .. name .. "~" .. token) then
     state.questActive[token] = nil
+    return false
+  end
+
+  return token
+end
+
+function Comm.RequestGameObjects(name)
+  local state = ensureBridgeState()
+  if not state.connected and not state.bootstrapPending then
+    return false
+  end
+
+  name = trim(name)
+  state.gameObjectSeq = (tonumber(state.gameObjectSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-gob-" .. tostring(state.gameObjectSeq)
+
+  state.gameObjectActive[token] = {
+    botName = name,
+    isGroup = name == "",
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("GET", "GAMEOBJECTS~" .. name .. "~" .. token) then
+    state.gameObjectActive[token] = nil
     return false
   end
 
@@ -1036,6 +1063,68 @@ function Comm.ApplyQuestDonePayload(payload)
   end
 
   debugPrint("ADDON:RX", "QUESTS_DONE", mode)
+  return true
+end
+
+local function getActiveGameObjectRequest(token)
+  local state = ensureBridgeState()
+  token = trim(token)
+  if token == "" then
+    return nil
+  end
+  return state.gameObjectActive and state.gameObjectActive[token] or nil
+end
+
+function Comm.ApplyGameObjectBeginPayload(payload)
+  local botName, token = splitOnce(payload or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  if botName == "" or not getActiveGameObjectRequest(token) then
+    return false
+  end
+  ensureRuntimeTable("LastGameObjectSearch")[botName] = {}
+  debugPrint("ADDON:RX", "GAMEOBJECTS_BEGIN", botName)
+  return true
+end
+
+function Comm.ApplyGameObjectItemPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, encodedLine = splitOnce(rest or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  if botName == "" or not getActiveGameObjectRequest(token) then
+    return false
+  end
+  local store = ensureRuntimeTable("LastGameObjectSearch")
+  store[botName] = store[botName] or {}
+  table.insert(store[botName], urlDecodeField(encodedLine))
+  return true
+end
+
+function Comm.ApplyGameObjectEndPayload(payload)
+  local botName, token = splitOnce(payload or "", "~")
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  if botName == "" or not getActiveGameObjectRequest(token) then
+    return false
+  end
+  debugPrint("ADDON:RX", "GAMEOBJECTS_END", botName)
+  return true
+end
+
+function Comm.ApplyGameObjectDonePayload(payload)
+  local token = trim(payload or "")
+  local state = ensureBridgeState()
+  local request = getActiveGameObjectRequest(token)
+  if not request then
+    return false
+  end
+  state.gameObjectActive[token] = nil
+  state.gameObjects.lastDoneAt = safeNow()
+  if MultiBot.OnBridgeGameObjectsDone then
+    MultiBot.OnBridgeGameObjectsDone(request)
+  end
+  debugPrint("ADDON:RX", "GAMEOBJECTS_DONE")
   return true
 end
 
@@ -1661,6 +1750,30 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "GAMEOBJECTS_BEGIN" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyGameObjectBeginPayload(payload)
+  end
+
+  if opcode == "GAMEOBJECTS_ITEM" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyGameObjectItemPayload(payload)
+  end
+
+  if opcode == "GAMEOBJECTS_END" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyGameObjectEndPayload(payload)
+  end
+
+  if opcode == "GAMEOBJECTS_DONE" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyGameObjectDonePayload(payload)
+  end
+
   if opcode == "INV_BEGIN" then
     local botName, token = splitOnce(payload or "", "~")
     state.connected = true
@@ -1919,6 +2032,8 @@ function Comm.OnPlayerEnteringWorld()
   state.pvpStats = {}
   state.quests = {}
   state.questActive = {}
+  state.gameObjects = {}
+  state.gameObjectActive = {}
   state.talentSpecs = {}
   state.talentSpecActive = nil
   state.inventoryActive = nil
