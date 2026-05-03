@@ -9,7 +9,7 @@ Ce document suit les commandes `mod-playerbots` encore intéressantes à intégr
 - les commandes serveur/admin à ne pas intégrer dans l'addon ;
 - les priorités d'intégration bridge-first/chatless.
 
-Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies, Disperse et Loot Rules :  
+Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Profession Recipes, Craft et Loot Master :
 **éviter le spam chat automatique**, utiliser le bridge quand c'est possible, et conserver les commandes manuelles utiles comme `who`, `co ?`, `nc ?`, `ss ?`.
 
 ---
@@ -23,20 +23,26 @@ Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats
 | Roster / Units | Fait | Peuplement via bridge, sans dépendre du spam `.playerbot bot list` côté UI. |
 | States | Fait | Récupération structurée via bridge. |
 | Inventory | Fait | Fenêtre inventaire alimentée par `GET~INVENTORY`, sans parsing chat automatique. |
-| Spellbook | Fait | Migré vers bridge, avec logs serveur, sans spam chat automatique. |
+| Spellbook | Fait | Migré vers bridge, avec logs serveur, sans spam chat automatique, et filtrage des recettes métiers hors spellbook combat. |
 | Glyphs | Fait | Endpoint bridge ajouté et UI alimentée par payloads structurés. |
 | Talent specs | Partiel/Fait | Liste/specs présentes côté UI/bridge, à consolider selon les prochains besoins. |
 | Stats / PvP stats | Fait | Requêtes bridge présentes. |
 | Quests | Présent | UI quêtes existante, pas à mélanger avec les commandes manuelles de diagnostic. |
 | Outfits | Fait | Endpoint bridge + commandes outfits intégrées. |
+| Character Info / Skills | Fait | Nouvelle frame infos personnage alimentée par `GET~BOT_SKILLS`, catégories skills/professions/armes, noms localisés via le client quand possible. |
+| Profession recipes | Fait | Nouvelle frame recettes par métier via `GET~PROFESSION_RECIPES`, composants, compte craftable, recettes à résultat direct ou indirect. |
+| Profession recipe craft | Fait | Bouton `Créer` via `RUN~CRAFT_RECIPE`, support recettes classiques et résultats aléatoires/indirects, erreurs détaillées. |
 | RTI / Target Icons | Fait | UI complète + bridge `RUN~RTI`, scopes `ALL`, `GROUP`, `BOT`. |
-| Pull Control | Fait / à fignoler | Mini-frame MainBar + bridge `RUN~COMBAT`, séquences de commandes, scopes et presets. |
-| Combat Strategies | Fait / à tester large | Toggles individuels dans les EveryBars + mini-frame Party/Raid, via `RUN~COMBAT`. |
-| Disperse | Fait / à tester large | Mini-frame MainBar + bridge `RUN~POSITION`, distance 1-100 yards et disable. |
+| Pull Control | Fait | Mini-frame MainBar + bridge `RUN~COMBAT`, séquences de commandes, scopes et presets. |
+| Combat Strategies | Fait | Toggles individuels dans les EveryBars + mini-frame Party/Raid, via `RUN~COMBAT`. |
+| Disperse | Fait | Mini-frame MainBar + bridge `RUN~POSITION`, distance 1-100 yards et disable. |
+| Loot Rules | Fait | Mini-frame MainBar + bridge `RUN~LOOT`, profils prédéfinis, bouton masquable via switch persistant. |
+| Loot Master | Fait | Nouvelle frame de gestion master loot côté addon, debug désactivé pour éviter le spam chat. |
+| MainBar switches | Fait | Switch Creator, Beast Master, Disperse et Loot Rules persistants, avec relayout des boutons visibles. |
 
 ---
 
-## Derniers lots terminés : Pull Control + Combat Strategies + Disperse + Loot Rules
+## Derniers lots terminés : Pull Control + Combat Strategies + Disperse + Loot Rules + Character Info + Craft + Loot Master
 
 ### Pull Control
 
@@ -132,6 +138,88 @@ Fonctionnalités terminées :
 - comportement en groupe complet et raid ;
 - interaction avec les mécaniques de déplacement existantes des bots ;
 - lisibilité/position exacte de la mini-frame selon les résolutions et skins UI.
+
+### Loot Rules
+
+Le bloc `Loot Rules` a été ajouté pour gérer rapidement les profils de loot sans repasser par le chat.
+
+Fonctionnalités terminées :
+
+- bouton `Loot Rules` ajouté dans la MainBar ;
+- mini-frame compacte avec profils de loot prédéfinis ;
+- endpoint bridge `RUN~LOOT~<scope>~<target>~<token>~<command>` ;
+- whitelist serveur limitée aux commandes de loot attendues ;
+- activation/désactivation loot via `nc +loot` / `nc -loot` ;
+- profils `ll all`, `ll normal` et `ll gray` ;
+- ACK bridge `LOOT_ACK` ;
+- bouton principal masquable par un switch dédié dans la barre de contrôle ;
+- état du switch mémorisé dans les SavedVariables.
+
+À garder en tête :
+
+- `ll quest` et `ll skill` doivent rester à traiter avec prudence, car ils ne correspondent pas à de vrais profils natifs distincts dans l'état actuel vérifié côté `mod-playerbots` ;
+- `ll [item]` et `ll -[item]` restent des améliorations futures possibles depuis l'inventaire.
+
+### Character Info / Skills
+
+La nouvelle frame `Infos personnage` expose les compétences du bot sans dépendre d'un spellbook trop large ni d'un parsing chat.
+
+Fonctionnalités terminées :
+
+- endpoint bridge `GET~BOT_SKILLS~<bot>~<token>` ;
+- payloads structurés `BOT_SKILLS_BEGIN`, `BOT_SKILLS_ITEM`, `BOT_SKILLS_END` ;
+- catégories `class`, `profession`, `secondary`, `weapon`, `armor` ;
+- barres de niveau actuelles/max comme dans une frame Blizzard ;
+- noms localisés via les données du client quand c'est possible ;
+- fallback texte serveur conservé si le client ne sait pas localiser une compétence ;
+- compatibilité AddClass bots, altbots et randombots groupés ;
+- clic sur un métier ou une compétence secondaire pour ouvrir la frame recettes quand des recettes existent.
+
+### Profession Recipes / Craft
+
+La frame recettes métier permet maintenant de consulter et lancer les crafts connus par un bot via bridge.
+
+Fonctionnalités terminées :
+
+- endpoint bridge `GET~PROFESSION_RECIPES~<bot>~<skillId>~<token>` ;
+- payloads structurés `PROFESSION_RECIPES_BEGIN`, `PROFESSION_RECIPES_ITEM`, `PROFESSION_RECIPES_END` ;
+- affichage des recettes connues par métier ;
+- composants requis et quantité disponible côté bot ;
+- compte craftable calculé depuis l'inventaire du bot ;
+- coloration/état du bouton `Créer` selon la possibilité de craft ;
+- support des recettes à résultat direct via `itemId` ;
+- support des recettes à résultat indirect ou aléatoire via `spellId`, par exemple les cartes de calligraphie ;
+- endpoint bridge `RUN~CRAFT_RECIPE~<bot>~<token>~<skillId>~<spellId>~<itemId>` ;
+- retour structuré `PROFESSION_RECIPE_CRAFT` avec `OK` ou `ERR` et raison ;
+- messages d'échec plus parlants côté addon, notamment feu de cuisine requis, déplacement du bot, outil/focus requis, sort non prêt ou cast refusé ;
+- refresh différé de la liste après un craft réussi.
+
+### Loot Master
+
+La frame `Master Loot` a été ajoutée côté addon pour préparer une attribution plus lisible du loot.
+
+Fonctionnalités terminées :
+
+- frame dédiée au Master Loot ;
+- affichage des candidats ;
+- score/préférences/historique récent côté addon ;
+- exploitation des données déjà remontées par le bridge quand disponibles : inventaire, détails, équipement, professions ;
+- ouverture/usage séparé des règles de loot ;
+- debug désactivé pour éviter le spam chat à chaque loot.
+
+### MainBar switches
+
+La barre de contrôle a été ajustée pour éviter d'encombrer la MainBar avec des boutons rarement nécessaires.
+
+Fonctionnalités terminées :
+
+- switch `Creator` existant conservé ;
+- switch `Beast Master` existant conservé ;
+- nouveau switch `Disperse` ;
+- nouveau switch `Loot Rules` ;
+- tooltips multilangues `Switch Disperse` et `Switch Loot Rules` ;
+- persistance SavedVariables de l'état visible/caché ;
+- relayout des boutons visibles pour que `Flee` et `Stay/Follow` restent directement après `Formation` quand les boutons optionnels sont cachés.
 
 ---
 
@@ -388,6 +476,12 @@ POSITION_ACK~ALL~~<token>~<executed>~disperse disable
 
 ## Priorité 5 - Loot Rules / Loot List
 
+### Statut
+
+**Terminé côté MultiBot + bridge pour les profils fiables et l'activation/désactivation loot.**
+
+Le sujet reste ouvert uniquement pour les ajouts/retraits d'items précis et la décision autour des profils `Quest`, `Skill` et `Disenchant`.
+
 ### Pourquoi
 
 Le contrôle du loot est utile, mais moins prioritaire que RTI/pull/combat/disperse.
@@ -401,14 +495,15 @@ Le contrôle du loot est utile, mais moins prioritaire que RTI/pull/combat/dispe
 | `ll all` | Fait | Moyenne | Profil Loot All via `RUN~LOOT` |
 | `ll normal` | Fait | Moyenne | Profil Normal via `RUN~LOOT` |
 | `ll gray` | Fait | Moyenne | Profil Gray via `RUN~LOOT` |
-| `ll quest` | Fait | Moyenne | Profil Quest via `RUN~LOOT` |
-| `ll skill` | Fait | Moyenne | Profil Skill via `RUN~LOOT` |
+| `ll quest` | À corriger / à vérifier | Moyenne | Ne pas considérer fiable tant que le profil natif n'est pas confirmé côté `mod-playerbots` |
+| `ll skill` | À corriger / à vérifier | Moyenne | Ne pas considérer fiable tant que le profil natif n'est pas confirmé côté `mod-playerbots` |
+| `ll disenchant` | À ajouter si besoin | Moyenne | Profil natif à préférer si l'UI expose un profil désenchantement |
 | `ll [item]` | Manquant | Basse | Ajouter item depuis inventaire |
 | `ll -[item]` | Manquant | Basse | Retirer item depuis inventaire |
 
 ### Proposition UI
 
-Loot Rules` est désormais exposé par une mini-frame de profils prédéfinis.
+`Loot Rules` est désormais exposé par une mini-frame de profils prédéfinis.
 
 Les commandes `ll [item]` et `ll -[item]` peuvent être ajoutées plus tard via clic droit sur item dans l'inventaire bridge.
 
@@ -450,7 +545,7 @@ Pas besoin de parsing automatique de réponses longues, sauf si une future UI ve
 
 ### Pourquoi
 
-L'inventaire bridge-first est déjà en place. Ces commandes sont des améliorations secondaires.
+L'inventaire bridge-first est déjà en place, et le craft de recettes métier passe maintenant par le bridge. Les commandes restantes sont des améliorations secondaires autour des items ponctuels, de la vente, de l'ouverture d'objets et des enchantements ciblant un item.
 
 ### Commandes à couvrir
 
@@ -461,6 +556,9 @@ L'inventaire bridge-first est déjà en place. Ces commandes sont des améliorat
 | `s *` | Déjà présent côté addon, legacy whisper, pas encore bridge-first | Moyenne | Bouton Sell Gray existant |
 | `s vendor` | Déjà présent côté addon inventaire, legacy whisper item par item, pas encore bridge-first | Moyenne | Bouton Sell Vendor existant |
 | `open items` | Déjà présent côté addon, legacy whisper | Moyenne | Bouton dans inventaire existant |
+| Craft recette métier | Fait | Moyenne | Frame recettes + bouton `Créer` via `RUN~CRAFT_RECIPE` |
+| Craft recette à résultat aléatoire / indirect | Fait | Moyenne | Support `spellId` sans `itemId`, par exemple cartes de calligraphie |
+| Enchanter un item | Manquant / à étudier | Moyenne | UI dédiée probable, avec cible item/sort et garde-fous |
 | `bank [item]` | Manquant | Basse | Clic droit item |
 | `bank -[item]` | Manquant | Basse | UI banque |
 | `gb [item]` | Manquant | Basse | Clic droit item |
@@ -546,11 +644,17 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 |---:|---|---|---:|---:|
 | 1 | RTI bridge-first | UI + bridge command | Haute | Fait |
 | 2 | Pull Control avancé | Nouvelle UI + séquences commandes | Haute | Fait / à fignoler |
-| 3 | Advanced Combat Strategies | EveryBars + mini-frame Party/Raid via `RUN~COMBAT` | Haute/Moyenne | Fait / à tester |
-| 4 | Disperse | Petite UI + commande positionnement via `RUN~POSITION` | Moyenne | Fait / à tester |
-| 5 | Loot Rules | Petite UI profils + bridge `RUN~LOOT` | Moyenne | Fait / à tester |
-| 6 | Trainer / Maintenance extras | UI maintenance | Moyenne/Basse | À faire |
-| 7 | Items avancés | Extensions inventaire | Basse/Moyenne | À faire |
+| 3 | Advanced Combat Strategies | EveryBars + mini-frame Party/Raid via `RUN~COMBAT` | Haute/Moyenne | Fait |
+| 4 | Disperse | Petite UI + commande positionnement via `RUN~POSITION` | Moyenne | Fait |
+| 5 | Loot Rules | Petite UI profils + bridge `RUN~LOOT` | Moyenne | Fait, profils `Quest`/`Skill` à corriger si conservés |
+| 6 | Character Info / Skills | Nouvelle frame + endpoint skills | Moyenne | Fait |
+| 7 | Profession recipes / Craft | Frame recettes + `RUN~CRAFT_RECIPE` | Moyenne | Fait |
+| 8 | Loot Master | Nouvelle frame addon + données bridge disponibles | Moyenne | Fait |
+| 9 | Roll | Commandes ponctuelles loot/items | Moyenne | À faire |
+| 10 | Ventes / Open items bridge-first | Migration de commandes déjà exposées côté addon | Moyenne | À faire |
+| 11 | Enchantements d'items | UI dédiée et garde-fous | Moyenne | À étudier |
+| 12 | Trainer / Maintenance extras | UI maintenance | Moyenne/Basse | À faire |
+| 13 | Items avancés banque/guild bank/buy | Extensions inventaire | Basse/Moyenne | À faire |
 
 ---
 
@@ -559,11 +663,12 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 - Toute nouvelle commande utilisée automatiquement par l'addon devrait passer par le bridge quand possible.
 - Les commandes manuelles informatives doivent rester fonctionnelles en whisper/party/raid.
 - Ne pas réintroduire de parsing chat automatique pour peupler l'UI.
-- Pour les commandes qui ne nécessitent aucun retour structuré, un endpoint générique de type `RUN~COMMAND` ou un endpoint spécialisé comme `RUN~RTI` / `RUN~COMBAT` / `RUN~POSITION` peut suffire.
+- Pour les commandes qui ne nécessitent aucun retour structuré, un endpoint générique de type `RUN~COMMAND` ou un endpoint spécialisé comme `RUN~RTI` / `RUN~COMBAT` / `RUN~POSITION` / `RUN~LOOT` peut suffire.
 - Pour les commandes qui doivent alimenter une frame, préférer un endpoint structuré dédié.
+- Pour les actions de craft, garder un retour structuré avec raison d'échec exploitable par l'addon, comme `PROFESSION_RECIPE_CRAFT`.
 - Les commandes serveur/admin ne doivent pas être exposées dans l'addon utilisateur.
 - Les boutons ajoutés dans les barres doivent conserver une position cohérente avec `MultiBotLeftCoreUI.lua` et la position par défaut de `MultiBar` dans `MultiBotInit.lua` / reset dans `MultiBotMainUI.lua`.
-- Les tooltips nouvellement ajoutés doivent passer par AceLocale, comme les tooltips RTI, Pull Control et Combat Strategies.
+- Les tooltips nouvellement ajoutés doivent passer par AceLocale, comme les tooltips RTI, Pull Control, Combat Strategies, Switch Disperse et Switch Loot Rules.
 - `RUN~COMBAT`, `RUN~POSITION` et `RUN~LOOT` doivent rester whitelistés côté bridge : ne pas en faire des exécuteurs libres de n'importe quelle commande chat.
 - Éviter les doublons UI : si une stratégie dispose déjà d'un bouton EveryBar dédié, ne pas la rajouter dans une nouvelle frame sauf besoin UX clairement identifié.
 
@@ -571,9 +676,9 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 
 ## Point logique suivant
 
-Le prochain bloc logique conseillé est **Roll + migration optionnelle des ventes existantes vers bridge**.
+Le prochain bloc logique conseillé est **Roll + migration optionnelle des ventes/open items vers bridge + étude des enchantements d'items**.
 
-Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse et Loot Rules couvrent maintenant le ciblage, le pull, les stratégies combat, le positionnement collectif et les profils de loot. Après vérification du code actuel, la vente grise et la vente vendor existent déjà côté addon, mais restent en legacy whisper et ne sont pas encore bridge-first.
+Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Profession Recipes, Craft et Loot Master couvrent maintenant le ciblage, le pull, les stratégies combat, le positionnement collectif, les profils de loot, les compétences, les recettes métier, le craft et la préparation du master loot. Après vérification du code actuel, la vente grise, la vente vendor et `open items` existent déjà côté addon, mais restent en legacy whisper et ne sont pas encore bridge-first.
 
 État précis des commandes items/loot ponctuelles :
 
@@ -581,13 +686,16 @@ Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse et Loot Rules 
 - `roll [item]` : Manquant ;
 - `s *` : Déjà présent côté addon, legacy whisper, pas encore bridge-first ;
 - `s vendor` : Déjà présent côté addon inventaire, legacy whisper item par item, pas encore bridge-first ;
-- `open items` : Déjà présent côté addon, legacy whisper.
+- `open items` : Déjà présent côté addon, legacy whisper ;
+- enchantement d'un item précis : manquant / à étudier avec une UI dédiée ;
+- `ll [item]` / `ll -[item]` : manquant, amélioration possible depuis l'inventaire.
 
 Proposition de prochaine itération, plus tard :
 
-- ajouter `roll` / `roll [item]`, car c'est le vrai manque fonctionnel restant dans ce bloc ;
+- ajouter `roll` / `roll [item]`, car c'est le vrai manque fonctionnel restant dans le bloc loot ponctuel ;
 - ne pas recréer de boutons `s *`, `s vendor` ou `open items`, car ils existent déjà côté addon ;
 - décider si les ventes existantes doivent passer par un endpoint dédié ou par un endpoint existant whitelisté ;
 - éviter toute vente automatique dangereuse sans action explicite de l'utilisateur ;
+- étudier une UI d'enchantement d'item séparée du craft métier classique, car elle doit cibler un item et prévoir plus de garde-fous ;
 - garder les commandes informatives manuelles inchangées ;
-- A noter que `Quest` et `Skill` devront être remplacés plus tard par `Disenchant`, ou devenir de vrais profils ajoutés côté `mod-playerbots` avant exposition définitive ;
+- noter que `Quest` et `Skill` devront être remplacés plus tard par `Disenchant`, ou devenir de vrais profils ajoutés côté `mod-playerbots` avant exposition définitive.

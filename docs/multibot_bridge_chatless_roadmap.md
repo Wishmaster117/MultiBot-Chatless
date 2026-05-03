@@ -1,6 +1,6 @@
 # MultiBot / Bridge — roadmap chatless
 
-Dernière mise à jour : 2026-04-26
+Dernière mise à jour : 2026-05-03
 
 ## Objectif exact
 
@@ -106,7 +106,33 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] `Comm.RequestSpellbook(name)`
 - [x] Ouverture du spellbook via bridge
 - [x] Remplissage du spellbook via bridge
+- [x] Filtrage des recettes métiers, métiers secondaires et skills hors spellbook combat
 - [x] Fallback whisper `spells` réactivable uniquement via `MultiBot.allowLegacyChatFallback = true`
+
+### Character Info / Skills
+
+- [x] Endpoint côté bridge : `GET~BOT_SKILLS~<bot>~<token>`
+- [x] Réponses en paquets courts : `BOT_SKILLS_BEGIN`, `BOT_SKILLS_ITEM`, `BOT_SKILLS_END`
+- [x] Nouvelle frame `MultiBotCharacterInfoFrame`
+- [x] Affichage séparé des compétences de classe, métiers, métiers secondaires, compétences d'arme et armures
+- [x] Noms de compétences localisés via les données client quand possible
+- [x] Clic sur un métier ou métier secondaire pour ouvrir la frame recettes
+- [x] Fonctionne avec AddClass bots, altbots et randombots groupés visibles par la bridge
+
+### Profession recipes / Craft
+
+- [x] Endpoint côté bridge : `GET~PROFESSION_RECIPES~<bot>~<skillId>~<token>`
+- [x] Réponses en paquets courts : `PROFESSION_RECIPES_BEGIN`, `PROFESSION_RECIPES_ITEM`, `PROFESSION_RECIPES_END`
+- [x] Nouvelle frame recettes ouverte depuis `MultiBotCharacterInfoFrame`
+- [x] Affichage des recettes connues, couleurs de difficulté, composants et nombre craftable
+- [x] Support des recettes avec item de résultat direct
+- [x] Support des recettes à résultat indirect ou aléatoire via `spellId`, par exemple cartes de calligraphie
+- [x] Endpoint côté bridge : `RUN~CRAFT_RECIPE~<bot>~<token>~<skillId>~<spellId>~<itemId>`
+- [x] Réponse d'action : `PROFESSION_RECIPE_CRAFT~<bot>~<token>~<skillId>~<spellId>~<itemId>~OK|ERR~<reason>`
+- [x] Bouton `Créer` par recette, désactivé uniquement si la recette n'est pas craftable ou déjà en attente
+- [x] Messages d'erreur détaillés : feu de cuisine requis, bot en mouvement, outil/focus requis, recette pas prête, cast refusé
+- [x] Refresh différé des recettes après craft lancé
+- [x] Aucun changement requis dans `mod-playerbots` : le bridge lance le sort métier connu par le bot
 
 ### PVP Stats
 
@@ -201,6 +227,21 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Pas de parsing automatique de réponse `nc ?` ou `ll`
 - [x] Les commandes manuelles informatives restent disponibles
 
+### Loot Master
+
+- [x] Nouvelle frame Loot Master côté addon
+- [x] Ouverture automatique optionnelle pendant les loots en mode responsable du butin
+- [x] Liste de candidats, scoring, préférences et historique récent
+- [x] Lien avec les données bridge disponibles : inventaire, détails bot, professions et équipement
+- [x] Debug Loot Master désactivé pour éviter le spam chat à chaque loot
+
+### Main bar / boutons switch
+
+- [x] Boutons `Switch Loot Rules` et `Switch Disperse`
+- [x] Persistance SavedVariables du choix affiché/caché
+- [x] Comportement aligné avec les switches Creator et Beast Master
+- [x] Relayout des boutons pour éviter que Flee / Stay-Follow restent trop loin quand les boutons optionnels sont cachés
+
 ---
 
 ## Règle importante sur les payloads volumineux
@@ -217,6 +258,8 @@ Avec beaucoup de bots, éviter les réponses globales trop grosses.
 - `GET~TALENT_SPEC_LIST` répond en paquets `TALENT_SPEC_BEGIN` / `TALENT_SPEC_ITEM` / `TALENT_SPEC_END` ;
 - `GET~GLYPHS` répond en paquets `GLYPHS_BEGIN` / `GLYPHS_ITEM` / `GLYPHS_END` ;
 - `GET~OUTFITS` répond en paquets `OUTFITS_BEGIN` / `OUTFITS_ITEM` / `OUTFITS_END` ;
+- `GET~BOT_SKILLS` répond en paquets `BOT_SKILLS_BEGIN` / `BOT_SKILLS_ITEM` / `BOT_SKILLS_END` ;
+- `GET~PROFESSION_RECIPES` répond en paquets `PROFESSION_RECIPES_BEGIN` / `PROFESSION_RECIPES_ITEM` / `PROFESSION_RECIPES_END` ;
 - un paquet global vide peut seulement servir de réponse vide si aucun bot n’est disponible.
 
 ---
@@ -250,6 +293,12 @@ La lecture des glyphes n’est plus dépendante du whisper `glyphs` quand la bri
 ### Outfits
 
 Les Outfits sont maintenant migrés en bridge-first. La liste des tenues ne dépend plus du parsing automatique `outfit ?`, et les actions `update`, `reset`, `equip` et `replace` passent par `RUN~OUTFIT`. Le bridge traite directement les actions nécessaires pour éviter le spam détaillé `Equipping [item] ...`, tout en gardant un message joueur unique et lisible.
+
+### Character Info / Profession recipes
+
+Les compétences et recettes métiers sont maintenant migrées en bridge-first. La frame Character Info récupère les skills par `GET~BOT_SKILLS`, et la frame recettes récupère les recettes par `GET~PROFESSION_RECIPES`.
+
+Le craft de recette passe par `RUN~CRAFT_RECIPE`. Les recettes à résultat aléatoire ou indirect sont pilotées par `spellId`, ce qui évite de bloquer les crafts comme les cartes de calligraphie. Les erreurs de cast remontent une raison structurée au lieu d'un simple échec générique.
 
 ### Audit chatless final
 
@@ -285,18 +334,6 @@ Encore à évaluer :
 
 Conclusion : ne pas migrer par réflexe. À traiter seulement si une fenêtre UI dépend encore réellement d’un parsing chat ou d’un inspect instable.
 
-### C) Outfits
-
-État actuel après migration :
-
-- la liste des tenues utilise `GET~OUTFITS` ;
-- les actions utilisent `RUN~OUTFIT` ;
-- le parsing automatique `outfit ?` n’est plus le chemin nominal ;
-- le bridge évite le spam détaillé d’équipement sans modifier `mod-playerbots` ;
-- l’ancien chemin peut rester comme compatibilité / diagnostic si le fallback legacy est explicitement réactivé.
-
-Conclusion : `Outfits` est maintenant bridge-first. Il reste seulement à surveiller les derniers parsers historiques qui ne servent plus au chemin nominal.
-
 ---
 
 ## Tableau d’avancement
@@ -319,6 +356,12 @@ Conclusion : `Outfits` est maintenant bridge-first. Il reste seulement à survei
 | Inspect `ue` refresh inventory | Fait |
 | Trade sans dump inventory legacy | Fait |
 | Spellbook bridge | Fait |
+| Spellbook sans recettes métiers | Fait |
+| Character Info bridge | Fait |
+| Profession recipes bridge | Fait |
+| Craft recettes métier bridge | Fait |
+| Craft recettes à résultat aléatoire / indirect | Fait |
+| Erreurs détaillées de craft | Fait |
 | PVP Stats bridge | Fait |
 | Stats simples bridge | Fait |
 | Quêtes bridge | Fait |
@@ -328,33 +371,34 @@ Conclusion : `Outfits` est maintenant bridge-first. Il reste seulement à survei
 | Outfits bridge | Fait |
 | Outfits sans spam détaillé `Equipping [item]` | Fait |
 | Loot Rules / Loot List bridge | Fait |
+| Loot Master frame | Fait |
+| Debug Loot Master désactivé | Fait |
+| Switch Loot Rules / Disperse | Fait |
+| Relayout boutons MainBar optionnels | Fait |
 | Custom Talents navigation | Corrigé |
 | Custom Glyphs mapping sockets | Corrigé |
 | Switch `MultiBot.allowLegacyChatFallback` | Fait |
 | Nettoyage fallbacks automatiques stats/items/spells/glyphs/spec list | Fait |
 | Reconnexion bots au login / `/reload` | Fait |
 | Refresh Units après AddClass | Fait |
-| Talents actifs détaillés bridge | À évaluer / à faire si UI nécessaire |
 | Nettoyage final parsers legacy | Fait pour les refresh UI ciblés ; audit résiduel à faire |
 
 ---
 
 ## Prochain pas logique recommandé
 
-Le prochain pas logique est maintenant : **stabilisation finale après migration Loot Rules**.
+Le prochain pas logique est maintenant : **audit résiduel + commandes items avancées**.
 
-À valider après cette dernière migration :
+À valider après les derniers lots :
 
-1. ouvrir la mini-frame Loot et tester `Enable`, `Disable`, `All`, `Normal`, `Gray`, `Quest`, `Skill` sur un groupe et un raid ;
-2. vérifier que les confirmations système `LOOT_ACK` affichent bien le nombre de bots concernés ;
-3. vérifier que les commandes refusées côté bridge ne s’exécutent pas ;
-4. ouvrir la frame Outfits sur plusieurs bots avec et sans tenues existantes ;
-5. créer / mettre à jour une tenue avec `update` et vérifier qu’elle apparaît immédiatement dans la liste ;
-6. tester `equip` et `replace` et vérifier qu’il n’y a plus de spam détaillé `Equipping [item] ...` ;
-7. vérifier que le message joueur unique reste présent : `Equipping outfit ...` ou `Replacing current equip with outfit ...` ;
-8. refaire un cycle complet login, `/reload`, groupe, raid, ajout via `AddClass`, ouverture de chaque frame ;
-9. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list`, `outfit ?` avec `MultiBot.allowLegacyChatFallback = false` ;
-10. vérifier que les commandes manuelles volontaires restent fonctionnelles : `who`, `co ?`, `nc ?`, `ss ?`, `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec et actions Outfits.
+1. refaire un cycle complet login, `/reload`, groupe, raid, AddClass, randombot groupé et altbot ;
+2. ouvrir Inventory, Spellbook, Character Info, Profession recipes, Glyphs, Outfits, Quests, Stats, PVP Stats, Loot Master ;
+3. tester un craft métier classique avec item de résultat direct ;
+4. tester un craft métier à résultat indirect ou aléatoire, par exemple carte de calligraphie ;
+5. tester un craft cuisine sans feu puis avec feu, et vérifier l'erreur localisée ;
+6. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list`, `outfit ?` avec `MultiBot.allowLegacyChatFallback = false` ;
+7. vérifier que les commandes manuelles volontaires restent fonctionnelles : `who`, `co ?`, `nc ?`, `ss ?`, `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec et actions Outfits ;
+8. poursuivre ensuite avec Roll, ventes existantes et enchantements d'objets si besoin.
 
 Après cette stabilisation, il restera surtout un audit de nettoyage : supprimer les debug temporaires, garder les fallbacks legacy uniquement quand ils sont utiles au diagnostic, et retirer les parsers historiques devenus morts.
 
