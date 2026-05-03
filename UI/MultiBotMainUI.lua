@@ -13,9 +13,11 @@ local MAINBAR_AUTOHIDE_HOTSPOT_SIZE = 42
 local MAINBAR_AUTOHIDE_UPDATE_INTERVAL = 0.2
 
 local LEFT_LAYOUT_NAMES = {
-    "BotRTI",
+    "Creator",
+    "Beast",	
     "Disperse",
     "Loot",
+    "BotRTI",	
     "Tanker",
     "Attack",
     "Mode",
@@ -32,6 +34,16 @@ local LEFT_LAYOUT_FRAME_NAMES = {
     BotRTI = "BotRTIAction",
     Disperse = "DisperseMenu",
     Loot = "LootMenu",
+}
+
+local PRE_FORMAT_LEFT_TOGGLE_ORDER = {
+    "Creator",
+    "Beast",
+}
+
+local POST_FORMAT_LEFT_TOGGLE_ORDER = {
+    "Disperse",
+    "Loot",
 }
 
 local leftLayoutBase = nil
@@ -110,6 +122,22 @@ local function getLeftBaseX(leftRoot, name)
     return 0
 end
 
+local function hideLeftControl(leftRoot, name)
+    local frameName = LEFT_LAYOUT_FRAME_NAMES[name] or name
+    local frame = leftRoot.frames and leftRoot.frames[frameName]
+    if frame then
+        frame:Hide()
+        if MultiBot.RequestClickBlockerUpdate then
+            MultiBot.RequestClickBlockerUpdate(frame)
+        end
+    end
+
+    local button = leftRoot.buttons and leftRoot.buttons[name]
+    if button then
+        button:Hide()
+    end
+end
+
 local function refreshLeftLayout()
     withLeftRoot(function(leftRoot)
         captureLeftLayoutBase(leftRoot)
@@ -118,18 +146,46 @@ local function refreshLeftLayout()
             return
         end
 
-        local creatorEnabled = getMainToggleState("Creator")
-        local beastEnabled = getMainToggleState("Beast")
+        local preShift = 0
+        local postVisibleCount = 0
         local expandEnabled = getMainToggleState("Expand")
 
-        local commonShift = 0
-        if creatorEnabled then
-            commonShift = commonShift - LEFT_LAYOUT_SHIFT
-        end
-        if beastEnabled then
-            commonShift = commonShift - LEFT_LAYOUT_SHIFT
+        for _, name in ipairs(PRE_FORMAT_LEFT_TOGGLE_ORDER) do
+            local button = leftRoot.buttons and leftRoot.buttons[name]
+            local enabled = getMainToggleState(name)
+
+            if button then
+                if enabled then
+                    setLeftElementX(leftRoot, name, -preShift)
+                    button:Show()
+                    preShift = preShift + LEFT_LAYOUT_SHIFT
+                else
+                    hideLeftControl(leftRoot, name)
+                end
+            end
         end
 
+        local formatX = getLeftBaseX(leftRoot, "Format") - preShift
+        setLeftElementX(leftRoot, "Format", formatX)
+
+        local postX = formatX - LEFT_LAYOUT_SHIFT
+        for _, name in ipairs(POST_FORMAT_LEFT_TOGGLE_ORDER) do
+            local button = leftRoot.buttons and leftRoot.buttons[name]
+            local enabled = getMainToggleState(name)
+
+            if button then
+                if enabled then
+                    setLeftElementX(leftRoot, name, postX)
+                    button:Show()
+                    postVisibleCount = postVisibleCount + 1
+                    postX = postX - LEFT_LAYOUT_SHIFT
+                else
+                    hideLeftControl(leftRoot, name)
+                end
+            end
+        end
+
+        local commonShift = -preShift + ((#POST_FORMAT_LEFT_TOGGLE_ORDER - postVisibleCount) * LEFT_LAYOUT_SHIFT)
         local heavyShift = commonShift
         if expandEnabled then
             heavyShift = heavyShift - LEFT_LAYOUT_SHIFT
@@ -145,11 +201,6 @@ local function refreshLeftLayout()
         setLeftElementX(leftRoot, "ExpandStay", getLeftBaseX(leftRoot, "ExpandStay") + commonShift)
         setLeftElementX(leftRoot, "ExpandFollow", getLeftBaseX(leftRoot, "ExpandFollow") + commonShift)
         setLeftElementX(leftRoot, "Flee", getLeftBaseX(leftRoot, "Flee") + commonShift)
-        setLeftElementX(leftRoot, "Loot", getLeftBaseX(leftRoot, "Loot") + commonShift)
-        setLeftElementX(leftRoot, "Disperse", getLeftBaseX(leftRoot, "Disperse") + commonShift)
-        setLeftElementX(leftRoot, "Format", getLeftBaseX(leftRoot, "Format") + commonShift)
-
-        setLeftElementX(leftRoot, "Beast", getLeftBaseX(leftRoot, "Beast") + (creatorEnabled and -LEFT_LAYOUT_SHIFT or 0))
 
         if expandEnabled then
             leftRoot.buttons["ExpandFollow"]:Show()
@@ -233,32 +284,33 @@ local function toggleRaidus(button)
     MultiBot.raidus:Hide()
 end
 
-local function toggleCreator(button)
+local function toggleLeftControl(button, controlName)
     withLeftRoot(function(leftRoot)
-        if MultiBot.OnOffSwitch(button) then
-            leftRoot.frames["Creator"]:Hide()
-            leftRoot.buttons["Creator"]:Show()
-        else
-            leftRoot.frames["Creator"]:Hide()
-            leftRoot.buttons["Creator"]:Hide()
+        local frameName = LEFT_LAYOUT_FRAME_NAMES[controlName] or controlName
+        local frame = leftRoot.frames and leftRoot.frames[frameName]
+        if frame then
+            frame:Hide()
         end
 
+        MultiBot.OnOffSwitch(button)
         refreshLeftLayout()
     end)
 end
 
-local function toggleBeast(button)
-    withLeftRoot(function(leftRoot)
-        if MultiBot.OnOffSwitch(button) then
-            leftRoot.frames["Beast"]:Hide()
-            leftRoot.buttons["Beast"]:Show()
-        else
-            leftRoot.frames["Beast"]:Hide()
-            leftRoot.buttons["Beast"]:Hide()
-        end
+local function toggleCreator(button)
+    toggleLeftControl(button, "Creator")
+end
 
-        refreshLeftLayout()
-    end)
+local function toggleBeast(button)
+    toggleLeftControl(button, "Beast")
+end
+
+local function toggleDisperse(button)
+    toggleLeftControl(button, "Disperse")
+end
+
+local function toggleLoot(button)
+    toggleLeftControl(button, "Loot")
 end
 
 local function toggleExpand(button)
@@ -1233,6 +1285,8 @@ function MultiBot.InitializeMainUI(tMultiBar)
         "Raidus",
         "Creator",
         "Beast",
+        "Disperse",
+        "Loot",
         "Expand",
         "Release",
         "Stats",
@@ -1370,8 +1424,32 @@ function MultiBot.InitializeMainUI(tMultiBar)
     wireShiftRightSwap(mainFrame.buttons["Beast"], "Beast")
 
     createMainActionButton(mainFrame, {
-        name = "Expand",
+        name = "Disperse",
         y = 204,
+        icon = "spell_nature_wispsplode",
+        tip = "tips.main.disperse",
+        disabled = true,
+        doLeft = function(button)
+            toggleDisperse(button)
+        end,
+    })
+    wireShiftRightSwap(mainFrame.buttons["Disperse"], "Disperse")
+
+    createMainActionButton(mainFrame, {
+        name = "Loot",
+        y = 238,
+        icon = "inv_misc_bag_10",
+        tip = "tips.main.loot",
+        disabled = true,
+        doLeft = function(button)
+            toggleLoot(button)
+        end,
+    })
+    wireShiftRightSwap(mainFrame.buttons["Loot"], "Loot")
+
+    createMainActionButton(mainFrame, {
+        name = "Expand",
+        y = 272,
         icon = "Interface\\AddOns\\MultiBot\\Icons\\command_follow.blp",
         tip = "tips.main.expand",
         disabled = true,
@@ -1383,7 +1461,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
 
     createMainActionButton(mainFrame, {
         name = "Release",
-        y = 238,
+        y = 306,
         icon = "achievement_bg_xkills_avgraveyard",
         tip = "tips.main.release",
         disabled = true,
@@ -1395,7 +1473,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
 
     createMainActionButton(mainFrame, {
         name = "Stats",
-        y = 272,
+        y = 340,
         icon = "inv_scroll_08",
         tip = "tips.main.stats",
         disabled = true,
