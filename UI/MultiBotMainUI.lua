@@ -14,10 +14,10 @@ local MAINBAR_AUTOHIDE_UPDATE_INTERVAL = 0.2
 
 local LEFT_LAYOUT_NAMES = {
     "Creator",
-    "Beast",	
+    "Beast",
     "Disperse",
     "Loot",
-    "BotRTI",	
+    "BotRTI",
     "Tanker",
     "Attack",
     "Mode",
