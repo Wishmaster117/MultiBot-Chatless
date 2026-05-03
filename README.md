@@ -96,6 +96,7 @@ GET~GLYPHS
 GET~OUTFITS
 GET~QUESTS
 GET~GAMEOBJECTS
+RUN~CRAFT_RECIPE
 RUN~OUTFIT
 RUN~RTI
 RUN~COMBAT
@@ -170,7 +171,7 @@ The goal is to remove automatic UI-refresh spam.
   </tr>
   <tr>
     <td>Profession recipe frame</td>
-    <td><strong>Bridge-first</strong> recipe listing opened from Character Info profession and secondary skill rows</td>
+    <td><strong>Bridge-first</strong> recipe listing and recipe crafting opened from Character Info profession and secondary skill rows</td>
   </tr>
   <tr>
     <td>Glyphs</td>

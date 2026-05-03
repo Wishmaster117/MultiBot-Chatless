@@ -37,7 +37,10 @@ local CHARACTER_SKILL_VALUE_WIDTH = 72
 local RECIPE_FRAME_WIDTH = 340
 local RECIPE_FRAME_X = 145
 local RECIPE_ROW_WIDTH = 302
-local RECIPE_TEXT_WIDTH = 270
+local RECIPE_CRAFT_BUTTON_WIDTH = 54
+local RECIPE_TEXT_WIDTH = 206
+local RECIPE_REFRESH_DELAY = 3.0
+local COOKING_SKILL_ID = 185
 
 local SKILL_DISPLAY_SPELL_IDS = {
     [171] = 2259, -- Alchemy
@@ -292,6 +295,57 @@ local function buildMaterialsText(recipe)
     return table.concat(parts, ", ")
 end
 
+local function getRecipePendingKey(botName, skillId, spellId)
+    return string.lower(tostring(botName or "")) .. ":" .. tostring(tonumber(skillId or 0) or 0) .. ":" .. tostring(tonumber(spellId or 0) or 0)
+end
+
+local function getCraftReasonText(reason, skillId)
+    reason = tostring(reason or "")
+    if reason == "" or reason == "OK" then
+        return ""
+    end
+
+    if reason == "REQUIRES_SPELL_FOCUS" and tonumber(skillId or 0) == COOKING_SKILL_ID then
+        return L("profession.recipes.craft.reason.REQUIRES_SPELL_FOCUS.cooking", "You must be near a cooking fire.")
+    end
+
+    local castCode = string.match(reason, "^CAST_FAILED_(%d+)$")
+    if castCode then
+        return string.format(L("profession.recipes.craft.reason.cast_code", "The server refused the cast (code %s)."), castCode)
+    end
+
+    return L("profession.recipes.craft.reason." .. reason, reason)
+end
+
+local function scheduleRecipeRefresh(botName, skillId)
+    if not MultiBot.Comm or not MultiBot.Comm.RequestProfessionRecipes then
+        return
+    end
+
+    local function refresh()
+        local frame = MultiBot.professionRecipeFrame
+        if frame and not frame:IsShown() then
+            return
+        end
+
+        if frame and frame:IsShown() and frame.botName ~= botName then
+            return
+        end
+
+        if frame and frame:IsShown() and frame.skill and tonumber(frame.skill.skillId or 0) ~= tonumber(skillId or 0) then
+            return
+        end
+
+        MultiBot.Comm.RequestProfessionRecipes(botName, skillId)
+    end
+
+    if type(MultiBot.TimerAfter) == "function" then
+        MultiBot.TimerAfter(RECIPE_REFRESH_DELAY, refresh)
+    else
+        refresh()
+    end
+end
+
 local function ensureRecipeFrame()
     if MultiBot.professionRecipeFrame then
         return MultiBot.professionRecipeFrame
@@ -308,6 +362,7 @@ local function ensureRecipeFrame()
     frame.page = 1
     frame.pageSize = 14
     frame.recipes = {}
+    frame.pendingCrafts = {}
 
     for i = 1, frame.pageSize do
         local row = CreateFrame("Button", nil, content)
@@ -321,6 +376,44 @@ local function ensureRecipeFrame()
         row.text = createText(row, "GameFontHighlightSmall", "LEFT", 26, 0)
         row.text:SetWidth(RECIPE_TEXT_WIDTH)
         row.text:SetHeight(20)
+        row.craftButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        row.craftButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row.craftButton:SetWidth(RECIPE_CRAFT_BUTTON_WIDTH)
+        row.craftButton:SetHeight(20)
+        row.craftButton:SetText(L("profession.recipes.craft", "Craft"))
+        row.craftButton:SetScript("OnClick", function()
+            local recipe = row.recipe
+            if not recipe or not frame.botName then return end
+
+            local skillId = tonumber(recipe.skillId or (frame.skill and frame.skill.skillId) or 0) or 0
+            local spellId = tonumber(recipe.spellId or 0) or 0
+            local itemId = tonumber(recipe.itemId or 0) or 0
+            local craftable = tonumber(recipe.craftable or 0) or 0
+            if skillId <= 0 or spellId <= 0 or craftable <= 0 then
+                return
+            end
+
+            if MultiBot.Comm and MultiBot.Comm.RunProfessionRecipeCraft then
+                local token = MultiBot.Comm.RunProfessionRecipeCraft(frame.botName, skillId, spellId, itemId)
+                if token then
+                    frame.pendingCrafts[getRecipePendingKey(frame.botName, skillId, spellId)] = true
+                    frame.status:SetText(L("profession.recipes.craft.pending", "Craft requested..."))
+                    frame:render()
+                else
+                    frame.status:SetText(L("profession.recipes.craft.failed", "Craft request failed."))
+                end
+            end
+        end)
+        row.craftButton:SetScript("OnEnter", function(self)
+            if not GameTooltip then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L("profession.recipes.craft", "Craft"))
+            GameTooltip:AddLine(L("profession.recipes.craft.tooltip", "Ask the bot to craft this recipe once."), 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        row.craftButton:SetScript("OnLeave", function()
+            if GameTooltip then GameTooltip:Hide() end
+        end)
         row:SetScript("OnEnter", function(self)
             if not self.recipe or not GameTooltip then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -372,10 +465,15 @@ local function ensureRecipeFrame()
                 local name, icon = getSpellDisplay(recipe.spellId)
                 local color = DIFFICULTY_COLORS[recipe.difficulty or ""] or "|cffffffff"
                 local craftable = tonumber(recipe.craftable or 0) or 0
+                local pending = self.pendingCrafts[getRecipePendingKey(self.botName, recipe.skillId, recipe.spellId)]
                 row.icon:SetTexture(MultiBot.SafeTexturePath(icon))
                 row.text:SetText(color .. name .. "|r |cff999999x" .. craftable .. "|r")
+                row.craftButton:SetText(pending and "..." or L("profession.recipes.craft", "Craft"))
+                setButtonEnabled(row.craftButton, craftable > 0 and tonumber(recipe.spellId or 0) > 0 and not pending)
+                row.craftButton:Show()
                 row:Show()
             else
+                row.craftButton:Hide()
                 row:Hide()
             end
         end
@@ -653,6 +751,33 @@ function MultiBot.OnBridgeProfessionRecipes(botName, skillId, recipes)
     end
 
     ensureRecipeFrame():setRecipes(botName, skill or { name = "Skill " .. tostring(skillId), skillId = skillId }, recipes or {})
+end
+
+function MultiBot.OnBridgeProfessionRecipeCraftResult(botName, skillId, spellId, _itemId, result, reason)
+    local frame = ensureRecipeFrame()
+    local sameBot = string.lower(tostring(frame.botName or "")) == string.lower(tostring(botName or ""))
+    local sameSkill = frame.skill and tonumber(frame.skill.skillId or 0) == tonumber(skillId or 0)
+
+    frame.pendingCrafts[getRecipePendingKey(botName, skillId, spellId)] = nil
+
+    if result == "OK" then
+        if sameBot and sameSkill then
+            frame.status:SetText(L("profession.recipes.craft.ok", "Craft started."))
+            frame:render()
+        end
+        scheduleRecipeRefresh(botName, skillId)
+        return
+    end
+
+    if sameBot and sameSkill then
+        local reasonText = getCraftReasonText(reason, skillId)
+        if reasonText ~= "" then
+            frame.status:SetText(string.format(L("profession.recipes.craft.err", "Craft failed: %s"), reasonText))
+        else
+            frame.status:SetText(L("profession.recipes.craft.failed", "Craft request failed."))
+        end
+        frame:render()
+    end
 end
 
 function MultiBot.InitializeCharacterInfoFrame()
