@@ -12,15 +12,12 @@
 * Quick bars : ne pas faire apparaître les quick bars pour les joueurs humains.
 * Raidus : rafraîchir correctement à l'ouverture et à la fermeture.
 * Raidus : ajouter un bouton pour enlever les bots inconnus et les supprimer aussi des SavedVariables.
-* Quêtes : dans la liste des quêtes, corriger les cas où l'ID de quête apparaît à la place du titre.
+* Quêtes : dans la liste des quêtes, corriger les cas où l'ID de quête apparaît à la place du titre. quand on rouvre c'est ok
 * Talents / glyphes : revoir `UI/MultiBotTalent`, car il y a eu des modifications dans le fichier `.conf` de MultiBot.
-* Menus déroulants de la main bar : fermer automatiquement les autres menus quand on en ouvre un nouveau.
 * J'ai l'impression que le disperse ne fait rien
-* Quand on fait apparaitre les boutons creator ou/et Maitre des bêtes, les deux boutons Disperse et Règles de buttin ne bougent pas
-ce qui fait que quand on ajoute Creator + maitre des betes le bouton attaque tank se retrouve caché par le bouton disperse
-* Les tooltips du spellbook sont derrière la frale.
 * Refaire uns passe pour que toutes les frames respectent le strata de la config.
-* Le SpellBook remonte encore quelques spells des métier cuisine et first aid
+* Retravailler la frame pvp stats qu'elle ressemble aux autres, et ajuster l'alignement du texte
+* Faire une UI pour enchanter les objets à moins qu'on arrive à faire le bot caster le spell sur la fenêtre de trade.
 
 ## Informations bot
 ** Frame faite
@@ -99,6 +96,14 @@ ce qui fait que quand on ajoute Creator + maitre des betes le bouton attaque tan
   * completed ;
   * all.
 * Outfits bridge-first.
+* Character Info bridge-first.
+* Profession recipes bridge-first.
+* Craft de recettes métier via bridge `RUN~CRAFT_RECIPE`.
+* Messages d'erreur détaillés pour le craft :
+  * feu de cuisine requis ;
+  * bot en mouvement ;
+  * outil / focus requis ;
+  * recette pas prête ou cast refusé.
 * RTI bridge-first.
 * Pull Control bridge-first.
 * Combat Strategies bridge-first.

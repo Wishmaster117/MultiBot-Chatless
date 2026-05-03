@@ -121,6 +121,8 @@ local function ensureBridgeState()
   state.professionRecipes = state.professionRecipes or {}
   state.professionRecipeSeq = state.professionRecipeSeq or 0
   state.professionRecipeActive = state.professionRecipeActive or nil
+  state.professionRecipeCraftSeq = state.professionRecipeCraftSeq or 0
+  state.professionRecipeCrafts = state.professionRecipeCrafts or {}
   state.outfitSeq = state.outfitSeq or 0
   state.outfitActive = state.outfitActive or nil
   state.outfitCommands = state.outfitCommands or {}
@@ -622,6 +624,35 @@ function Comm.RequestProfessionRecipes(name, skillId)
   return true
 end
 
+function Comm.RunProfessionRecipeCraft(name, skillId, spellId, itemId)
+  local state = ensureBridgeState()
+  name = trim(name)
+  skillId = tonumber(skillId or 0) or 0
+  spellId = tonumber(spellId or 0) or 0
+  itemId = tonumber(itemId or 0) or 0
+  if name == "" or skillId <= 0 or spellId <= 0 or itemId < 0 or not state.connected then
+    return false
+  end
+
+  state.professionRecipeCraftSeq = (tonumber(state.professionRecipeCraftSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-craft-" .. tostring(state.professionRecipeCraftSeq)
+  state.professionRecipeCrafts[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    skillId = skillId,
+    spellId = spellId,
+    itemId = itemId,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("RUN", "CRAFT_RECIPE~" .. name .. "~" .. token .. "~" .. skillId .. "~" .. spellId .. "~" .. itemId) then
+    state.professionRecipeCrafts[token] = nil
+    return false
+  end
+
+  return token
+end
+
 function Comm.MarkDisconnected(reason)
   local state = ensureBridgeState()
   state.connected = false
@@ -632,6 +663,7 @@ function Comm.MarkDisconnected(reason)
   state.spellbookActive = nil
   state.botSkillActive = nil
   state.professionRecipeActive = nil
+  state.professionRecipeCrafts = {}
   state.outfitActive = nil
   state.outfitCommands = {}
 end
@@ -1411,6 +1443,45 @@ function Comm.ApplyOutfitCommandPayload(payload)
   return true
 end
 
+function Comm.ApplyProfessionRecipeCraftPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local skillId, rest3 = splitOnce(rest2 or "", "~")
+  local spellId, rest4 = splitOnce(rest3 or "", "~")
+  local itemId, rest5 = splitOnce(rest4 or "", "~")
+  local result, reason = splitOnce(rest5 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  skillId = tonumber(skillId or "0") or 0
+  spellId = tonumber(spellId or "0") or 0
+  itemId = tonumber(itemId or "0") or 0
+  result = trim(result)
+  reason = trim(urlDecodeField(reason))
+
+  local state = ensureBridgeState()
+  local command = state.professionRecipeCrafts and state.professionRecipeCrafts[token] or nil
+  if not command then
+    return false
+  end
+
+  command.botName = botName ~= "" and botName or command.botName
+  command.botNameKey = string.lower(command.botName or "")
+  command.skillId = skillId > 0 and skillId or command.skillId
+  command.spellId = spellId > 0 and spellId or command.spellId
+  command.itemId = itemId >= 0 and itemId or command.itemId
+  command.result = result
+  command.reason = reason
+
+  if MultiBot.OnBridgeProfessionRecipeCraftResult then
+    MultiBot.OnBridgeProfessionRecipeCraftResult(command.botName, command.skillId, command.spellId, command.itemId, result, reason, command)
+  end
+
+  state.professionRecipeCrafts[token] = nil
+  debugPrint("ADDON:RX", "PROFESSION_RECIPE_CRAFT", command.botName, command.skillId, command.spellId, result, reason)
+  return true
+end
+
 function Comm.ApplyGlyphsBeginPayload(payload)
   local botName, token = splitOnce(payload or "", "~")
   botName = trim(urlDecodeField(botName))
@@ -2160,6 +2231,12 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "PROFESSION_RECIPE_CRAFT" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyProfessionRecipeCraftPayload(payload)
+  end
+
   if opcode == "RTI_ACK" then
     state.connected = true
     state.lastError = nil
@@ -2289,6 +2366,7 @@ function Comm.OnPlayerEnteringWorld()
   state.botSkillActive = nil
   state.professionRecipes = {}
   state.professionRecipeActive = nil
+  state.professionRecipeCrafts = {}  
   state.outfitActive = nil
   state.outfitCommands = {}
   Comm.MarkDisconnected(nil)
