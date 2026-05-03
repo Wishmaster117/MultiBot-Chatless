@@ -47,7 +47,6 @@ local enUSValues = {
   ["character.skills"] = "Skills",
   ["profession.recipes.loading"] = "Loading...",
   ["profession.recipes.craft"] = "Craft",
-  ["profession.recipes.craft"] = "Craft",
   ["profession.recipes.craft.tooltip"] = "Ask the bot to craft this recipe once.",
   ["profession.recipes.craft.pending"] = "Craft requested...",
   ["profession.recipes.craft.ok"] = "Craft started.",

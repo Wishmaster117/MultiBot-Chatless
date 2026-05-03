@@ -2366,7 +2366,7 @@ function Comm.OnPlayerEnteringWorld()
   state.botSkillActive = nil
   state.professionRecipes = {}
   state.professionRecipeActive = nil
-  state.professionRecipeCrafts = {}  
+  state.professionRecipeCrafts = {}
   state.outfitActive = nil
   state.outfitCommands = {}
   Comm.MarkDisconnected(nil)
