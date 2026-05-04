@@ -305,6 +305,19 @@ local function sendInventoryFeedback(key, fallback)
     SendChatMessage(inventoryItemL(key, fallback), "SAY")
 end
 
+local function addInventorySystemMessage(message)
+    message = tostring(message or "")
+    if message == "" then
+        return
+    end
+
+    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+        DEFAULT_CHAT_FRAME:AddMessage(message)
+    elseif print then
+        print(message)
+    end
+end
+
 local function isInventoryProtectedKey(item)
     return MultiBot.isInside(item and item.info or "", "%f[%a][Kk]ey%f[%A]")
 end
@@ -373,6 +386,29 @@ local function sendInventoryItemCommand(command, button, botName, options)
     return true
 end
 
+local function runBridgeInventoryItemAction(action, button, botName, options)
+    options = options or {}
+    if not action or action == "" or not button or not button.item or not botName or botName == "" then
+        return false
+    end
+
+    local itemId = tonumber(button.item.id or 0) or 0
+    if itemId <= 0 then
+        return false
+    end
+
+    if not MultiBot.Comm or not MultiBot.Comm.RunInventoryItemAction then
+        return false
+    end
+
+    local token = MultiBot.Comm.RunInventoryItemAction(botName, action, itemId, options.count or 0)
+    if not token then
+        return false
+    end
+
+    return true
+end
+
 local function handleInventoryItemClick(button)
     local action, botName = getInventoryItemActionState()
     local item = button and button.item or nil
@@ -415,6 +451,45 @@ local function handleInventoryItemClick(button)
         return
     end
 
+    if action == "bank" then
+        if runBridgeInventoryItemAction("BANK_DEPOSIT", button, botName) then
+            return
+        end
+
+        sendInventoryItemCommand("bank", button, botName, {
+            postActionRefresh = true,
+            refreshDelay = 0.45,
+            followupRefreshDelay = 1.20,
+        })
+        return
+    end
+
+    if action == "gb" then
+        if runBridgeInventoryItemAction("GBANK_DEPOSIT", button, botName) then
+            return
+        end
+
+        sendInventoryItemCommand("gb", button, botName, {
+            postActionRefresh = true,
+            refreshDelay = 0.45,
+            followupRefreshDelay = 1.20,
+        })
+        return
+    end
+
+    if action == "b" then
+        if runBridgeInventoryItemAction("BUY_ITEM", button, botName, { count = 1 }) then
+            return
+        end
+
+        sendInventoryItemCommand("b", button, botName, {
+            postActionRefresh = true,
+            refreshDelay = 0.45,
+            followupRefreshDelay = 1.20,
+        })
+        return
+    end
+
     if action == "u" then
         registerInventoryPendingConsume(botName, item, 1)
         sendInventoryItemCommand(action, button, botName, {
@@ -438,6 +513,87 @@ local function handleInventoryItemClick(button)
     sendInventoryItemCommand(action, button, botName, {
         hideButton = true,
     })
+end
+
+local function getInventoryItemActionLabel(action)
+    action = tostring(action or "")
+    return inventoryItemL("inventory.action." .. action, action)
+end
+
+local function getInventoryItemActionReason(reason)
+    reason = tostring(reason or "")
+    if reason == "" or reason == "OK" then
+        return ""
+    end
+
+    return inventoryItemL("inventory.item_action.reason." .. reason, reason)
+end
+
+function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, result, reason, moved)
+    local actionLabel = getInventoryItemActionLabel(action)
+    local itemName = tostring(itemId or "")
+    if GetItemInfo then
+        itemName = GetItemInfo(tonumber(itemId or 0) or 0) or itemName
+    end
+
+    if result == "OK" then
+        addInventorySystemMessage(string.format(
+            inventoryItemL("inventory.item_action.ok", "%s: %s x%d."),
+            actionLabel,
+            itemName,
+            tonumber(moved or 0) or 0
+        ))
+
+        requestInventoryPostActionRefresh(botName, 0.45, 1.20)
+        if MultiBot.RefreshBotBank and (action == "BANK_DEPOSIT" or action == "BANK_WITHDRAW") then
+            MultiBot.RefreshBotBank(botName, 0.65)
+        end
+        if action == "GBANK_DEPOSIT" and MultiBot.RefreshBotGuildBank then
+            MultiBot.RefreshBotGuildBank(botName, 0.65)
+        end
+        if action == "BUY_ITEM" and MultiBot.professionRecipeFrame and MultiBot.professionRecipeFrame:IsShown()
+            and MultiBot.professionRecipeFrame.botName == botName
+            and MultiBot.professionRecipeFrame.skill
+            and MultiBot.Comm and MultiBot.Comm.RequestProfessionRecipes then
+            local skillId = tonumber(MultiBot.professionRecipeFrame.skill.skillId or 0) or 0
+            if MultiBot.professionRecipeFrame.status then
+                MultiBot.professionRecipeFrame.status:SetText(inventoryItemL("inventory.item_action.buy.ok", "Purchase completed."))
+            end
+            if skillId > 0 then
+                if type(MultiBot.TimerAfter) == "function" then
+                    MultiBot.TimerAfter(0.75, function()
+                        MultiBot.Comm.RequestProfessionRecipes(botName, skillId)
+                    end)
+                else
+                    MultiBot.Comm.RequestProfessionRecipes(botName, skillId)
+                end
+            end
+        end
+        return
+    end
+
+    local reasonText = getInventoryItemActionReason(reason)
+    if action == "BUY_ITEM" and MultiBot.professionRecipeFrame and MultiBot.professionRecipeFrame:IsShown()
+        and MultiBot.professionRecipeFrame.botName == botName
+        and MultiBot.professionRecipeFrame.status then
+        MultiBot.professionRecipeFrame.status:SetText(string.format(
+            inventoryItemL("inventory.item_action.buy.err", "Purchase failed: %s"),
+            reasonText ~= "" and reasonText or tostring(reason or "")
+        ))
+    end
+
+    if reasonText ~= "" then
+        addInventorySystemMessage(string.format(
+            inventoryItemL("inventory.item_action.err", "%s failed: %s"),
+            actionLabel,
+            reasonText
+        ))
+    else
+        addInventorySystemMessage(string.format(
+            inventoryItemL("inventory.item_action.failed", "%s failed."),
+            actionLabel
+        ))
+    end
 end
 
 MultiBot.InventoryAddItem = function(frame, itemInfo)
