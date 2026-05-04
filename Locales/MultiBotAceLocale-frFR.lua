@@ -54,7 +54,6 @@ local frFRValues = {
   ["profession.recipes.craft.err"] = "Création échouée : %s",
   ["profession.recipes.buy_missing"] = "Acheter",
   ["profession.recipes.buy_missing.tooltip"] = "Demande au bot d'acheter le premier composant manquant chez un vendeur proche.",
-  ["profession.recipes.buy_missing.tooltip"] = "Demande au bot d'acheter les composants manquants chez les vendeurs proches.",
   ["profession.recipes.buy_missing.pending"] = "Achat demandé...",
   ["profession.recipes.buy_missing.failed"] = "La demande d'achat a échoué.",
   ["profession.recipes.craft.reason.NO_BOT"] = "Bot introuvable.",
