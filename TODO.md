@@ -20,10 +20,26 @@
 * Faire une UI pour enchanter les objets à moins qu'on arrive à faire le bot caster le spell sur la fenêtre de trade.
 
 ## Informations bot
-** Frame faite
-* Il y'a encore des spell des professions qui fuitent vers le spellbook
-* y ajouter Monnaies (emblemes etc..)
-* Réputations
+* Dans les frames métier ajout d'un bouton pour faire le bot acheter les composants manquants pour crafter l'item.
+
+** TODO
+* Ajouter les Monnaies (emblemes etc..)
+* Ajouter les Réputations
+ 
+
+## Inventaire Bot étendu
+* Ajout d'un bouton Pour déposer des objets dans la banque du bot.
+* Ajout d'une frame pour afficher le contenu de la banque du bot, avec un bouton pour retirer les objets de la banque.
+* Ajout d'un bouton pour déposer des objets dans la banque de guilde.
+* Ajout d'une frame pour afficher le contenu de la banque de guilde.
+*
+
+** TODO
+* Voire si on tiends compte des droits de guilde pour les retraits et dépots, est ce que les rangs des bots évoluent dans playerbots.
+* Les banquier neutres comme par exemple Dalaran ne sont pas reconnus comme banquiers
+* Uniformiser le layout des frames de banque bot et BDG
+* Ajouter un bouton retrait à la frame BDG
+* Afficher les sous de la guilde dans la frame BDG
 
 ## Frame Loot
 

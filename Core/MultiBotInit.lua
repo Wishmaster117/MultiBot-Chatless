@@ -73,6 +73,10 @@ if MultiBot.InitializeCharacterInfoFrame then
 	MultiBot.InitializeCharacterInfoFrame()
 end
 
+if MultiBot.InitializeBankFrame then
+	MultiBot.InitializeBankFrame()
+end
+
 if MultiBot.InitializeRewardFrame then
 	MultiBot.InitializeRewardFrame()
 end

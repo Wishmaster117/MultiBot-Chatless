@@ -113,6 +113,14 @@ local function ensureBridgeState()
   state.bootstrapDeadline = state.bootstrapDeadline or 0
   state.inventorySeq = state.inventorySeq or 0
   state.inventoryActive = state.inventoryActive or nil
+  state.bankItems = state.bankItems or {}
+  state.bankSeq = state.bankSeq or 0
+  state.bankActive = state.bankActive or nil
+  state.guildBankItems = state.guildBankItems or {}
+  state.guildBankSeq = state.guildBankSeq or 0
+  state.guildBankActive = state.guildBankActive or nil
+  state.inventoryItemActionSeq = state.inventoryItemActionSeq or 0
+  state.inventoryItemActions = state.inventoryItemActions or {}
   state.spellbookSeq = state.spellbookSeq or 0
   state.spellbookActive = state.spellbookActive or nil
   state.botSkills = state.botSkills or {}
@@ -548,6 +556,58 @@ function Comm.RequestInventory(name)
   return true
 end
 
+function Comm.RequestBank(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.bankSeq = (tonumber(state.bankSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-bank-" .. tostring(state.bankSeq)
+  state.bankActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+    items = {},
+    error = nil,
+  }
+
+  if not Comm.Send("GET", "BANK~" .. name .. "~" .. token) then
+    state.bankActive = nil
+    return false
+  end
+
+  return token
+end
+
+function Comm.RequestGuildBank(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.guildBankSeq = (tonumber(state.guildBankSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-gbank-" .. tostring(state.guildBankSeq)
+  state.guildBankActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+    items = {},
+    error = nil,
+  }
+
+  if not Comm.Send("GET", "GBANK~" .. name .. "~" .. token) then
+    state.guildBankActive = nil
+    return false
+  end
+
+  return token
+end
+
 function Comm.RequestSpellbook(name)
   local state = ensureBridgeState()
   name = trim(name)
@@ -653,6 +713,35 @@ function Comm.RunProfessionRecipeCraft(name, skillId, spellId, itemId)
   return token
 end
 
+function Comm.RunInventoryItemAction(name, action, itemId, count)
+  local state = ensureBridgeState()
+  name = trim(name)
+  action = string.upper(trim(action))
+  itemId = tonumber(itemId or 0) or 0
+  count = tonumber(count or 0) or 0
+  if name == "" or action == "" or itemId <= 0 or count < 0 or not state.connected then
+    return false
+  end
+
+  state.inventoryItemActionSeq = (tonumber(state.inventoryItemActionSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-item-" .. tostring(state.inventoryItemActionSeq)
+  state.inventoryItemActions[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    action = action,
+    itemId = itemId,
+    count = count,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("RUN", "ITEM_ACTION~" .. name .. "~" .. token .. "~" .. action .. "~" .. itemId .. "~" .. count) then
+    state.inventoryItemActions[token] = nil
+    return false
+  end
+
+  return token
+end
+
 function Comm.MarkDisconnected(reason)
   local state = ensureBridgeState()
   state.connected = false
@@ -660,6 +749,9 @@ function Comm.MarkDisconnected(reason)
   state.protocol = nil
   state.lastError = reason or nil
   state.inventoryActive = nil
+  state.bankActive = nil
+  state.guildBankActive = nil
+  state.inventoryItemActions = {}
   state.spellbookActive = nil
   state.botSkillActive = nil
   state.professionRecipeActive = nil
@@ -1631,6 +1723,56 @@ local function clearActiveInventoryRequest(botName, token)
   end
 end
 
+local function getActiveBankRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.bankActive
+  if not active then
+    return nil
+  end
+
+  if trim(token) ~= trim(active.token) then
+    return nil
+  end
+
+  if string.lower(trim(urlDecodeField(botName))) ~= tostring(active.botNameKey or "") then
+    return nil
+  end
+
+  return active
+end
+
+local function clearActiveBankRequest(botName, token)
+  local state = ensureBridgeState()
+  if getActiveBankRequest(botName, token) then
+    state.bankActive = nil
+  end
+end
+
+local function getActiveGuildBankRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.guildBankActive
+  if not active then
+    return nil
+  end
+
+  if trim(token) ~= trim(active.token) then
+    return nil
+  end
+
+  if string.lower(trim(urlDecodeField(botName))) ~= tostring(active.botNameKey or "") then
+    return nil
+  end
+
+  return active
+end
+
+local function clearActiveGuildBankRequest(botName, token)
+  local state = ensureBridgeState()
+  if getActiveGuildBankRequest(botName, token) then
+    state.guildBankActive = nil
+  end
+end
+
 local function getInventoryFrame()
   return MultiBot and MultiBot.inventory or nil
 end
@@ -2041,6 +2183,180 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     end
 
     clearActiveInventoryRequest(botName, token)
+    return true
+  end
+
+  if opcode == "BANK_BEGIN" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBankRequest(botName, token)
+    if active then
+      active.items = {}
+      active.error = nil
+      if MultiBot.OnBridgeBankBegin then
+        MultiBot.OnBridgeBankBegin(botName, token)
+      end
+    end
+
+    return true
+  end
+
+  if opcode == "BANK_ITEM" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, encodedLine = splitOnce(rest or "", "~")
+    botName = trim(urlDecodeField(botName))
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBankRequest(botName, token)
+    if active then
+      table.insert(active.items, urlDecodeField(encodedLine))
+    end
+
+    return true
+  end
+
+  if opcode == "BANK_ERROR" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, reason = splitOnce(rest or "", "~")
+    botName = trim(urlDecodeField(botName))
+    reason = trim(urlDecodeField(reason))
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBankRequest(botName, token)
+    if active then
+      active.error = reason ~= "" and reason or "FAILED"
+    end
+
+    return true
+  end
+
+  if opcode == "BANK_END" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBankRequest(botName, token)
+    if active then
+      local key = string.lower(botName)
+      state.bankItems[key] = active.items or {}
+      if MultiBot.OnBridgeBankItems then
+        MultiBot.OnBridgeBankItems(botName, state.bankItems[key], active.error, token)
+      end
+    end
+
+    clearActiveBankRequest(botName, token)
+    return true
+  end
+
+  if opcode == "GBANK_BEGIN" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveGuildBankRequest(botName, token)
+    if active then
+      active.items = {}
+      active.error = nil
+      if MultiBot.OnBridgeGuildBankBegin then
+        MultiBot.OnBridgeGuildBankBegin(botName, token)
+      end
+    end
+
+    return true
+  end
+
+  if opcode == "GBANK_ITEM" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, encodedLine = splitOnce(rest or "", "~")
+    botName = trim(urlDecodeField(botName))
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveGuildBankRequest(botName, token)
+    if active then
+      table.insert(active.items, urlDecodeField(encodedLine))
+    end
+
+    return true
+  end
+
+  if opcode == "GBANK_ERROR" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, reason = splitOnce(rest or "", "~")
+    botName = trim(urlDecodeField(botName))
+    reason = trim(urlDecodeField(reason))
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveGuildBankRequest(botName, token)
+    if active then
+      active.error = reason ~= "" and reason or "FAILED"
+    end
+
+    return true
+  end
+
+  if opcode == "GBANK_END" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveGuildBankRequest(botName, token)
+    if active then
+      local key = string.lower(botName)
+      state.guildBankItems[key] = active.items or {}
+      if MultiBot.OnBridgeGuildBankItems then
+        MultiBot.OnBridgeGuildBankItems(botName, state.guildBankItems[key], active.error, token)
+      end
+    end
+
+    clearActiveGuildBankRequest(botName, token)
+    return true
+  end
+
+  if opcode == "INVENTORY_ITEM_ACTION" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, rest2 = splitOnce(rest or "", "~")
+    local action, rest3 = splitOnce(rest2 or "", "~")
+    local itemId, rest4 = splitOnce(rest3 or "", "~")
+    local result, rest5 = splitOnce(rest4 or "", "~")
+    local reason, moved = splitOnce(rest5 or "", "~")
+
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    action = string.upper(trim(action))
+    itemId = tonumber(itemId or "0") or 0
+    result = trim(result)
+    reason = trim(urlDecodeField(reason))
+    moved = tonumber(moved or "0") or 0
+    state.connected = true
+    state.lastError = nil
+
+    local command = state.inventoryItemActions and state.inventoryItemActions[token] or nil
+    if command then
+      command.botName = botName ~= "" and botName or command.botName
+      command.action = action ~= "" and action or command.action
+      command.itemId = itemId > 0 and itemId or command.itemId
+      command.result = result
+      command.reason = reason
+      command.moved = moved
+
+      if MultiBot.OnBridgeInventoryItemActionResult then
+        MultiBot.OnBridgeInventoryItemActionResult(command.botName, command.action, command.itemId, result, reason, moved, command)
+      end
+
+      state.inventoryItemActions[token] = nil
+    end
+
+    debugPrint("ADDON:RX", "INVENTORY_ITEM_ACTION", botName, action, itemId, result, reason, moved)
     return true
   end
 
