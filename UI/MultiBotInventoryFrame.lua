@@ -20,6 +20,9 @@ local INVENTORY_WINDOW_DEFAULTS = {
     instantActionColumns = 3,
     instantActionSpacingX = 29,
     instantActionSpacingY = 34,
+    modeActionColumns = 2,
+    modeActionSpacingX = 36,
+    modeActionSpacingY = 36,
     summaryTopPadding = 10,
     summaryLineSpacing = 16,
     itemSize = 32,
@@ -32,12 +35,15 @@ local INVENTORY_WINDOW_DEFAULTS = {
 }
 local INVENTORY_LAYOUT_KEY = "InventoryPoint"
 
-local ACTION_ORDER = { "Sell", "Equip", "Use", "Trade", "Destroy" }
+local ACTION_ORDER = { "Sell", "Equip", "Use", "Trade", "Bank", "GuildBank", "Buy", "Destroy" }
 local ACTION_MODE_CONFIG = {
     Sell = { value = "s", cancelTradeOnActivate = true },
     Equip = { value = "e", cancelTradeOnActivate = true },
     Use = { value = "u", cancelTradeOnActivate = true },
     Trade = { value = "give", cancelTradeOnActivate = false },
+    Bank = { value = "bank", cancelTradeOnActivate = true },
+    GuildBank = { value = "gb", cancelTradeOnActivate = true },
+    Buy = { value = "b", cancelTradeOnActivate = true },
     Destroy = { value = "destroy", cancelTradeOnActivate = true },
 }
 
@@ -567,6 +573,9 @@ local function updateModeLabel()
         e = "Equip",
         u = "Use",
         give = "Trade",
+        bank = MultiBot.L("inventory.mode.bank", "Bank"),
+        gb = MultiBot.L("inventory.mode.gbank", "Guild Bank"),
+        b = MultiBot.L("inventory.mode.buy", "Buy"),
         destroy = "Destroy",
     }
 
@@ -1153,21 +1162,34 @@ local function createInventoryContent(window)
         { key = "Equip", texture = "inv_helmet_22", tip = MultiBot.L("tips.inventory.equip") },
         { key = "Use", texture = "inv_gauntlets_25", tip = MultiBot.L("tips.inventory.use") },
         { key = "Trade", texture = "achievement_reputation_01", tip = MultiBot.L("tips.inventory.trade") },
+        { key = "Bank", texture = "inv_misc_bag_10", tip = MultiBot.L("tips.inventory.bank.deposit", "Deposit to bank") },
+        { key = "GuildBank", texture = "inv_misc_bag_15", tip = MultiBot.L("tips.inventory.gbank.deposit", "Deposit to guild bank") },
+        { key = "Buy", texture = "inv_misc_coin_05", tip = MultiBot.L("tips.inventory.buy", "Buy this item from a nearby vendor") },
         { key = "Destroy", texture = "inv_hammer_15", tip = MultiBot.L("tips.inventory.drop") },
     }
     local instantButtonDefs = {
         { key = "SellGrey", texture = "inv_misc_coin_03", tip = MultiBot.L("tips.inventory.sellgrey") },
         { key = "SellVendor", texture = "inv_misc_coin_04", tip = MultiBot.L("tips.inventory.sellvendor") },
         { key = "Open", texture = "inv_misc_gift_05", tip = MultiBot.L("tips.inventory.open") },
+        { key = "BankOpen", texture = "inv_misc_bag_10", tip = MultiBot.L("tips.inventory.bank.open", "Open bot bank") },
+        { key = "GuildBankOpen", texture = "inv_misc_bag_15", tip = MultiBot.L("tips.inventory.gbank.open", "Open bot guild bank") },
     }
 
     for index, definition in ipairs(modeButtonDefs) do
-        local yOffset = -INVENTORY_WINDOW_DEFAULTS.buttonStartOffsetY - ((index - 1) * INVENTORY_WINDOW_DEFAULTS.buttonSpacing)
-        buttons[definition.key] = makeActionButton(leftPanel, definition.key, definition.texture, definition.tip, yOffset)
+        local columns = math.max(1, INVENTORY_WINDOW_DEFAULTS.modeActionColumns or 1)
+        local spacingX = INVENTORY_WINDOW_DEFAULTS.modeActionSpacingX or INVENTORY_WINDOW_DEFAULTS.buttonSpacing
+        local spacingY = INVENTORY_WINDOW_DEFAULTS.modeActionSpacingY or INVENTORY_WINDOW_DEFAULTS.buttonSpacing
+        local groupWidth = INVENTORY_WINDOW_DEFAULTS.buttonSize + ((columns - 1) * spacingX)
+        local startX = math.floor((INVENTORY_WINDOW_DEFAULTS.actionsWidth - groupWidth) / 2)
+        local column = (index - 1) % columns
+        local row = math.floor((index - 1) / columns)
+        local xOffset = startX + (column * spacingX)
+        local yOffset = -INVENTORY_WINDOW_DEFAULTS.buttonStartOffsetY - (row * spacingY)
+        buttons[definition.key] = makeActionButton(leftPanel, definition.key, definition.texture, definition.tip, yOffset, xOffset)
     end
 
     local instantStartY = -INVENTORY_WINDOW_DEFAULTS.buttonStartOffsetY
-        - (#modeButtonDefs * INVENTORY_WINDOW_DEFAULTS.buttonSpacing)
+        - (math.ceil(#modeButtonDefs / math.max(1, INVENTORY_WINDOW_DEFAULTS.modeActionColumns or 1)) * (INVENTORY_WINDOW_DEFAULTS.modeActionSpacingY or INVENTORY_WINDOW_DEFAULTS.buttonSpacing))
         - INVENTORY_WINDOW_DEFAULTS.instantActionsTopPadding
     local instantColumns = math.max(1, INVENTORY_WINDOW_DEFAULTS.instantActionColumns or 1)
     local instantSpacingX = INVENTORY_WINDOW_DEFAULTS.instantActionSpacingX or INVENTORY_WINDOW_DEFAULTS.buttonSpacing
@@ -1485,6 +1507,20 @@ function MultiBot.InitializeInventoryFrame()
 
     inventory.buttons.Open.doLeft = function(pButton)
         runInventoryInstantAction(pButton.getName(), "open items")
+    end
+
+    inventory.buttons.BankOpen.doLeft = function(pButton)
+        local botName = pButton.getName and pButton.getName() or nil
+        if MultiBot.OpenBotBank then
+            MultiBot.OpenBotBank(botName)
+        end
+    end
+
+    inventory.buttons.GuildBankOpen.doLeft = function(pButton)
+        local botName = pButton.getName and pButton.getName() or nil
+        if MultiBot.OpenBotGuildBank then
+            MultiBot.OpenBotGuildBank(botName)
+        end
     end
 
     setInventoryActionState("Sell", { cancelTrade = false })

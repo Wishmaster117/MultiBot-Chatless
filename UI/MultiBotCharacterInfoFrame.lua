@@ -36,9 +36,9 @@ local CHARACTER_SKILL_VALUE_X = 142
 local CHARACTER_SKILL_VALUE_WIDTH = 72
 local RECIPE_FRAME_WIDTH = 340
 local RECIPE_FRAME_X = 145
-local RECIPE_ROW_WIDTH = 302
-local RECIPE_CRAFT_BUTTON_WIDTH = 54
-local RECIPE_TEXT_WIDTH = 206
+local RECIPE_ROW_WIDTH = 286
+local RECIPE_CRAFT_BUTTON_WIDTH = 62
+local RECIPE_TEXT_WIDTH = 176
 local RECIPE_REFRESH_DELAY = 3.0
 local COOKING_SKILL_ID = 185
 
@@ -295,6 +295,39 @@ local function buildMaterialsText(recipe)
     return table.concat(parts, ", ")
 end
 
+local function getFirstMissingMaterial(recipe)
+    for _, material in ipairs((recipe and recipe.materials) or {}) do
+        local itemId = tonumber(material.itemId or 0) or 0
+        local required = tonumber(material.required or 0) or 0
+        local available = tonumber(material.available or 0) or 0
+        if itemId > 0 and required > available then
+            return {
+                itemId = itemId,
+                missing = required - available,
+            }
+        end
+    end
+
+    return nil
+end
+
+local function getMissingMaterials(recipe)
+    local missings = {}
+    for _, material in ipairs((recipe and recipe.materials) or {}) do
+        local itemId = tonumber(material.itemId or 0) or 0
+        local required = tonumber(material.required or 0) or 0
+        local available = tonumber(material.available or 0) or 0
+        if itemId > 0 and required > available then
+            table.insert(missings, {
+                itemId = itemId,
+                missing = required - available,
+            })
+        end
+    end
+
+    return missings
+end
+
 local function getRecipePendingKey(botName, skillId, spellId)
     return string.lower(tostring(botName or "")) .. ":" .. tostring(tonumber(skillId or 0) or 0) .. ":" .. tostring(tonumber(spellId or 0) or 0)
 end
@@ -389,7 +422,26 @@ local function ensureRecipeFrame()
             local spellId = tonumber(recipe.spellId or 0) or 0
             local itemId = tonumber(recipe.itemId or 0) or 0
             local craftable = tonumber(recipe.craftable or 0) or 0
-            if skillId <= 0 or spellId <= 0 or craftable <= 0 then
+            if craftable <= 0 then
+                local missings = getMissingMaterials(recipe)
+                local requested = false
+                if #missings > 0 and MultiBot.Comm and MultiBot.Comm.RunInventoryItemAction then
+                    for _, missing in ipairs(missings) do
+                        local token = MultiBot.Comm.RunInventoryItemAction(frame.botName, "BUY_ITEM", missing.itemId, missing.missing)
+                        if token then
+                            requested = true
+                        end
+                    end
+                end
+                if requested then
+                    frame.status:SetText(L("profession.recipes.buy_missing.pending", "Buy requested..."))
+                else
+                    frame.status:SetText(L("profession.recipes.buy_missing.failed", "Buy request failed."))
+                end
+                return
+            end
+
+            if skillId <= 0 or spellId <= 0 then
                 return
             end
 
@@ -407,8 +459,13 @@ local function ensureRecipeFrame()
         row.craftButton:SetScript("OnEnter", function(self)
             if not GameTooltip then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(L("profession.recipes.craft", "Craft"))
-            GameTooltip:AddLine(L("profession.recipes.craft.tooltip", "Ask the bot to craft this recipe once."), 1, 1, 1, true)
+            if row.recipe and tonumber(row.recipe.craftable or 0) <= 0 and getFirstMissingMaterial(row.recipe) then
+                GameTooltip:AddLine(L("profession.recipes.buy_missing", "Buy"))
+                GameTooltip:AddLine(L("profession.recipes.buy_missing.tooltip", "Ask the bot to buy the first missing material from a nearby vendor."), 1, 1, 1, true)
+            else
+                GameTooltip:AddLine(L("profession.recipes.craft", "Craft"))
+                GameTooltip:AddLine(L("profession.recipes.craft.tooltip", "Ask the bot to craft this recipe once."), 1, 1, 1, true)
+            end
             GameTooltip:Show()
         end)
         row.craftButton:SetScript("OnLeave", function()
@@ -466,10 +523,19 @@ local function ensureRecipeFrame()
                 local color = DIFFICULTY_COLORS[recipe.difficulty or ""] or "|cffffffff"
                 local craftable = tonumber(recipe.craftable or 0) or 0
                 local pending = self.pendingCrafts[getRecipePendingKey(self.botName, recipe.skillId, recipe.spellId)]
+                local missing = getFirstMissingMaterial(recipe)
                 row.icon:SetTexture(MultiBot.SafeTexturePath(icon))
                 row.text:SetText(color .. name .. "|r |cff999999x" .. craftable .. "|r")
-                row.craftButton:SetText(pending and "..." or L("profession.recipes.craft", "Craft"))
-                setButtonEnabled(row.craftButton, craftable > 0 and tonumber(recipe.spellId or 0) > 0 and not pending)
+                if craftable > 0 then
+                    row.craftButton:SetText(pending and "..." or L("profession.recipes.craft", "Craft"))
+                    setButtonEnabled(row.craftButton, tonumber(recipe.spellId or 0) > 0 and not pending)
+                elseif missing then
+                    row.craftButton:SetText(L("profession.recipes.buy_missing", "Buy"))
+                    setButtonEnabled(row.craftButton, true)
+                else
+                    row.craftButton:SetText(L("profession.recipes.craft", "Craft"))
+                    setButtonEnabled(row.craftButton, false)
+                end
                 row.craftButton:Show()
                 row:Show()
             else
