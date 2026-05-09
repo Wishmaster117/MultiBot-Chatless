@@ -18,6 +18,7 @@
 * Refaire uns passe pour que toutes les frames respectent le strata de la config.
 * Retravailler la frame pvp stats qu'elle ressemble aux autres, et ajuster l'alignement du texte
 * Faire une UI pour enchanter les objets à moins qu'on arrive à faire le bot caster le spell sur la fenêtre de trade.
+* implementer les commandes rep all et emblems pour être affichées dans la frame d'info des bots 
 
 ## Informations bot
 * Dans les frames métier ajout d'un bouton pour faire le bot acheter les composants manquants pour crafter l'item.
