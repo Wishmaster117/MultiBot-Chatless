@@ -89,8 +89,12 @@ GET~STATS
 GET~PVP_STATS
 GET~TALENT_SPEC_LIST
 GET~INVENTORY
+GET~BANK
+GET~GBANK
 GET~SPELLBOOK
 GET~BOT_SKILLS
+GET~BOT_REPUTATIONS
+GET~BOT_EMBLEMS
 GET~PROFESSION_RECIPES
 GET~GLYPHS
 GET~OUTFITS
@@ -167,7 +171,11 @@ The goal is to remove automatic UI-refresh spam.
   </tr>
   <tr>
     <td>Character Info frame</td>
-    <td><strong>Bridge-first</strong> class skills, professions, secondary skills, weapon skills and armor skills</td>
+    <td><strong>Bridge-first</strong> Blizzard-style tabs for skills, reputations and currencies/emblems</td>
+  </tr>
+  <tr>
+    <td>Bot bank / guild bank / vendor buy</td>
+    <td><strong>Bridge-first</strong> bank snapshots, guild bank snapshots, bank deposit/withdraw, guild bank deposit and vendor buy actions</td>
   </tr>
   <tr>
     <td>Profession recipe frame</td>
@@ -461,7 +469,8 @@ Implemented bridge-first / chatless areas:
 - Talent spec list refresh.
 - Inventory refresh with icons and item tooltips.
 - Spellbook refresh, with profession/crafting spells separated from the combat spellbook path.
-- Character Info frame through the bridge with class, profession, secondary, weapon and armor skills.
+- Character Info frame through the bridge with Blizzard-style tabs for class, profession, secondary, weapon and armor skills, reputations and currencies/emblems.
+- Bot bank and guild bank snapshots through the bridge, plus bank deposit/withdraw, guild bank deposit and vendor buy item actions.
 - Profession recipe frame through the bridge, opened from profession and secondary skill rows.
 - Glyph refresh with icons and glyph tooltips.
 - Outfits refresh and actions through the bridge.
@@ -491,11 +500,11 @@ Kept intentionally:
 
 # Remaining Work
 
-The Outfits, RTI, Pull Control, Combat Strategy, Disperse, Loot Rules, Quest, Game Object, Character Info and Profession Recipe migrations are implemented. The Loot Master UI is also implemented as an optional client-side master-loot helper. The next step is final stabilization and cleanup.
+The Outfits, RTI, Pull Control, Combat Strategy, Disperse, Loot Rules, Quest, Game Object, Character Info, Profession Recipe, Reputations, Currencies and advanced inventory bank/vendor migrations are implemented. The Loot Master UI is also implemented as an optional client-side master-loot helper. The next step is final stabilization and cleanup.
 
 Planned follow-up work:
 
-- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, PvP Stats, Inventory, Spellbook, Character Info, Profession Recipes, Talents, Glyphs, Outfits, Quests, Game Objects, RTI, Pull Control, Combat Strategies, Disperse, Loot Rules and Loot Master.
+- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, PvP Stats, Inventory, Bot Bank, Guild Bank, Vendor Buy, Spellbook, Character Info, Reputations, Currencies, Profession Recipes, Talents, Glyphs, Outfits, Quests, Game Objects, RTI, Pull Control, Combat Strategies, Disperse, Loot Rules and Loot Master.
 - Verify that `MultiBot.allowLegacyChatFallback = false` prevents automatic legacy refresh spam on all migrated UI paths.
 - Keep manual diagnostic commands documented and functional.
 - Remove obsolete debug prints.
@@ -560,10 +569,14 @@ Check the server console for bridge requests such as:
 
 ```text
 GET~INVENTORY
+GET~BANK
+GET~GBANK
 GET~SPELLBOOK
 GET~GLYPHS
 GET~OUTFITS
 GET~BOT_SKILLS
+GET~BOT_REPUTATIONS
+GET~BOT_EMBLEMS
 GET~PROFESSION_RECIPES
 GET~QUESTS
 GET~GAMEOBJECTS

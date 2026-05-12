@@ -126,6 +126,13 @@ local function ensureBridgeState()
   state.botSkills = state.botSkills or {}
   state.botSkillSeq = state.botSkillSeq or 0
   state.botSkillActive = state.botSkillActive or nil
+  state.botReputations = state.botReputations or {}
+  state.botReputationSeq = state.botReputationSeq or 0
+  state.botReputationActive = state.botReputationActive or nil
+  state.botEmblems = state.botEmblems or {}
+  state.botEmblemMoney = state.botEmblemMoney or {}
+  state.botEmblemSeq = state.botEmblemSeq or 0
+  state.botEmblemActive = state.botEmblemActive or nil
   state.professionRecipes = state.professionRecipes or {}
   state.professionRecipeSeq = state.professionRecipeSeq or 0
   state.professionRecipeActive = state.professionRecipeActive or nil
@@ -657,6 +664,57 @@ function Comm.RequestBotSkills(name)
   return true
 end
 
+function Comm.RequestBotReputations(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.botReputationSeq = (tonumber(state.botReputationSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-rep-" .. tostring(state.botReputationSeq)
+  state.botReputationActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+    items = {},
+  }
+
+  if not Comm.Send("GET", "BOT_REPUTATIONS~" .. name .. "~" .. token) then
+    state.botReputationActive = nil
+    return false
+  end
+
+  return true
+end
+
+function Comm.RequestBotEmblems(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.botEmblemSeq = (tonumber(state.botEmblemSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-emblem-" .. tostring(state.botEmblemSeq)
+  state.botEmblemActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    startedAt = safeNow(),
+    items = {},
+    money = nil,
+  }
+
+  if not Comm.Send("GET", "BOT_EMBLEMS~" .. name .. "~" .. token) then
+    state.botEmblemActive = nil
+    return false
+  end
+
+  return true
+end
+
 function Comm.RequestProfessionRecipes(name, skillId)
   local state = ensureBridgeState()
   name = trim(name)
@@ -754,6 +812,8 @@ function Comm.MarkDisconnected(reason)
   state.inventoryItemActions = {}
   state.spellbookActive = nil
   state.botSkillActive = nil
+  state.botReputationActive = nil
+  state.botEmblemActive = nil
   state.professionRecipeActive = nil
   state.professionRecipeCrafts = {}
   state.outfitActive = nil
@@ -1824,6 +1884,42 @@ local function getActiveBotSkillRequest(botName, token)
   return active
 end
 
+local function getActiveBotReputationRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.botReputationActive
+  if type(active) ~= "table" then
+    return nil
+  end
+
+  if botName and botName ~= "" and string.lower(trim(botName)) ~= trim(active.botNameKey or "") then
+    return nil
+  end
+
+  if token and token ~= "" and tostring(token) ~= tostring(active.token or "") then
+    return nil
+  end
+
+  return active
+end
+
+local function getActiveBotEmblemRequest(botName, token)
+  local state = ensureBridgeState()
+  local active = state.botEmblemActive
+  if type(active) ~= "table" then
+    return nil
+  end
+
+  if botName and botName ~= "" and string.lower(trim(botName)) ~= trim(active.botNameKey or "") then
+    return nil
+  end
+
+  if token and token ~= "" and tostring(token) ~= tostring(active.token or "") then
+    return nil
+  end
+
+  return active
+end
+
 local function getActiveProfessionRecipeRequest(botName, token, skillId)
   local state = ensureBridgeState()
   local active = state.professionRecipeActive
@@ -2478,6 +2574,143 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "BOT_REPUTATIONS_BEGIN" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotReputationRequest(botName, token)
+    if active then
+      active.items = {}
+    end
+
+    return true
+  end
+
+  if opcode == "BOT_REPUTATION_ITEM" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, rest2 = splitOnce(rest or "", "~")
+    local factionId, rest3 = splitOnce(rest2 or "", "~")
+    local factionName, rest4 = splitOnce(rest3 or "", "~")
+    local rank, rest5 = splitOnce(rest4 or "", "~")
+    local value, maxValue = splitOnce(rest5 or "", "~")
+
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotReputationRequest(botName, token)
+    if active then
+      table.insert(active.items, {
+        factionId = tonumber(factionId or "0") or 0,
+        name = trim(urlDecodeField(factionName)),
+        rank = tonumber(rank or "0") or 0,
+        value = tonumber(value or "0") or 0,
+        max = tonumber(maxValue or "0") or 0,
+      })
+    end
+
+    return true
+  end
+
+  if opcode == "BOT_REPUTATIONS_END" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotReputationRequest(botName, token)
+    if active then
+      local key = string.lower(botName)
+      state.botReputations[key] = active.items or {}
+      if MultiBot.OnBridgeBotReputations then
+        MultiBot.OnBridgeBotReputations(botName, state.botReputations[key], token)
+      end
+      state.botReputationActive = nil
+    end
+
+    return true
+  end
+
+  if opcode == "BOT_EMBLEMS_BEGIN" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotEmblemRequest(botName, token)
+    if active then
+      active.items = {}
+      active.money = nil
+    end
+
+    return true
+  end
+
+  if opcode == "BOT_EMBLEM_ITEM" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, rest2 = splitOnce(rest or "", "~")
+    local itemId, count = splitOnce(rest2 or "", "~")
+
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotEmblemRequest(botName, token)
+    if active then
+      table.insert(active.items, {
+        itemId = tonumber(itemId or "0") or 0,
+        count = tonumber(count or "0") or 0,
+      })
+    end
+
+    return true
+  end
+
+  if opcode == "BOT_EMBLEMS_MONEY" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, money = splitOnce(rest or "", "~")
+
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotEmblemRequest(botName, token)
+    if active then
+      active.money = tonumber(money or "0") or 0
+    end
+
+    return true
+  end
+
+  if opcode == "BOT_EMBLEMS_END" then
+    local botName, token = splitOnce(payload or "", "~")
+    botName = trim(urlDecodeField(botName))
+    token = trim(token)
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveBotEmblemRequest(botName, token)
+    if active then
+      local key = string.lower(botName)
+      state.botEmblems[key] = active.items or {}
+      state.botEmblemMoney[key] = active.money
+      if MultiBot.OnBridgeBotEmblems then
+        MultiBot.OnBridgeBotEmblems(botName, state.botEmblems[key], token, state.botEmblemMoney[key])
+      end
+      state.botEmblemActive = nil
+    end
+
+    return true
+  end
+
   if opcode == "PROFESSION_RECIPES_BEGIN" then
     local botName, rest = splitOnce(payload or "", "~")
     local token, skillId = splitOnce(rest or "", "~")
@@ -2680,6 +2913,11 @@ function Comm.OnPlayerEnteringWorld()
   state.spellbookActive = nil
   state.botSkills = {}
   state.botSkillActive = nil
+  state.botReputations = {}
+  state.botReputationActive = nil
+  state.botEmblems = {}
+  state.botEmblemMoney = {}
+  state.botEmblemActive = nil
   state.professionRecipes = {}
   state.professionRecipeActive = nil
   state.professionRecipeCrafts = {}
