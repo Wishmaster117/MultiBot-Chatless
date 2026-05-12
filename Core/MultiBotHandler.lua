@@ -202,6 +202,8 @@ local MAINBAR_STATE_KEYS = {
 	"Masters",
 	"Creator",
 	"Beast",
+	"Disperse",
+	"Loot",
 	"Expand",
 	"RTSC",
 }
@@ -795,6 +797,27 @@ local FLEE_BUTTON_BINDINGS = {
 	flee_target = "Target",
 }
 
+local function getButtonTextureKey(button)
+	local texture = button and button.texture
+	if type(texture) ~= "string" or texture == "" then
+		return nil
+	end
+
+	local normalized = string.gsub(texture, "/", "\\")
+	local fileName = string.match(normalized, "([^\\]+)$") or normalized
+	fileName = string.gsub(fileName, "%.[Bb][Ll][Pp]$", "")
+	fileName = string.gsub(fileName, "%.[Tt][Gg][Aa]$", "")
+	return fileName
+end
+
+local function getBoundButtonTextureKey(button, bindings, fallback)
+	local key = getButtonTextureKey(button)
+	if key and bindings and bindings[key] then
+		return key
+	end
+	return fallback
+end
+
 local function getMultiBarButton(sectionName, frameName, buttonName)
 	local multiBar = MultiBot.frames and MultiBot.frames["MultiBar"]
 	local section = multiBar and multiBar.frames and multiBar.frames[sectionName]
@@ -905,6 +928,10 @@ local function restoreMainBarSavedStates()
 			MultiBot.frames["MultiBar"].setPoint(MultiBot.frames["MultiBar"].x, MultiBot.frames["MultiBar"].y - 34)
 		end
 	end)
+
+	if MultiBot.RefreshLeftLayout then
+		MultiBot.RefreshLeftLayout()
+	end
 end
 
 local function hideButtonUnitFrame(button)
@@ -1328,25 +1355,27 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 		saveBoundFramePoints()
 		savePortalMemory()
 
-		local tValue = MultiBot.doSplit(MultiBot.frames["MultiBar"].frames["Left"].buttons["Attack"].texture, "\\")[5]
-		tValue = string.sub(tValue, 1, string.len(tValue) - 4)
-		setSavedMainBarValue("AttackButton", tValue)
+		local multiBar = MultiBot.frames and MultiBot.frames["MultiBar"]
+		local leftButtons = multiBar and multiBar.frames and multiBar.frames["Left"] and multiBar.frames["Left"].buttons
+		local mainButtons = multiBar and multiBar.frames and multiBar.frames["Main"] and multiBar.frames["Main"].buttons
+		local function mainButtonState(name)
+			return MultiBot.IF(mainButtons and mainButtons[name] and mainButtons[name].state, "true", "false")
+		end
 
-		tValue = MultiBot.doSplit(MultiBot.frames["MultiBar"].frames["Left"].buttons["Flee"].texture, "\\")[5]
-		tValue = string.sub(tValue, 1, string.len(tValue) - 4)
-		setSavedMainBarValue("FleeButton", tValue)
+		setSavedMainBarValue("AttackButton", getBoundButtonTextureKey(leftButtons and leftButtons["Attack"], ATTACK_BUTTON_BINDINGS, "attack"))
+		setSavedMainBarValue("FleeButton", getBoundButtonTextureKey(leftButtons and leftButtons["Flee"], FLEE_BUTTON_BINDINGS, "flee"))
 
 		setSavedMainBarValue("AutoRelease", MultiBot.IF(MultiBot.auto.release, "true", "false"))
 		setSavedMainBarValue("NecroNet", MultiBot.IF(MultiBot.necronet.state, "true", "false"))
 		setSavedMainBarValue("Reward", MultiBot.IF(MultiBot.reward.state, "true", "false"))
 
-		setSavedMainBarValue("Masters", MultiBot.IF(MultiBot.frames["MultiBar"].frames["Main"].buttons["Masters"].state, "true", "false"))
-		setSavedMainBarValue("Creator", MultiBot.IF(MultiBot.frames["MultiBar"].frames["Main"].buttons["Creator"].state, "true", "false"))
-		setSavedMainBarValue("Beast", MultiBot.IF(MultiBot.frames["MultiBar"].frames["Main"].buttons["Beast"].state, "true", "false"))
-		setSavedMainBarValue("Disperse", MultiBot.IF(MultiBot.frames["MultiBar"].frames["Main"].buttons["Disperse"].state, "true", "false"))
-		setSavedMainBarValue("Loot", MultiBot.IF(MultiBot.frames["MultiBar"].frames["Main"].buttons["Loot"].state, "true", "false"))
-		setSavedMainBarValue("Expand", MultiBot.IF(MultiBot.frames["MultiBar"].frames["Main"].buttons["Expand"].state, "true", "false"))
-		setSavedMainBarValue("RTSC", MultiBot.IF(MultiBot.frames["MultiBar"].frames["Main"].buttons["RTSC"].state, "true", "false"))
+		setSavedMainBarValue("Masters", mainButtonState("Masters"))
+		setSavedMainBarValue("Creator", mainButtonState("Creator"))
+		setSavedMainBarValue("Beast", mainButtonState("Beast"))
+		setSavedMainBarValue("Disperse", mainButtonState("Disperse"))
+		setSavedMainBarValue("Loot", mainButtonState("Loot"))
+		setSavedMainBarValue("Expand", mainButtonState("Expand"))
+		setSavedMainBarValue("RTSC", mainButtonState("RTSC"))
 
 		return
 	end

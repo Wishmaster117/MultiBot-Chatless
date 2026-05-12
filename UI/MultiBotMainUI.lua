@@ -229,6 +229,8 @@ local function refreshLeftLayout()
     end)
 end
 
+MultiBot.RefreshLeftLayout = refreshLeftLayout
+
 local function resetDefaultWindowPositions()
     MultiBot.frames["MultiBar"].setPoint(-363, 144)
     MultiBot.inventory.setPoint(-700, -144)
