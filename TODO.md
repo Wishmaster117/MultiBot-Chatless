@@ -21,6 +21,7 @@
 ## Informations bot
 * Dans les frames métier ajout d'un bouton pour faire le bot acheter les composants manquants pour crafter l'item.
 * Infos personnage : onglets style Blizzard pour compétences, réputations et monnaies.
+* Ajouter un bouton pour abandonner les quêtes dans la frame de quêtes finies et en cours des bots
  
 
 ## Inventaire Bot étendu
