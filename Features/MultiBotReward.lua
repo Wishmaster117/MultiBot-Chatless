@@ -367,7 +367,7 @@ MultiBot.setRewards = function(attempt, token)
 		token = rewardCollectToken
 	end
 
-	local expectedChoices = 0
+	local expectedChoices
 	tReward.rewards, expectedChoices = collectQuestChoices()
 	tReward.units = collectEligibleUnits()
 	MultiBot.rewardResetPagination()
