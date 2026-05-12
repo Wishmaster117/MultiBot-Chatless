@@ -1,7 +1,9 @@
 local MB_REWARD_PAGE_SIZE = 12
 local MB_REWARD_MAX_CHOICES = 6
+local MB_REWARD_RETRY_DELAYS = { 0.15, 0.45, 0.90 }
 
 local MB_REWARD_CONFIG_POPUP_KEY = "MULTIBOT_REWARD_CONFIG_WARNING"
+local rewardCollectToken = 0
 
 local function showRewardConfigPopup()
 	if(type(StaticPopupDialogs) ~= "table" or type(StaticPopup_Show) ~= "function") then return end
@@ -88,7 +90,33 @@ local function collectQuestChoices()
 		end
 	end
 
-	return tChoices
+	return tChoices, tMaxChoices
+end
+
+local function isQuestRewardPanelOpen()
+	if(QuestFrameRewardPanel ~= nil and QuestFrameRewardPanel.IsShown ~= nil) then
+		return QuestFrameRewardPanel:IsShown()
+	end
+
+	if(QuestFrame ~= nil and QuestFrame.IsShown ~= nil) then
+		return QuestFrame:IsShown()
+	end
+
+	return true
+end
+
+local function scheduleRewardCollectRetry(attempt, token)
+	local delay = MB_REWARD_RETRY_DELAYS[attempt]
+	if(delay == nil or MultiBot.TimerAfter == nil) then return false end
+
+	MultiBot.TimerAfter(delay, function()
+		if(token ~= rewardCollectToken) then return end
+		if(not isQuestRewardPanelOpen()) then return end
+		if(MultiBot.reward == nil or MultiBot.reward.state == false) then return end
+		MultiBot.setRewards(attempt + 1, token)
+	end)
+
+	return true
 end
 
 local function collectEligibleUnits()
@@ -111,6 +139,10 @@ local function collectEligibleUnits()
 	end
 
 	return tUnits
+end
+
+local function hasGroupMembers()
+	return (GetNumRaidMembers() > 0 or GetNumPartyMembers() > 0)
 end
 
 local function applyRewardChoice(pButton)
@@ -325,15 +357,27 @@ MultiBot.rewardRenderPage = function()
 	end
 end
 
-MultiBot.setRewards = function()
+MultiBot.setRewards = function(attempt, token)
 	local tReward = MultiBot.rewardEnsureState()
 	if(tReward == nil or tReward.state == false) then return end
 
-	tReward.rewards = collectQuestChoices()
+	attempt = tonumber(attempt) or 1
+	if(token == nil) then
+		rewardCollectToken = rewardCollectToken + 1
+		token = rewardCollectToken
+	end
+
+	local expectedChoices = 0
+	tReward.rewards, expectedChoices = collectQuestChoices()
 	tReward.units = collectEligibleUnits()
 	MultiBot.rewardResetPagination()
 
 	local unitsCount, rewardCount = MultiBot.rewardSyncPageBounds()
+	local rewardsPending = (expectedChoices == 0 or rewardCount < expectedChoices)
+	local unitsPending = (unitsCount == 0 and hasGroupMembers())
+	if((rewardsPending or unitsPending) and scheduleRewardCollectRetry(attempt, token)) then
+		return
+	end
 	if(unitsCount == 0 or rewardCount == 0) then
 		MultiBot.rewardClearPage()
 		MultiBot.rewardRefreshPager()
