@@ -18,7 +18,9 @@
 * Refaire uns passe pour que toutes les frames respectent le strata de la config.
 * Retravailler la frame pvp stats qu'elle ressemble aux autres, et ajuster l'alignement du texte
 * Faire une UI pour enchanter les objets à moins qu'on arrive à faire le bot caster le spell sur la fenêtre de trade.
-* implementer les commandes rep all et emblems pour être affichées dans la frame d'info des bots 
+* implementer les commandes rep all et emblems pour être affichées dans la frame d'info des bots
+* Ajouter un bouton dans la frame des quêtes du bot pour le faire abandonner la quête
+* Voi si besoin de quelque chose dans l'addon pour le : https://github.com/mod-playerbots/mod-playerbots/pull/2372
 
 ## Informations bot
 * Dans les frames métier ajout d'un bouton pour faire le bot acheter les composants manquants pour crafter l'item.
