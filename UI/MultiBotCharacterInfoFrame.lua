@@ -339,9 +339,11 @@ end
 
 local function getEmblemInfo(itemId)
     itemId = tonumber(itemId or 0) or 0
-    local name, _, _, _, _, _, _, _, _, icon
+    local name, icon
     if itemId > 0 and GetItemInfo then
-        name, _, _, _, _, _, _, _, _, icon = GetItemInfo(itemId)
+        local itemInfo = { GetItemInfo(itemId) }
+        name = itemInfo[1]
+        icon = itemInfo[10]
     end
 
     if itemId > 0 and not icon and GetItemIcon then
