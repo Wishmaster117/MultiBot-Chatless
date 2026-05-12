@@ -9,7 +9,7 @@ Ce document suit les commandes `mod-playerbots` encore intéressantes à intégr
 - les commandes serveur/admin à ne pas intégrer dans l'addon ;
 - les priorités d'intégration bridge-first/chatless.
 
-Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Profession Recipes, Craft et Loot Master :
+Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Reputations, Monnaies, Profession Recipes, Craft, Loot Master, Bot Bank, Guild Bank et Vendor Buy :
 **éviter le spam chat automatique**, utiliser le bridge quand c'est possible, et conserver les commandes manuelles utiles comme `who`, `co ?`, `nc ?`, `ss ?`.
 
 ---
@@ -30,8 +30,11 @@ Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats
 | Quests | Présent | UI quêtes existante, pas à mélanger avec les commandes manuelles de diagnostic. |
 | Outfits | Fait | Endpoint bridge + commandes outfits intégrées. |
 | Character Info / Skills | Fait | Nouvelle frame infos personnage alimentée par `GET~BOT_SKILLS`, catégories skills/professions/armes, noms localisés via le client quand possible. |
+| Character Info / Reputations | Fait | Onglet réputations alimenté par `GET~BOT_REPUTATIONS`, sans spam chat `rep all`. |
+| Character Info / Monnaies | Fait | Onglet monnaies alimenté par `GET~BOT_EMBLEMS`, avec emblèmes et argent du bot. |
 | Profession recipes | Fait | Nouvelle frame recettes par métier via `GET~PROFESSION_RECIPES`, composants, compte craftable, recettes à résultat direct ou indirect. |
 | Profession recipe craft | Fait | Bouton `Créer` via `RUN~CRAFT_RECIPE`, support recettes classiques et résultats aléatoires/indirects, erreurs détaillées. |
+| Bot bank / Guild bank / Vendor buy | Fait/Partiel | `GET~BANK`, `GET~GBANK` et `RUN~ITEM_ACTION` pour banque bot, banque de guilde bot, achat vendeur et actions inventaire avancées validées. |
 | RTI / Target Icons | Fait | UI complète + bridge `RUN~RTI`, scopes `ALL`, `GROUP`, `BOT`. |
 | Pull Control | Fait | Mini-frame MainBar + bridge `RUN~COMBAT`, séquences de commandes, scopes et presets. |
 | Combat Strategies | Fait | Toggles individuels dans les EveryBars + mini-frame Party/Raid, via `RUN~COMBAT`. |
@@ -42,7 +45,7 @@ Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats
 
 ---
 
-## Derniers lots terminés : Pull Control + Combat Strategies + Disperse + Loot Rules + Character Info + Craft + Loot Master
+## Derniers lots terminés : Pull Control + Combat Strategies + Disperse + Loot Rules + Character Info + Craft + Loot Master + Reputations + Monnaies + Items avancés
 
 ### Pull Control
 
@@ -175,6 +178,21 @@ Fonctionnalités terminées :
 - compatibilité AddClass bots, altbots et randombots groupés ;
 - clic sur un métier ou une compétence secondaire pour ouvrir la frame recettes quand des recettes existent.
 
+### Character Info / Reputations / Monnaies
+
+La frame `Infos personnage` expose maintenant les réputations et monnaies dans des onglets séparés, sans lancer automatiquement `rep all` ou `emblems` en chat.
+
+Fonctionnalités terminées :
+
+- endpoint bridge `GET~BOT_REPUTATIONS~<bot>~<token>` ;
+- payloads structurés `BOT_REPUTATIONS_BEGIN`, `BOT_REPUTATION_ITEM`, `BOT_REPUTATIONS_END` ;
+- endpoint bridge `GET~BOT_EMBLEMS~<bot>~<token>` ;
+- payloads structurés `BOT_EMBLEMS_BEGIN`, `BOT_EMBLEM_ITEM`, `BOT_EMBLEMS_MONEY`, `BOT_EMBLEMS_END` ;
+- affichage des réputations visibles du bot ;
+- affichage des emblèmes dans l'ordre WotLK attendu ;
+- affichage de l'argent du bot en bas de l'onglet monnaies ;
+- onglets style Blizzard en bas de la frame.
+
 ### Profession Recipes / Craft
 
 La frame recettes métier permet maintenant de consulter et lancer les crafts connus par un bot via bridge.
@@ -220,6 +238,30 @@ Fonctionnalités terminées :
 - tooltips multilangues `Switch Disperse` et `Switch Loot Rules` ;
 - persistance SavedVariables de l'état visible/caché ;
 - relayout des boutons visibles pour que `Flee` et `Stay/Follow` restent directement après `Formation` quand les boutons optionnels sont cachés.
+
+### Items avancés banque / guild bank / buy
+
+Le bloc inventaire avancé couvre maintenant les usages banque, banque de guilde et achat vendeur les plus utiles sans parsing chat automatique.
+
+Fonctionnalités terminées :
+
+- endpoint bridge `GET~BANK~<bot>~<token>` ;
+- payloads structurés `BANK_BEGIN`, `BANK_ITEM`, `BANK_ERROR`, `BANK_END` ;
+- endpoint bridge `GET~GBANK~<bot>~<token>` ;
+- payloads structurés `GBANK_BEGIN`, `GBANK_ITEM`, `GBANK_ERROR`, `GBANK_END` ;
+- endpoint bridge `RUN~ITEM_ACTION~<bot>~<token>~<action>~<itemId>~<count>` ;
+- dépôt dans la banque du bot ;
+- retrait depuis la banque du bot ;
+- dépôt en banque de guilde du bot ;
+- achat de composants chez un vendeur proche ;
+- messages d'échec plus précis, notamment vendeur sans monnaie compatible ou banquier introuvable ;
+- consultation de la banque de guilde du bot sans exiger que le joueur soit dans la même guilde.
+
+À garder pour plus tard :
+
+- retrait banque de guilde, si l'UI doit l'exposer ;
+- affichage de l'argent de guilde ;
+- harmonisation visuelle finale des frames banque et BDG.
 
 ---
 
@@ -545,7 +587,7 @@ Pas besoin de parsing automatique de réponses longues, sauf si une future UI ve
 
 ### Pourquoi
 
-L'inventaire bridge-first est déjà en place, et le craft de recettes métier passe maintenant par le bridge. Les commandes restantes sont des améliorations secondaires autour des items ponctuels, de la vente, de l'ouverture d'objets et des enchantements ciblant un item.
+L'inventaire bridge-first est déjà en place, le craft de recettes métier passe par le bridge, et les actions banque/guild bank/buy principales sont maintenant couvertes. Les commandes restantes sont des améliorations secondaires autour des items ponctuels, de la vente, de l'ouverture d'objets, du retrait BDG et des enchantements ciblant un item.
 
 ### Commandes à couvrir
 
@@ -559,11 +601,11 @@ L'inventaire bridge-first est déjà en place, et le craft de recettes métier p
 | Craft recette métier | Fait | Moyenne | Frame recettes + bouton `Créer` via `RUN~CRAFT_RECIPE` |
 | Craft recette à résultat aléatoire / indirect | Fait | Moyenne | Support `spellId` sans `itemId`, par exemple cartes de calligraphie |
 | Enchanter un item | Manquant / à étudier | Moyenne | UI dédiée probable, avec cible item/sort et garde-fous |
-| `bank [item]` | Manquant | Basse | Clic droit item |
-| `bank -[item]` | Manquant | Basse | UI banque |
-| `gb [item]` | Manquant | Basse | Clic droit item |
-| `gb -[item]` | Manquant | Basse | UI guild bank |
-| `b [item]` | Manquant | Basse | UI vendor |
+| `bank [item]` | Fait via bridge | Basse | Dépôt banque bot via action item |
+| `bank -[item]` | Fait via bridge | Basse | Retrait depuis la frame banque bot |
+| `gb [item]` | Fait via bridge | Basse | Dépôt banque de guilde du bot |
+| `gb -[item]` | Manquant / à étudier | Basse | Retrait BDG à exposer seulement avec garde-fous |
+| `b [item]` | Fait via bridge | Basse | Achat vendeur proche depuis composants manquants |
 
 ---
 
@@ -654,7 +696,7 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 | 10 | Ventes / Open items bridge-first | Migration de commandes déjà exposées côté addon | Moyenne | À faire |
 | 11 | Enchantements d'items | UI dédiée et garde-fous | Moyenne | À étudier |
 | 12 | Trainer / Maintenance extras | UI maintenance | Moyenne/Basse | À faire |
-| 13 | Items avancés banque/guild bank/buy | Extensions inventaire | Basse/Moyenne | À faire |
+| 13 | Items avancés banque/guild bank/buy | Extensions inventaire | Basse/Moyenne | Fait/partiel |
 
 ---
 
@@ -676,9 +718,9 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 
 ## Point logique suivant
 
-Le prochain bloc logique conseillé est **Roll + migration optionnelle des ventes/open items vers bridge + étude des enchantements d'items**.
+Le prochain bloc logique conseillé est **Roll + migration optionnelle des ventes/open items vers bridge + retrait BDG + étude des enchantements d'items**.
 
-Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Profession Recipes, Craft et Loot Master couvrent maintenant le ciblage, le pull, les stratégies combat, le positionnement collectif, les profils de loot, les compétences, les recettes métier, le craft et la préparation du master loot. Après vérification du code actuel, la vente grise, la vente vendor et `open items` existent déjà côté addon, mais restent en legacy whisper et ne sont pas encore bridge-first.
+Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Reputations, Monnaies, Profession Recipes, Craft, Loot Master et Items avancés banque/guild bank/buy couvrent maintenant le ciblage, le pull, les stratégies combat, le positionnement collectif, les profils de loot, les compétences, les réputations, les monnaies, les recettes métier, le craft, la préparation du master loot et les actions banque/achat principales. Après vérification du code actuel, la vente grise, la vente vendor et `open items` existent déjà côté addon, mais restent en legacy whisper et ne sont pas encore bridge-first.
 
 État précis des commandes items/loot ponctuelles :
 
@@ -687,6 +729,9 @@ Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, C
 - `s *` : Déjà présent côté addon, legacy whisper, pas encore bridge-first ;
 - `s vendor` : Déjà présent côté addon inventaire, legacy whisper item par item, pas encore bridge-first ;
 - `open items` : Déjà présent côté addon, legacy whisper ;
+- banque bot : Consultation, dépôt et retrait via bridge ;
+- banque de guilde bot : Consultation et dépôt via bridge, retrait à étudier ;
+- achat vendeur : Disponible via bridge depuis les composants manquants de recette ;
 - enchantement d'un item précis : manquant / à étudier avec une UI dédiée ;
 - `ll [item]` / `ll -[item]` : manquant, amélioration possible depuis l'inventaire.
 
@@ -696,6 +741,7 @@ Proposition de prochaine itération, plus tard :
 - ne pas recréer de boutons `s *`, `s vendor` ou `open items`, car ils existent déjà côté addon ;
 - décider si les ventes existantes doivent passer par un endpoint dédié ou par un endpoint existant whitelisté ;
 - éviter toute vente automatique dangereuse sans action explicite de l'utilisateur ;
+- décider si le retrait BDG doit être exposé, et avec quels garde-fous ;
 - étudier une UI d'enchantement d'item séparée du craft métier classique, car elle doit cibler un item et prévoir plus de garde-fous ;
 - garder les commandes informatives manuelles inchangées ;
 - noter que `Quest` et `Skill` devront être remplacés plus tard par `Disenchant`, ou devenir de vrais profils ajoutés côté `mod-playerbots` avant exposition définitive.

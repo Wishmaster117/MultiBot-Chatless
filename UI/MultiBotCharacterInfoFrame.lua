@@ -34,6 +34,20 @@ local CHARACTER_SKILL_HEADER_WIDTH = CHARACTER_SKILL_ROW_WIDTH - 20
 local CHARACTER_SKILL_NAME_WIDTH = 132
 local CHARACTER_SKILL_VALUE_X = 142
 local CHARACTER_SKILL_VALUE_WIDTH = 72
+local CHARACTER_TABS = {
+    { id = "skills", key = "character.tab.skills", fallback = "Skills" },
+    { id = "reputations", key = "character.tab.reputations", fallback = "Reputations" },
+    { id = "emblems", key = "character.tab.emblems", fallback = "Emblems" },
+}
+local CHARACTER_TAB_WIDTH = 116
+local CHARACTER_TAB_HEIGHT = 28
+local CHARACTER_TAB_SPACING = 6
+local CHARACTER_TAB_OFFSET_Y = -4
+local CHARACTER_STATUS_Y = -10
+local CHARACTER_SCROLL_TOP_Y = -32
+local REPUTATION_ROW_HEIGHT = 24
+local EMBLEM_ROW_HEIGHT = 26
+local EMBLEM_ICON_SIZE = 16
 local RECIPE_FRAME_WIDTH = 340
 local RECIPE_FRAME_X = 145
 local RECIPE_ROW_WIDTH = 286
@@ -41,6 +55,26 @@ local RECIPE_CRAFT_BUTTON_WIDTH = 62
 local RECIPE_TEXT_WIDTH = 176
 local RECIPE_REFRESH_DELAY = 3.0
 local COOKING_SKILL_ID = 185
+
+local REPUTATION_BAR_COLORS = {
+    [0] = { 0.80, 0.12, 0.12 }, -- Hated
+    [1] = { 0.80, 0.25, 0.12 }, -- Hostile
+    [2] = { 0.75, 0.35, 0.12 }, -- Unfriendly
+    [3] = { 0.75, 0.75, 0.10 }, -- Neutral
+    [4] = { 0.10, 0.70, 0.10 }, -- Friendly
+    [5] = { 0.10, 0.65, 0.75 }, -- Honored
+    [6] = { 0.05, 0.45, 0.85 }, -- Revered
+    [7] = { 0.65, 0.30, 0.85 }, -- Exalted
+}
+
+local EMBLEM_NAME_KEYS = {
+    [29434] = "tips.every.BadgeofJustice",
+    [40752] = "tips.every.EmblemofHeroism",
+    [40753] = "tips.every.EmblemofValor",
+    [45624] = "tips.every.EmblemofConquest",
+    [47241] = "tips.every.EmblemofTriumph",
+    [49426] = "tips.every.EmblemofFrost",
+}
 
 local SKILL_DISPLAY_SPELL_IDS = {
     [171] = 2259, -- Alchemy
@@ -243,6 +277,106 @@ local function createText(parent, template, point, x, y)
     text:SetPoint(point or "TOPLEFT", parent, point or "TOPLEFT", x or 0, y or 0)
     text:SetJustifyH("LEFT")
     return text
+end
+
+local function setFrameShown(frame, shown)
+    if not frame then
+        return
+    end
+
+    if shown then
+        frame:Show()
+    else
+        frame:Hide()
+    end
+end
+
+local function getTabTitle(tab)
+    return L(tab.key, tab.fallback)
+end
+
+local function createCharacterTab(parent, name, index, text)
+    local template = (_G["CharacterFrameTabButtonTemplate"] and "CharacterFrameTabButtonTemplate") or "UIPanelButtonTemplate"
+    local button = CreateFrame("Button", name .. "Tab" .. tostring(index), parent, template)
+    button:SetID(index)
+    button:SetWidth(CHARACTER_TAB_WIDTH)
+    button:SetHeight(CHARACTER_TAB_HEIGHT)
+    button:SetText(text or "")
+    return button
+end
+
+local function getFactionDisplayName(reputation)
+    local factionId = tonumber(reputation and reputation.factionId or 0) or 0
+    if factionId > 0 and GetFactionInfoByID then
+        local name = GetFactionInfoByID(factionId)
+        if type(name) == "string" and name ~= "" then
+            return name
+        end
+    end
+
+    local name = tostring(reputation and reputation.name or "")
+    if name ~= "" then
+        return name
+    end
+
+    return "Faction " .. tostring(factionId)
+end
+
+local function getReputationRankLabel(rank)
+    local index = (tonumber(rank or 0) or 0) + 1
+    local label = _G["FACTION_STANDING_LABEL" .. tostring(index)]
+    if type(label) == "string" and label ~= "" then
+        return label
+    end
+
+    return tostring(rank or "")
+end
+
+local function getReputationColor(rank)
+    local color = REPUTATION_BAR_COLORS[tonumber(rank or 0) or 0] or REPUTATION_BAR_COLORS[3]
+    return color[1], color[2], color[3]
+end
+
+local function getEmblemInfo(itemId)
+    itemId = tonumber(itemId or 0) or 0
+    local name, _, _, _, _, _, _, _, _, icon
+    if itemId > 0 and GetItemInfo then
+        name, _, _, _, _, _, _, _, _, icon = GetItemInfo(itemId)
+    end
+
+    if itemId > 0 and not icon and GetItemIcon then
+        icon = GetItemIcon(itemId)
+    end
+
+    if type(name) ~= "string" or name == "" then
+        local key = EMBLEM_NAME_KEYS[itemId]
+        name = key and L(key, "item:" .. tostring(itemId)) or ("item:" .. tostring(itemId))
+    end
+
+    if type(icon) ~= "string" or icon == "" then
+        icon = "Interface\\Icons\\INV_Misc_QuestionMark"
+    end
+
+    return name, icon
+end
+
+local function formatMoneyText(money)
+    money = math.max(0, tonumber(money or 0) or 0)
+    local gold = math.floor(money / 10000)
+    local silver = math.floor((money % 10000) / 100)
+    local copper = money % 100
+    local parts = {}
+
+    if gold > 0 then
+        table.insert(parts, gold .. " |TInterface\\MoneyFrame\\UI-GoldIcon:12:12:2:0|t")
+    end
+
+    if silver > 0 or gold > 0 then
+        table.insert(parts, silver .. " |TInterface\\MoneyFrame\\UI-SilverIcon:12:12:2:0|t")
+    end
+
+    table.insert(parts, copper .. " |TInterface\\MoneyFrame\\UI-CopperIcon:12:12:2:0|t")
+    return table.concat(parts, "  ")
 end
 
 local function getSkillBarText(skill)
@@ -583,19 +717,79 @@ local function ensureCharacterFrame()
 
     local content = getFrameContent(frame)
 
-    frame.status = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, -10)
+    frame.tabs = {}
+    frame.activeTab = "skills"
+    frame.status = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, CHARACTER_STATUS_Y)
+    frame.reputationStatus = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, CHARACTER_STATUS_Y)
+    frame.emblemStatus = createText(content, "GameFontHighlightSmall", "TOPLEFT", 18, CHARACTER_STATUS_Y)
     frame.rows = {}
+    frame.reputationRows = {}
+    frame.emblemRows = {}
     frame.skills = {}
+    frame.reputations = {}
+    frame.emblems = {}
+    frame.emblemMoney = nil
     frame.collapsedCategories = frame.collapsedCategories or {}
 
+    local tabTotalWidth = (#CHARACTER_TABS * CHARACTER_TAB_WIDTH) + ((#CHARACTER_TABS - 1) * CHARACTER_TAB_SPACING)
+    local tabStartX = -math.floor(tabTotalWidth / 2)
+
+    for index, tab in ipairs(CHARACTER_TABS) do
+        local button = createCharacterTab(frame, "MultiBotCharacterInfoFrame", index, getTabTitle(tab))
+        button:SetPoint("TOPLEFT", content, "BOTTOM", tabStartX + ((index - 1) * (CHARACTER_TAB_WIDTH + CHARACTER_TAB_SPACING)), CHARACTER_TAB_OFFSET_Y)
+        button:SetScript("OnClick", function()
+            frame:setActiveTab(tab.id)
+        end)
+        button.tabId = tab.id
+        button.tabIndex = index
+        frame.tabs[tab.id] = button
+    end
+
+    frame.numTabs = #CHARACTER_TABS
+    frame.usePanelTemplates = _G["CharacterFrameTabButtonTemplate"] and PanelTemplates_SetTab
+    if frame.usePanelTemplates and PanelTemplates_SetNumTabs then
+        PanelTemplates_SetNumTabs(frame, frame.numTabs)
+    end
+
     frame.scrollFrame = CreateFrame("ScrollFrame", "MultiBotCharacterInfoFrameSkillScrollFrame", content, "UIPanelScrollFrameTemplate")
-    frame.scrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, -32)
+    frame.scrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, CHARACTER_SCROLL_TOP_Y)
     frame.scrollFrame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -28, 36)
 
     frame.scrollChild = CreateFrame("Frame", "MultiBotCharacterInfoFrameSkillScrollChild", frame.scrollFrame)
     frame.scrollChild:SetWidth(CHARACTER_SKILL_ROW_WIDTH)
     frame.scrollChild:SetHeight(1)
     frame.scrollFrame:SetScrollChild(frame.scrollChild)
+
+    frame.reputationScrollFrame = CreateFrame("ScrollFrame", "MultiBotCharacterInfoFrameReputationScrollFrame", content, "UIPanelScrollFrameTemplate")
+    frame.reputationScrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, CHARACTER_SCROLL_TOP_Y)
+    frame.reputationScrollFrame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -28, 36)
+
+    frame.reputationScrollChild = CreateFrame("Frame", "MultiBotCharacterInfoFrameReputationScrollChild", frame.reputationScrollFrame)
+    frame.reputationScrollChild:SetWidth(CHARACTER_SKILL_ROW_WIDTH)
+    frame.reputationScrollChild:SetHeight(1)
+    frame.reputationScrollFrame:SetScrollChild(frame.reputationScrollChild)
+
+    frame.emblemScrollFrame = CreateFrame("ScrollFrame", "MultiBotCharacterInfoFrameEmblemScrollFrame", content, "UIPanelScrollFrameTemplate")
+    frame.emblemScrollFrame:SetPoint("TOPLEFT", content, "TOPLEFT", 18, CHARACTER_SCROLL_TOP_Y)
+    frame.emblemScrollFrame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -28, 58)
+
+    frame.emblemScrollChild = CreateFrame("Frame", "MultiBotCharacterInfoFrameEmblemScrollChild", frame.emblemScrollFrame)
+    frame.emblemScrollChild:SetWidth(CHARACTER_SKILL_ROW_WIDTH)
+    frame.emblemScrollChild:SetHeight(1)
+    frame.emblemScrollFrame:SetScrollChild(frame.emblemScrollChild)
+
+    frame.emblemMoneyText = createText(content, "GameFontHighlightSmall", "BOTTOMRIGHT", -18, 14)
+    frame.emblemMoneyText:SetWidth(170)
+    frame.emblemMoneyText:SetHeight(18)
+    frame.emblemMoneyText:SetJustifyH("RIGHT")
+
+    frame.itemInfoEventFrame = CreateFrame("Frame")
+    pcall(frame.itemInfoEventFrame.RegisterEvent, frame.itemInfoEventFrame, "GET_ITEM_INFO_RECEIVED")
+    frame.itemInfoEventFrame:SetScript("OnEvent", function()
+        if frame.activeTab == "emblems" then
+            frame:renderEmblems()
+        end
+    end)
 
     local function ensureSkillRow(index)
         if frame.rows[index] then
@@ -669,6 +863,102 @@ local function ensureCharacterFrame()
         return row
     end
 
+    local function ensureReputationRow(index)
+        if frame.reputationRows[index] then
+            return frame.reputationRows[index]
+        end
+
+        local row = CreateFrame("Frame", nil, frame.reputationScrollChild)
+        row:SetPoint("TOPLEFT", frame.reputationScrollChild, "TOPLEFT", 0, 0)
+        row:SetWidth(CHARACTER_SKILL_ROW_WIDTH)
+        row:SetHeight(REPUTATION_ROW_HEIGHT)
+        row:EnableMouse(true)
+
+        row.bar = CreateFrame("StatusBar", nil, row)
+        row.bar:SetPoint("LEFT", row, "LEFT", 0, 0)
+        row.bar:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row.bar:SetHeight(18)
+        row.bar:SetStatusBarTexture(SKILL_BAR_TEXTURE)
+        row.bar:SetMinMaxValues(0, 1)
+        row.bar:SetValue(0)
+        row.bar:SetBackdrop({
+            bgFile = SKILL_BAR_BACKGROUND,
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = false,
+            tileSize = 0,
+            edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        })
+        row.bar:SetBackdropColor(0.02, 0.02, 0.10, 0.75)
+        row.bar:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+
+        row.nameText = createText(row.bar, "GameFontNormalSmall", "LEFT", 8, 0)
+        row.nameText:SetWidth(128)
+        row.nameText:SetHeight(18)
+
+        row.valueText = createText(row.bar, "GameFontHighlightSmall", "RIGHT", -8, 0)
+        row.valueText:SetWidth(98)
+        row.valueText:SetHeight(18)
+        row.valueText:SetJustifyH("RIGHT")
+
+        row:SetScript("OnEnter", function(self)
+            if not self.reputation then
+                return
+            end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(getFactionDisplayName(self.reputation), 1, 0.82, 0)
+            GameTooltip:AddLine(getReputationRankLabel(self.reputation.rank) .. " " .. tostring(self.reputation.value or 0) .. "/" .. tostring(self.reputation.max or 0), 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        frame.reputationRows[index] = row
+        return row
+    end
+
+    local function ensureEmblemRow(index)
+        if frame.emblemRows[index] then
+            return frame.emblemRows[index]
+        end
+
+        local row = CreateFrame("Button", nil, frame.emblemScrollChild)
+        row:SetPoint("TOPLEFT", frame.emblemScrollChild, "TOPLEFT", 0, 0)
+        row:SetWidth(CHARACTER_SKILL_ROW_WIDTH)
+        row:SetHeight(EMBLEM_ROW_HEIGHT)
+
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetPoint("RIGHT", row, "RIGHT", -34, 0)
+        row.icon:SetWidth(EMBLEM_ICON_SIZE)
+        row.icon:SetHeight(EMBLEM_ICON_SIZE)
+
+        row.nameText = createText(row, "GameFontHighlightSmall", "LEFT", 0, 0)
+        row.nameText:SetWidth(160)
+        row.nameText:SetHeight(20)
+
+        row.countText = createText(row, "GameFontNormalSmall", "RIGHT", -56, 0)
+        row.countText:SetWidth(48)
+        row.countText:SetHeight(20)
+        row.countText:SetJustifyH("RIGHT")
+
+        row:SetScript("OnEnter", function(self)
+            local itemId = tonumber(self.itemId or 0) or 0
+            if itemId <= 0 then
+                return
+            end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("item:" .. tostring(itemId))
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        frame.emblemRows[index] = row
+        return row
+    end
+
     local function showHeaderRow(row, item, y)
         row:SetPoint("TOPLEFT", frame.scrollChild, "TOPLEFT", 0, -y)
         row:SetHeight(HEADER_ROW_HEIGHT)
@@ -714,6 +1004,44 @@ local function ensureCharacterFrame()
 
         row:Show()
         return SKILL_ROW_HEIGHT
+    end
+
+    local function setVisibleRows(rows, visible, hasContent)
+        for _, row in ipairs(rows or {}) do
+            if visible and hasContent(row) then
+                row:Show()
+            else
+                row:Hide()
+            end
+        end
+    end
+
+    frame.syncTabVisibility = function(self)
+        local showSkills = self.activeTab == "skills"
+        local showReputations = self.activeTab == "reputations"
+        local showEmblems = self.activeTab == "emblems"
+
+        setFrameShown(self.status, showSkills)
+        setFrameShown(self.scrollFrame, showSkills)
+        setFrameShown(self.scrollChild, showSkills)
+        setVisibleRows(self.rows, showSkills, function(row)
+            return row.skill ~= nil or row.categoryHeader ~= nil
+        end)
+
+        setFrameShown(self.reputationStatus, showReputations)
+        setFrameShown(self.reputationScrollFrame, showReputations)
+        setFrameShown(self.reputationScrollChild, showReputations)
+        setVisibleRows(self.reputationRows, showReputations, function(row)
+            return row.reputation ~= nil
+        end)
+
+        setFrameShown(self.emblemStatus, showEmblems)
+        setFrameShown(self.emblemScrollFrame, showEmblems)
+        setFrameShown(self.emblemScrollChild, showEmblems)
+        setFrameShown(self.emblemMoneyText, showEmblems)
+        setVisibleRows(self.emblemRows, showEmblems, function(row)
+            return row.itemId ~= nil
+        end)
     end
 
     frame.renderSkills = function(self)
@@ -766,6 +1094,118 @@ local function ensureCharacterFrame()
 
         self.scrollChild:SetHeight(math.max(1, contentHeight))
         self.scrollFrame:SetVerticalScroll(0)
+        self:syncTabVisibility()
+    end
+
+    frame.renderReputations = function(self)
+        local reputations = {}
+        for _, reputation in ipairs(self.reputations or {}) do
+            table.insert(reputations, reputation)
+        end
+
+        table.sort(reputations, function(a, b)
+            return getFactionDisplayName(a) < getFactionDisplayName(b)
+        end)
+
+        self.reputationStatus:SetText(#reputations .. " " .. L("character.reputations.count", "reputation(s)"))
+        if #reputations == 0 then
+            self.reputationStatus:SetText(L("character.reputations.empty", "No reputation data."))
+        end
+
+        local contentHeight = 0
+        for i = 1, #reputations do
+            local reputation = reputations[i]
+            local row = ensureReputationRow(i)
+            local value = tonumber(reputation.value or 0) or 0
+            local max = tonumber(reputation.max or 0) or 0
+            if max <= 0 then
+                max = 1
+            end
+
+            row:SetPoint("TOPLEFT", frame.reputationScrollChild, "TOPLEFT", 0, -contentHeight)
+            row.reputation = reputation
+            row.bar:SetMinMaxValues(0, max)
+            row.bar:SetValue(math.min(value, max))
+            row.bar:SetStatusBarColor(getReputationColor(reputation.rank))
+            row.nameText:SetText("|cffffcc00" .. getFactionDisplayName(reputation) .. "|r")
+            row.valueText:SetText("|cffffffff" .. getReputationRankLabel(reputation.rank) .. " " .. value .. "/" .. max .. "|r")
+            row:Show()
+            contentHeight = contentHeight + REPUTATION_ROW_HEIGHT
+        end
+
+        for i = #reputations + 1, #self.reputationRows do
+            local row = self.reputationRows[i]
+            row.reputation = nil
+            row:Hide()
+        end
+
+        self.reputationScrollChild:SetHeight(math.max(1, contentHeight))
+        self.reputationScrollFrame:SetVerticalScroll(0)
+        self:syncTabVisibility()
+    end
+
+    frame.renderEmblems = function(self)
+        local emblems = {}
+        for _, emblem in ipairs(self.emblems or {}) do
+            table.insert(emblems, emblem)
+        end
+
+        table.sort(emblems, function(a, b)
+            return (tonumber(a.itemId or 0) or 0) < (tonumber(b.itemId or 0) or 0)
+        end)
+
+        self.emblemStatus:SetText(#emblems .. " " .. L("character.emblems.count", "emblem(s)"))
+        if #emblems == 0 then
+            self.emblemStatus:SetText(L("character.emblems.empty", "No emblems."))
+        end
+
+        local contentHeight = 0
+        for i = 1, #emblems do
+            local emblem = emblems[i]
+            local row = ensureEmblemRow(i)
+            local itemId = tonumber(emblem.itemId or 0) or 0
+            local count = tonumber(emblem.count or 0) or 0
+            local name, icon = getEmblemInfo(itemId)
+
+            row:SetPoint("TOPLEFT", frame.emblemScrollChild, "TOPLEFT", 0, -contentHeight)
+            row.itemId = itemId
+            row.icon:SetTexture(MultiBot.SafeTexturePath(icon))
+            row.nameText:SetText((count > 0 and "|cffffffff" or "|cff808080") .. name .. "|r")
+            row.countText:SetText((count > 0 and "|cffffcc00" or "|cff808080") .. tostring(count) .. "|r")
+            row:Show()
+            contentHeight = contentHeight + EMBLEM_ROW_HEIGHT
+        end
+
+        for i = #emblems + 1, #self.emblemRows do
+            local row = self.emblemRows[i]
+            row.itemId = nil
+            row:Hide()
+        end
+
+        self.emblemScrollChild:SetHeight(math.max(1, contentHeight))
+        self.emblemMoneyText:SetText(self.emblemMoney and formatMoneyText(self.emblemMoney) or "")
+        self:syncTabVisibility()
+    end
+
+    frame.setActiveTab = function(self, tabId)
+        tabId = tabId or "skills"
+        self.activeTab = tabId
+        local selectedIndex
+
+        for id, button in pairs(self.tabs or {}) do
+            if id == tabId then
+                selectedIndex = button.tabIndex
+                button:LockHighlight()
+            else
+                button:UnlockHighlight()
+            end
+        end
+
+        if selectedIndex and self.usePanelTemplates then
+            PanelTemplates_SetTab(self, selectedIndex)
+        end
+
+        self:syncTabVisibility()
     end
 
     frame.setSkills = function(self, botName, skills)
@@ -776,6 +1216,24 @@ local function ensureCharacterFrame()
         self:Show()
     end
 
+    frame.setReputations = function(self, botName, reputations)
+        self.botName = botName
+        self.reputations = reputations or {}
+        setWindowTitle(self, L("character.info", "Character info") .. " - " .. (botName or ""))
+        self:renderReputations()
+        self:Show()
+    end
+
+    frame.setEmblems = function(self, botName, emblems, money)
+        self.botName = botName
+        self.emblems = emblems or {}
+        self.emblemMoney = money
+        setWindowTitle(self, L("character.info", "Character info") .. " - " .. (botName or ""))
+        self:renderEmblems()
+        self:Show()
+    end
+
+    frame:setActiveTab("skills")
     frame:Hide()
     MultiBot.characterInfoFrame = frame
     return frame
@@ -791,19 +1249,44 @@ function MultiBot.OpenCharacterInfo(botName)
     frame.botName = botName
     setWindowTitle(frame, L("character.info", "Character info") .. " - " .. botName)
     frame.skills = {}
+    frame.reputations = {}
+    frame.emblems = {}
+    frame.emblemMoney = nil
     frame:renderSkills()
+    frame:renderReputations()
+    frame:renderEmblems()
     frame.status:SetText(L("character.skills.loading", "Loading..."))
+    frame.reputationStatus:SetText(L("character.reputations.loading", "Loading..."))
+    frame.emblemStatus:SetText(L("character.emblems.loading", "Loading..."))
+    frame:setActiveTab("skills")
     frame:Show()
 
+    local requested = false
     if MultiBot.Comm and MultiBot.Comm.RequestBotSkills then
-        return MultiBot.Comm.RequestBotSkills(botName)
+        requested = MultiBot.Comm.RequestBotSkills(botName) or requested
     end
 
-    return false
+    if MultiBot.Comm and MultiBot.Comm.RequestBotReputations then
+        requested = MultiBot.Comm.RequestBotReputations(botName) or requested
+    end
+
+    if MultiBot.Comm and MultiBot.Comm.RequestBotEmblems then
+        requested = MultiBot.Comm.RequestBotEmblems(botName) or requested
+    end
+
+    return requested
 end
 
 function MultiBot.OnBridgeBotSkills(botName, skills)
     ensureCharacterFrame():setSkills(botName, skills or {})
+end
+
+function MultiBot.OnBridgeBotReputations(botName, reputations)
+    ensureCharacterFrame():setReputations(botName, reputations or {})
+end
+
+function MultiBot.OnBridgeBotEmblems(botName, emblems, _token, money)
+    ensureCharacterFrame():setEmblems(botName, emblems or {}, money)
 end
 
 function MultiBot.OnBridgeProfessionRecipes(botName, skillId, recipes)

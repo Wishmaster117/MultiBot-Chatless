@@ -18,16 +18,9 @@
 * Refaire uns passe pour que toutes les frames respectent le strata de la config.
 * Retravailler la frame pvp stats qu'elle ressemble aux autres, et ajuster l'alignement du texte
 * Faire une UI pour enchanter les objets à moins qu'on arrive à faire le bot caster le spell sur la fenêtre de trade.
-* implementer les commandes rep all et emblems pour être affichées dans la frame d'info des bots
-* Ajouter un bouton dans la frame des quêtes du bot pour le faire abandonner la quête
-* Voi si besoin de quelque chose dans l'addon pour le : https://github.com/mod-playerbots/mod-playerbots/pull/2372
-
 ## Informations bot
 * Dans les frames métier ajout d'un bouton pour faire le bot acheter les composants manquants pour crafter l'item.
-
-** TODO
-* Ajouter les Monnaies (emblemes etc..)
-* Ajouter les Réputations
+* Infos personnage : onglets style Blizzard pour compétences, réputations et monnaies.
  
 
 ## Inventaire Bot étendu
@@ -35,11 +28,9 @@
 * Ajout d'une frame pour afficher le contenu de la banque du bot, avec un bouton pour retirer les objets de la banque.
 * Ajout d'un bouton pour déposer des objets dans la banque de guilde.
 * Ajout d'une frame pour afficher le contenu de la banque de guilde.
-*
 
 ** TODO
-* Voire si on tiends compte des droits de guilde pour les retraits et dépots, est ce que les rangs des bots évoluent dans playerbots.
-* Les banquier neutres comme par exemple Dalaran ne sont pas reconnus comme banquiers
+* Voire si on tient compte des droits de guilde pour les retraits et dépôts, et si les rangs des bots évoluent dans playerbots.
 * Uniformiser le layout des frames de banque bot et BDG
 * Ajouter un bouton retrait à la frame BDG
 * Afficher les sous de la guilde dans la frame BDG
@@ -116,6 +107,11 @@
   * all.
 * Outfits bridge-first.
 * Character Info bridge-first.
+* Réputations bridge-first dans la frame Infos personnage.
+* Monnaies / emblèmes bridge-first dans la frame Infos personnage, avec argent du bot.
+* Banque bot bridge-first avec consultation, dépôt et retrait.
+* Banque de guilde bot bridge-first avec consultation et dépôt.
+* Achat vendeur bridge-first depuis les composants manquants de recette métier.
 * Profession recipes bridge-first.
 * Craft de recettes métier via bridge `RUN~CRAFT_RECIPE`.
 * Messages d'erreur détaillés pour le craft :

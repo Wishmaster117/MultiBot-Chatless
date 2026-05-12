@@ -1,6 +1,6 @@
 # MultiBot / Bridge — roadmap chatless
 
-Dernière mise à jour : 2026-05-03
+Dernière mise à jour : 2026-05-12
 
 ## Objectif exact
 
@@ -109,12 +109,19 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Filtrage des recettes métiers, métiers secondaires et skills hors spellbook combat
 - [x] Fallback whisper `spells` réactivable uniquement via `MultiBot.allowLegacyChatFallback = true`
 
-### Character Info / Skills
+### Character Info / Skills / Reputations / Monnaies
 
 - [x] Endpoint côté bridge : `GET~BOT_SKILLS~<bot>~<token>`
 - [x] Réponses en paquets courts : `BOT_SKILLS_BEGIN`, `BOT_SKILLS_ITEM`, `BOT_SKILLS_END`
+- [x] Endpoint côté bridge : `GET~BOT_REPUTATIONS~<bot>~<token>`
+- [x] Réponses en paquets courts : `BOT_REPUTATIONS_BEGIN`, `BOT_REPUTATION_ITEM`, `BOT_REPUTATIONS_END`
+- [x] Endpoint côté bridge : `GET~BOT_EMBLEMS~<bot>~<token>`
+- [x] Réponses en paquets courts : `BOT_EMBLEMS_BEGIN`, `BOT_EMBLEM_ITEM`, `BOT_EMBLEMS_MONEY`, `BOT_EMBLEMS_END`
 - [x] Nouvelle frame `MultiBotCharacterInfoFrame`
+- [x] Onglets style Blizzard : compétences, réputations et monnaies
 - [x] Affichage séparé des compétences de classe, métiers, métiers secondaires, compétences d'arme et armures
+- [x] Affichage des réputations visibles du bot sans lancer `rep all` en chat
+- [x] Affichage des emblèmes et de l'argent du bot sans lancer `emblems` en chat
 - [x] Noms de compétences localisés via les données client quand possible
 - [x] Clic sur un métier ou métier secondaire pour ouvrir la frame recettes
 - [x] Fonctionne avec AddClass bots, altbots et randombots groupés visibles par la bridge
@@ -133,6 +140,19 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Messages d'erreur détaillés : feu de cuisine requis, bot en mouvement, outil/focus requis, recette pas prête, cast refusé
 - [x] Refresh différé des recettes après craft lancé
 - [x] Aucun changement requis dans `mod-playerbots` : le bridge lance le sort métier connu par le bot
+
+### Bot bank / Guild bank / Vendor buy
+
+- [x] Endpoint côté bridge : `GET~BANK~<bot>~<token>`
+- [x] Réponses en paquets courts : `BANK_BEGIN`, `BANK_ITEM`, `BANK_ERROR`, `BANK_END`
+- [x] Endpoint côté bridge : `GET~GBANK~<bot>~<token>`
+- [x] Réponses en paquets courts : `GBANK_BEGIN`, `GBANK_ITEM`, `GBANK_ERROR`, `GBANK_END`
+- [x] Endpoint côté bridge : `RUN~ITEM_ACTION~<bot>~<token>~<action>~<itemId>~<count>`
+- [x] Actions validées : dépôt banque bot, retrait banque bot, dépôt banque de guilde et achat vendeur
+- [x] Consultation BDG basée sur la guilde du bot, sans exiger que le joueur soit dans la même guilde
+- [x] Détection des banquiers neutres avec flags compatibles Dalaran
+- [x] Messages d'erreur structurés pour banquier introuvable, droits BDG, vendeur introuvable, objet non vendu et monnaie spéciale
+- [x] Bouton `Acheter` dans la frame recettes pour acheter les composants manquants disponibles chez un vendeur proche
 
 ### PVP Stats
 
@@ -259,7 +279,11 @@ Avec beaucoup de bots, éviter les réponses globales trop grosses.
 - `GET~GLYPHS` répond en paquets `GLYPHS_BEGIN` / `GLYPHS_ITEM` / `GLYPHS_END` ;
 - `GET~OUTFITS` répond en paquets `OUTFITS_BEGIN` / `OUTFITS_ITEM` / `OUTFITS_END` ;
 - `GET~BOT_SKILLS` répond en paquets `BOT_SKILLS_BEGIN` / `BOT_SKILLS_ITEM` / `BOT_SKILLS_END` ;
+- `GET~BOT_REPUTATIONS` répond en paquets `BOT_REPUTATIONS_BEGIN` / `BOT_REPUTATION_ITEM` / `BOT_REPUTATIONS_END` ;
+- `GET~BOT_EMBLEMS` répond en paquets `BOT_EMBLEMS_BEGIN` / `BOT_EMBLEM_ITEM` / `BOT_EMBLEMS_MONEY` / `BOT_EMBLEMS_END` ;
 - `GET~PROFESSION_RECIPES` répond en paquets `PROFESSION_RECIPES_BEGIN` / `PROFESSION_RECIPES_ITEM` / `PROFESSION_RECIPES_END` ;
+- `GET~BANK` répond en paquets `BANK_BEGIN` / `BANK_ITEM` / `BANK_ERROR` / `BANK_END` ;
+- `GET~GBANK` répond en paquets `GBANK_BEGIN` / `GBANK_ITEM` / `GBANK_ERROR` / `GBANK_END` ;
 - un paquet global vide peut seulement servir de réponse vide si aucun bot n’est disponible.
 
 ---
@@ -298,7 +322,15 @@ Les Outfits sont maintenant migrés en bridge-first. La liste des tenues ne dép
 
 Les compétences et recettes métiers sont maintenant migrées en bridge-first. La frame Character Info récupère les skills par `GET~BOT_SKILLS`, et la frame recettes récupère les recettes par `GET~PROFESSION_RECIPES`.
 
+La frame Character Info expose aussi les réputations par `GET~BOT_REPUTATIONS` et les monnaies par `GET~BOT_EMBLEMS`. Les onglets sont maintenant alignés sur un comportement style Blizzard, avec compétences, réputations et monnaies séparées.
+
 Le craft de recette passe par `RUN~CRAFT_RECIPE`. Les recettes à résultat aléatoire ou indirect sont pilotées par `spellId`, ce qui évite de bloquer les crafts comme les cartes de calligraphie. Les erreurs de cast remontent une raison structurée au lieu d'un simple échec générique.
+
+### Bot bank / Guild bank / Vendor buy
+
+Les extensions inventaire banque, banque de guilde et achat vendeur sont maintenant bridge-first pour les chemins validés. La banque du bot et la banque de guilde du bot peuvent être consultées via `GET~BANK` et `GET~GBANK`.
+
+Les actions dépôt banque, retrait banque, dépôt banque de guilde et achat vendeur passent par `RUN~ITEM_ACTION`. Le retrait banque de guilde reste à traiter séparément si l'UI doit l'exposer plus tard, car il demande des garde-fous supplémentaires côté droits et logs.
 
 ### Audit chatless final
 
@@ -358,10 +390,15 @@ Conclusion : ne pas migrer par réflexe. À traiter seulement si une fenêtre UI
 | Spellbook bridge | Fait |
 | Spellbook sans recettes métiers | Fait |
 | Character Info bridge | Fait |
+| Character Info réputations bridge | Fait |
+| Character Info monnaies / emblèmes bridge | Fait |
 | Profession recipes bridge | Fait |
 | Craft recettes métier bridge | Fait |
 | Craft recettes à résultat aléatoire / indirect | Fait |
 | Erreurs détaillées de craft | Fait |
+| Banque bot bridge | Fait |
+| Banque de guilde bot bridge | Fait |
+| Achat vendeur bridge | Fait |
 | PVP Stats bridge | Fait |
 | Stats simples bridge | Fait |
 | Quêtes bridge | Fait |
@@ -387,18 +424,18 @@ Conclusion : ne pas migrer par réflexe. À traiter seulement si une fenêtre UI
 
 ## Prochain pas logique recommandé
 
-Le prochain pas logique est maintenant : **audit résiduel + commandes items avancées**.
+Le prochain pas logique est maintenant : **audit résiduel + Roll / ventes / open items / enchantements**.
 
 À valider après les derniers lots :
 
 1. refaire un cycle complet login, `/reload`, groupe, raid, AddClass, randombot groupé et altbot ;
-2. ouvrir Inventory, Spellbook, Character Info, Profession recipes, Glyphs, Outfits, Quests, Stats, PVP Stats, Loot Master ;
+2. ouvrir Inventory, Bot Bank, Guild Bank, Spellbook, Character Info, Reputations, Currencies, Profession recipes, Glyphs, Outfits, Quests, Stats, PVP Stats, Loot Master ;
 3. tester un craft métier classique avec item de résultat direct ;
 4. tester un craft métier à résultat indirect ou aléatoire, par exemple carte de calligraphie ;
 5. tester un craft cuisine sans feu puis avec feu, et vérifier l'erreur localisée ;
 6. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list`, `outfit ?` avec `MultiBot.allowLegacyChatFallback = false` ;
 7. vérifier que les commandes manuelles volontaires restent fonctionnelles : `who`, `co ?`, `nc ?`, `ss ?`, `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec et actions Outfits ;
-8. poursuivre ensuite avec Roll, ventes existantes et enchantements d'objets si besoin.
+8. poursuivre ensuite avec Roll, ventes existantes, open items bridge-first, retrait BDG et enchantements d'objets si besoin.
 
 Après cette stabilisation, il restera surtout un audit de nettoyage : supprimer les debug temporaires, garder les fallbacks legacy uniquement quand ils sont utiles au diagnostic, et retirer les parsers historiques devenus morts.
 
