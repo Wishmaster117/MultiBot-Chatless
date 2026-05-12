@@ -88,7 +88,6 @@ local enGBValues = {
   ["character.emblems.count"] = "emblem(s)",
   ["character.emblems.loading"] = "Loading...",
   ["character.emblems.empty"] = "No emblems.",
-  ["character.skills.loading"] = "Loading...",
   ["character.skills.category.class"] = "Class Skills",
   ["character.skills.category.profession"] = "Professions",
   ["character.skills.category.secondary"] = "Secondary Professions",
