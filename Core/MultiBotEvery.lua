@@ -230,16 +230,23 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 		end
 	end
 
-	local botName = pFrame.getName and pFrame.getName() or nil
-	if MultiBot.BuildBotRTIUI and botName and botName ~= "" then
-		MultiBot.BuildBotRTIUI(pFrame, botName, 394, 0)
+	pFrame.addButton("Trainer", 394, 0, "spell_holy_magicalsentry", MultiBot.L("tips.every.trainer", "Trainer")).setDisable()
+	.doLeft = function(pButton)
+		if(MultiBot.OpenBotTrainer) then
+			MultiBot.OpenBotTrainer(pButton.getName(), pButton)
+		end
 	end
 
-	local combatFrame = pFrame.addFrame("CombatCommands", 424, 29, nil, 58, 114)
+	local botName = pFrame.getName and pFrame.getName() or nil
+	if MultiBot.BuildBotRTIUI and botName and botName ~= "" then
+		MultiBot.BuildBotRTIUI(pFrame, botName, 424, 0)
+	end
+
+	local combatFrame = pFrame.addFrame("CombatCommands", 454, 29, nil, 58, 114)
 	combatFrame:Hide()
 	combatFrame._mbDropdownManaged = true
 
-	pFrame.addButton("Combat", 424, 0, "Ability_Warrior_BattleShout", MultiBot.L("tips.every.combat"))
+	pFrame.addButton("Combat", 454, 0, "Ability_Warrior_BattleShout", MultiBot.L("tips.every.combat"))
 	.doLeft = function()
 		MultiBot.ShowHideSwitch(combatFrame)
 	end

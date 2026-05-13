@@ -141,6 +141,10 @@ local function ensureBridgeState()
   state.outfitSeq = state.outfitSeq or 0
   state.outfitActive = state.outfitActive or nil
   state.outfitCommands = state.outfitCommands or {}
+  state.trainerSeq = state.trainerSeq or 0
+  state.trainerActive = state.trainerActive or nil
+  state.trainerCommands = state.trainerCommands or {}
+  state.trainerSpells = state.trainerSpells or {}
   state.glyphs = state.glyphs or {}
   state.glyphSeq = state.glyphSeq or 0
   state.glyphActive = state.glyphActive or nil
@@ -440,6 +444,74 @@ function Comm.RunOutfitCommand(name, commandSuffix, persist)
   local persistToken = persist and "1" or "0"
   if not Comm.Send("RUN", "OUTFIT~" .. name .. "~" .. token .. "~" .. urlEncodeField(commandSuffix) .. "~" .. persistToken) then
     state.outfitCommands[token] = nil
+    return false
+  end
+
+  return true
+end
+
+function Comm.RequestTrainer(name)
+  local state = ensureBridgeState()
+  name = trim(name)
+  if name == "" or not state.connected then
+    return false
+  end
+
+  state.trainerSeq = (tonumber(state.trainerSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-trainer-" .. tostring(state.trainerSeq)
+  state.trainerActive = {
+    botName = name,
+    botNameKey = string.lower(name),
+    token = token,
+    trainerEntry = 0,
+    trainerName = "",
+    startedAt = safeNow(),
+    spells = {},
+  }
+
+  if not Comm.Send("GET", "TRAINER~" .. name .. "~" .. token) then
+    state.trainerActive = nil
+    return false
+  end
+
+  return true
+end
+
+function Comm.RunTrainerLearn(name, trainerEntry, spellId)
+  local state = ensureBridgeState()
+  name = trim(name)
+  trainerEntry = tonumber(trainerEntry or 0) or 0
+
+  local spellToken = trim(spellId)
+  if spellToken == "" and tonumber(spellId or 0) then
+    spellToken = tostring(tonumber(spellId or 0) or 0)
+  end
+  if string.upper(spellToken) ~= "ALL" then
+    local numericSpellId = tonumber(spellToken or "0") or 0
+    if numericSpellId <= 0 then
+      return false
+    end
+    spellToken = tostring(numericSpellId)
+  else
+    spellToken = "ALL"
+  end
+
+  if name == "" or trainerEntry <= 0 or not state.connected then
+    return false
+  end
+
+  state.trainerSeq = (tonumber(state.trainerSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-trainer-learn-" .. tostring(state.trainerSeq)
+  state.trainerCommands[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    trainerEntry = trainerEntry,
+    spellId = spellToken,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("RUN", "TRAINER_LEARN~" .. name .. "~" .. token .. "~" .. trainerEntry .. "~" .. spellToken) then
+    state.trainerCommands[token] = nil
     return false
   end
 
@@ -818,6 +890,8 @@ function Comm.MarkDisconnected(reason)
   state.professionRecipeCrafts = {}
   state.outfitActive = nil
   state.outfitCommands = {}
+  state.trainerActive = nil
+  state.trainerCommands = {}
 end
 
 local function parseBridgeDetailPayload(payload)
@@ -1595,6 +1669,182 @@ function Comm.ApplyOutfitCommandPayload(payload)
   return true
 end
 
+local function getActiveTrainerRequest(botName, token)
+  local active = ensureBridgeState().trainerActive
+  if not active then return nil end
+  botName = trim(botName)
+  token = trim(token)
+  if token ~= active.token then return nil end
+  if botName ~= "" and string.lower(botName) ~= active.botNameKey then return nil end
+  return active
+end
+
+local function clearActiveTrainerRequest(botName, token)
+  local state = ensureBridgeState()
+  if getActiveTrainerRequest(botName, token) then
+    state.trainerActive = nil
+  end
+end
+
+function Comm.ApplyTrainerBeginPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local trainerEntry, trainerName = splitOnce(rest2 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  trainerEntry = tonumber(trainerEntry or "0") or 0
+  trainerName = trim(urlDecodeField(trainerName))
+
+  local active = getActiveTrainerRequest(botName, token)
+  if botName == "" or not active then
+    return false
+  end
+
+  active.botName = botName
+  active.botNameKey = string.lower(botName)
+  active.trainerEntry = trainerEntry
+  active.trainerName = trainerName
+  active.spells = {}
+
+  if MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeBegin then
+    MultiBot.TrainerUI:HandleBridgeBegin(botName, token, trainerEntry, trainerName)
+  end
+
+  debugPrint("ADDON:RX", "TRAINER_BEGIN", botName, trainerEntry)
+  return true
+end
+
+function Comm.ApplyTrainerItemPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local trainerEntry, rest3 = splitOnce(rest2 or "", "~")
+  local spellId, rest4 = splitOnce(rest3 or "", "~")
+  local cost, canAfford = splitOnce(rest4 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  trainerEntry = tonumber(trainerEntry or "0") or 0
+  spellId = tonumber(spellId or "0") or 0
+  cost = tonumber(cost or "0") or 0
+  canAfford = tostring(canAfford or "0") == "1"
+
+  local active = getActiveTrainerRequest(botName, token)
+  if botName == "" or not active or spellId <= 0 then
+    return false
+  end
+
+  local entry = {
+    spellId = spellId,
+    cost = cost,
+    canAfford = canAfford,
+    trainerEntry = trainerEntry,
+  }
+  active.spells[#active.spells + 1] = entry
+
+  if MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeLine then
+    MultiBot.TrainerUI:HandleBridgeLine(botName, token, entry)
+  end
+
+  debugPrint("ADDON:RX", "TRAINER_ITEM", botName, spellId, cost, canAfford and 1 or 0)
+  return true
+end
+
+function Comm.ApplyTrainerErrorPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local trainerEntry, reason = splitOnce(rest2 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  trainerEntry = tonumber(trainerEntry or "0") or 0
+  reason = trim(urlDecodeField(reason))
+
+  local active = getActiveTrainerRequest(botName, token)
+  if botName == "" or not active then
+    return false
+  end
+
+  active.error = reason
+  active.trainerEntry = trainerEntry
+
+  if MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeError then
+    MultiBot.TrainerUI:HandleBridgeError(botName, token, reason, trainerEntry)
+  end
+
+  debugPrint("ADDON:RX", "TRAINER_ERROR", botName, reason)
+  return true
+end
+
+function Comm.ApplyTrainerEndPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local trainerEntry, trainerName = splitOnce(rest2 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  trainerEntry = tonumber(trainerEntry or "0") or 0
+  trainerName = trim(urlDecodeField(trainerName))
+
+  local active = getActiveTrainerRequest(botName, token)
+  if botName == "" or not active then
+    return false
+  end
+
+  local state = ensureBridgeState()
+  state.trainerSpells[string.lower(botName)] = active.spells or {}
+
+  if MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeEnd then
+    MultiBot.TrainerUI:HandleBridgeEnd(botName, token, trainerEntry, trainerName, active.spells or {}, active.error)
+  end
+
+  clearActiveTrainerRequest(botName, token)
+  debugPrint("ADDON:RX", "TRAINER_END", botName)
+  return true
+end
+
+function Comm.ApplyTrainerLearnPayload(payload)
+  local botName, rest = splitOnce(payload or "", "~")
+  local token, rest2 = splitOnce(rest or "", "~")
+  local trainerEntry, rest3 = splitOnce(rest2 or "", "~")
+  local spellId, rest4 = splitOnce(rest3 or "", "~")
+  local result, rest5 = splitOnce(rest4 or "", "~")
+  local reason, rest6 = splitOnce(rest5 or "", "~")
+  local learnedCount, spent = splitOnce(rest6 or "", "~")
+
+  botName = trim(urlDecodeField(botName))
+  token = trim(token)
+  trainerEntry = tonumber(trainerEntry or "0") or 0
+  spellId = trim(urlDecodeField(spellId))
+  result = trim(result)
+  reason = trim(urlDecodeField(reason))
+  learnedCount = tonumber(learnedCount or "0") or 0
+  spent = tonumber(spent or "0") or 0
+
+  local state = ensureBridgeState()
+  local command = state.trainerCommands and state.trainerCommands[token] or nil
+  if not command then
+    return false
+  end
+
+  command.botName = botName ~= "" and botName or command.botName
+  command.botNameKey = string.lower(command.botName or "")
+  command.trainerEntry = trainerEntry
+  command.spellId = spellId
+  command.result = result
+  command.reason = reason
+  command.learnedCount = learnedCount
+  command.spent = spent
+
+  if MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeLearnResult then
+    MultiBot.TrainerUI:HandleBridgeLearnResult(command.botName, token, trainerEntry, spellId, result, reason, learnedCount, spent)
+  end
+
+  state.trainerCommands[token] = nil
+  debugPrint("ADDON:RX", "TRAINER_LEARN", command.botName, spellId, result, reason)
+  return true
+end
+
 function Comm.ApplyProfessionRecipeCraftPayload(payload)
   local botName, rest = splitOnce(payload or "", "~")
   local token, rest2 = splitOnce(rest or "", "~")
@@ -2101,6 +2351,36 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     return Comm.ApplyOutfitCommandPayload(payload)
+  end
+
+  if opcode == "TRAINER_BEGIN" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyTrainerBeginPayload(payload)
+  end
+
+  if opcode == "TRAINER_ITEM" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyTrainerItemPayload(payload)
+  end
+
+  if opcode == "TRAINER_ERROR" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyTrainerErrorPayload(payload)
+  end
+
+  if opcode == "TRAINER_END" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyTrainerEndPayload(payload)
+  end
+
+  if opcode == "TRAINER_LEARN" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyTrainerLearnPayload(payload)
   end
 
   if opcode == "GLYPHS_BEGIN" then
@@ -2944,7 +3224,13 @@ function Comm.OnPlayerEnteringWorld()
   state.professionRecipeCrafts = {}
   state.outfitActive = nil
   state.outfitCommands = {}
+  state.trainerActive = nil
+  state.trainerCommands = {}
+  state.trainerSpells = {}
   Comm.MarkDisconnected(nil)
+  state.trainerActive = nil
+  state.trainerCommands = {}
+  state.trainerSpells = {}
   state.bootstrapPending = true
   state.bootstrapDeadline = safeNow() + 4.0
 
