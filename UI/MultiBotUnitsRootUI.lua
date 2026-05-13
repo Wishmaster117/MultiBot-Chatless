@@ -124,6 +124,55 @@ local function getDisplayableUnits(unitsFrame, sourceTable)
     return display
 end
 
+local function addRefreshTarget(targets, seen, unitsFrame, name)
+    if type(name) ~= "string" or name == "" or name == UnitName("player") then
+        return
+    end
+
+    if seen[name] or not (unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]) then
+        return
+    end
+
+    seen[name] = true
+    table.insert(targets, name)
+end
+
+local function getVisibleRefreshTargets(unitsButton, unitsFrame)
+    local targets = {}
+    local seen = {}
+
+    if not unitsButton or not unitsFrame then
+        return targets
+    end
+
+    local visibleNames = unitsButton._visibleNames
+    if type(visibleNames) == "table" and #visibleNames > 0 then
+        for index = 1, #visibleNames do
+            addRefreshTarget(targets, seen, unitsFrame, visibleNames[index])
+        end
+
+        return targets
+    end
+
+    local sourceTable = getUnitsSourceTable(unitsButton)
+    local display = getDisplayableUnits(unitsFrame, sourceTable)
+    local fromIndex = tonumber(unitsButton.from) or 1
+    local toIndex = tonumber(unitsButton.to) or math.min(#display, UNITS_PAGE_SIZE)
+
+    if fromIndex < 1 then
+        fromIndex = 1
+    end
+    if toIndex < fromIndex then
+        toIndex = math.min(#display, UNITS_PAGE_SIZE)
+    end
+
+    for index = fromIndex, math.min(toIndex, #display) do
+        addRefreshTarget(targets, seen, unitsFrame, display[index])
+    end
+
+    return targets
+end
+
 local function hideTrackedVisibleUnits(unitsButton, unitsFrame)
     local visibleNames = unitsButton and unitsButton._visibleNames
     if type(visibleNames) ~= "table" then
@@ -292,7 +341,7 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
     relayoutUnitsDisplay(unitsButton, unitsFrame)
 
     if refreshStrategiesForActiveBots then
-        refreshStrategiesForActiveBots()
+        refreshStrategiesForActiveBots(unitsButton)
     end
 end
 
@@ -448,7 +497,14 @@ local function rebuildGuildAndFriendIndexes(button)
     return isGuildRetry
 end
 
-refreshStrategiesForActiveBots = function()
+refreshStrategiesForActiveBots = function(unitsButton)
+    local unitsFrame = MultiBot.frames
+        and MultiBot.frames["MultiBar"]
+        and MultiBot.frames["MultiBar"].frames
+        and MultiBot.frames["MultiBar"].frames[UNITS_FRAME_NAME]
+    local scopedToDisplayedUnits = unitsButton ~= nil
+    local targetNames = scopedToDisplayedUnits and getVisibleRefreshTargets(unitsButton, unitsFrame) or nil
+
     if MultiBot.bridge and MultiBot.Comm and MultiBot.Comm.RequestStates then
         if not MultiBot.bridge.connected then
             return
@@ -459,14 +515,22 @@ refreshStrategiesForActiveBots = function()
                 return
             end
 
-            local unitsFrame = MultiBot.frames
-                and MultiBot.frames["MultiBar"]
-                and MultiBot.frames["MultiBar"].frames
-                and MultiBot.frames["MultiBar"].frames[UNITS_FRAME_NAME]
             local button = unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]
             if button then
                 button.waitFor = "BRIDGE_STATE"
             end
+        end
+
+        if scopedToDisplayedUnits then
+            if targetNames and #targetNames > 0 and MultiBot.Comm.RequestState then
+                for index = 1, #targetNames do
+                    local name = targetNames[index]
+                    markBridgeStateWait(name)
+                    MultiBot.Comm.RequestState(name)
+                end
+            end
+
+            return
         end
 
         if IsInRaid() then
@@ -527,6 +591,16 @@ refreshStrategiesForActiveBots = function()
         SendChatMessage("co ?", "WHISPER", nil, name)
     end
 
+    if scopedToDisplayedUnits then
+        if targetNames and #targetNames > 0 then
+            for index = 1, #targetNames do
+                refreshStrategiesFor(targetNames[index])
+            end
+        end
+
+        return
+    end
+	
     if IsInRaid() then
         for index = 1, GetNumGroupMembers() do
             refreshStrategiesFor(UnitName("raid" .. index))
