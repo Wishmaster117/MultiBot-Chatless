@@ -109,6 +109,11 @@
 * Banque bot bridge-first avec consultation, dépôt et retrait.
 * Banque de guilde bot bridge-first avec consultation, dépôt et retrait protégé par les droits de guilde.
 * Layout des frames banque bot et BDG uniformisé avec fond interne sombre.
+* Trainer bridge-first :
+  * bouton `Trainer` ajouté dans l'EveryBar après `Outfits` ;
+  * frame harmonisée avec les frames de quêtes ;
+  * consultation des sorts apprenables depuis le trainer sélectionné ;
+  * apprentissage d'un sort ou de tous les sorts via bridge.
 * Achat vendeur bridge-first depuis les composants manquants de recette métier.
 * Profession recipes bridge-first.
 * Craft de recettes métier via bridge `RUN~CRAFT_RECIPE`.

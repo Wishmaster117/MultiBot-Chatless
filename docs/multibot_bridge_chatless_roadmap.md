@@ -1,6 +1,6 @@
 # MultiBot / Bridge — roadmap chatless
 
-Dernière mise à jour : 2026-05-12
+Dernière mise à jour : 2026-05-13
 
 ## Objectif exact
 
@@ -154,6 +154,17 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Messages d'erreur structurés pour banquier introuvable, droits BDG, vendeur introuvable, objet non vendu et monnaie spéciale
 - [x] Bouton `Acheter` dans la frame recettes pour acheter les composants manquants disponibles chez un vendeur proche
 
+### Trainer
+
+- [x] Endpoint côté bridge : `GET~TRAINER~<bot>~<token>`
+- [x] Réponses en paquets courts : `TRAINER_BEGIN`, `TRAINER_ITEM`, `TRAINER_ERROR`, `TRAINER_END`
+- [x] Endpoint côté bridge : `RUN~TRAINER_LEARN~<bot>~<token>~<trainerEntry>~<spellId|ALL>`
+- [x] Réponse d'action : `TRAINER_LEARN~<bot>~<token>~<trainerEntry>~<spellId|ALL>~OK|ERR~<reason>~<learnedCount>~<spent>`
+- [x] Validation du trainer sélectionné côté joueur pour éviter d'apprendre depuis un PNJ différent après ouverture
+- [x] Coût calculé côté bridge avec réduction réputation et budget playerbots `free money for spells`
+- [x] Bouton `Trainer` ajouté dans l'EveryBar après `Outfits`
+- [x] Nouvelle frame trainer harmonisée avec les frames de quêtes, avec bouton `Apprendre` par sort et `Tout apprendre`
+
 ### PVP Stats
 
 - [x] Endpoint côté bridge : `GET~PVP_STATS~<bot>`
@@ -282,6 +293,7 @@ Avec beaucoup de bots, éviter les réponses globales trop grosses.
 - `GET~BOT_REPUTATIONS` répond en paquets `BOT_REPUTATIONS_BEGIN` / `BOT_REPUTATION_ITEM` / `BOT_REPUTATIONS_END` ;
 - `GET~BOT_EMBLEMS` répond en paquets `BOT_EMBLEMS_BEGIN` / `BOT_EMBLEM_ITEM` / `BOT_EMBLEMS_MONEY` / `BOT_EMBLEMS_END` ;
 - `GET~PROFESSION_RECIPES` répond en paquets `PROFESSION_RECIPES_BEGIN` / `PROFESSION_RECIPES_ITEM` / `PROFESSION_RECIPES_END` ;
+- `GET~TRAINER` répond en paquets `TRAINER_BEGIN` / `TRAINER_ITEM` / `TRAINER_ERROR` / `TRAINER_END` ;
 - `GET~BANK` répond en paquets `BANK_BEGIN` / `BANK_ITEM` / `BANK_ERROR` / `BANK_END` ;
 - `GET~GBANK` répond en paquets `GBANK_BEGIN` / `GBANK_RIGHTS` / `GBANK_ITEM` / `GBANK_ERROR` / `GBANK_END` ;
 - un paquet global vide peut seulement servir de réponse vide si aucun bot n’est disponible.
@@ -331,6 +343,12 @@ Le craft de recette passe par `RUN~CRAFT_RECIPE`. Les recettes à résultat alé
 Les extensions inventaire banque, banque de guilde et achat vendeur sont maintenant bridge-first pour les chemins validés. La banque du bot et la banque de guilde du bot peuvent être consultées via `GET~BANK` et `GET~GBANK`.
 
 Les actions dépôt banque, retrait banque, dépôt banque de guilde, retrait banque de guilde et achat vendeur passent par `RUN~ITEM_ACTION`. Le retrait BDG est exposé dans l'UI avec un bouton grisé quand le bot n'a plus de droits de retrait disponibles.
+
+### Trainer
+
+La commande `trainer` est sortie du parsing chat automatique pour l'UI. Le bouton `Trainer` de l'EveryBar ouvre une frame alimentée par `GET~TRAINER`, basée sur le trainer actuellement sélectionné par le joueur.
+
+L'apprentissage passe par `RUN~TRAINER_LEARN`, soit pour un `spellId` précis, soit pour `ALL`. Le bridge revalide le trainer sélectionné, vérifie que le trainer peut enseigner au bot, applique le coût exact et renvoie une raison structurée en cas d'échec.
 
 ### Audit chatless final
 
@@ -399,6 +417,8 @@ Conclusion : ne pas migrer par réflexe. À traiter seulement si une fenêtre UI
 | Banque bot bridge | Fait |
 | Banque de guilde bot bridge | Fait |
 | Achat vendeur bridge | Fait |
+| Trainer bridge | Fait |
+| Trainer learn par sort / all | Fait |
 | PVP Stats bridge | Fait |
 | Stats simples bridge | Fait |
 | Quêtes bridge | Fait |

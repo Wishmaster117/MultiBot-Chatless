@@ -9,7 +9,7 @@ Ce document suit les commandes `mod-playerbots` encore intéressantes à intégr
 - les commandes serveur/admin à ne pas intégrer dans l'addon ;
 - les priorités d'intégration bridge-first/chatless.
 
-Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Reputations, Monnaies, Profession Recipes, Craft, Loot Master, Bot Bank, Guild Bank et Vendor Buy :
+Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats, Quests, Outfits, RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Reputations, Monnaies, Profession Recipes, Craft, Loot Master, Bot Bank, Guild Bank, Vendor Buy et Trainer :
 **éviter le spam chat automatique**, utiliser le bridge quand c'est possible, et conserver les commandes manuelles utiles comme `who`, `co ?`, `nc ?`, `ss ?`.
 
 ---
@@ -35,6 +35,7 @@ Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats
 | Profession recipes | Fait | Nouvelle frame recettes par métier via `GET~PROFESSION_RECIPES`, composants, compte craftable, recettes à résultat direct ou indirect. |
 | Profession recipe craft | Fait | Bouton `Créer` via `RUN~CRAFT_RECIPE`, support recettes classiques et résultats aléatoires/indirects, erreurs détaillées. |
 | Bot bank / Guild bank / Vendor buy | Fait/Partiel | `GET~BANK`, `GET~GBANK` et `RUN~ITEM_ACTION` pour banque bot, banque de guilde bot avec retrait protégé, achat vendeur et actions inventaire avancées validées. |
+| Trainer / Trainer learn | Fait | Frame EveryBar via `GET~TRAINER`, boutons `Apprendre` et `Tout apprendre` via `RUN~TRAINER_LEARN`, sans parsing chat automatique. |
 | RTI / Target Icons | Fait | UI complète + bridge `RUN~RTI`, scopes `ALL`, `GROUP`, `BOT`. |
 | Pull Control | Fait | Mini-frame MainBar + bridge `RUN~COMBAT`, séquences de commandes, scopes et presets. |
 | Combat Strategies | Fait | Toggles individuels dans les EveryBars + mini-frame Party/Raid, via `RUN~COMBAT`. |
@@ -258,6 +259,24 @@ Fonctionnalités terminées :
 - messages d'échec plus précis, notamment vendeur sans monnaie compatible ou banquier introuvable ;
 - consultation de la banque de guilde du bot sans exiger que le joueur soit dans la même guilde ;
 - harmonisation visuelle des frames banque bot et BDG avec fond interne sombre.
+
+### Trainer / apprentissage
+
+Les commandes trainer sont maintenant exposées en bridge-first pour les bots individuels.
+
+Fonctionnalités terminées :
+
+- bouton `Trainer` ajouté dans l'EveryBar de chaque bot, après `Outfits` ;
+- frame trainer harmonisée avec le style des frames quêtes ;
+- endpoint bridge `GET~TRAINER~<bot>~<token>` ;
+- payloads structurés `TRAINER_BEGIN`, `TRAINER_ITEM`, `TRAINER_ERROR`, `TRAINER_END` ;
+- affichage des sorts que le bot peut apprendre depuis le trainer sélectionné par le joueur ;
+- affichage du coût et désactivation du bouton si le bot n'a pas assez d'argent disponible selon le budget playerbots ;
+- endpoint bridge `RUN~TRAINER_LEARN~<bot>~<token>~<trainerEntry>~<spellId|ALL>` ;
+- bouton `Apprendre` par sort ;
+- bouton `Tout apprendre` ;
+- revalidation côté bridge du trainer sélectionné pour éviter d'apprendre depuis un autre PNJ si la cible change ;
+- retour structuré `TRAINER_LEARN` avec résultat, raison, nombre appris et coût dépensé.
 
 À garder pour plus tard :
 
