@@ -206,6 +206,9 @@ local function layoutVisibleUnits(unitsButton, unitsFrame, display, fromIndex, t
         local name = display[index]
         local unitButton = name and unitsFrame.buttons[name]
         local unitFrame = name and unitsFrame.frames[name]
+        if unitButton and unitButton.state and MultiBot.EnsureBridgeUnitFrame then
+            unitFrame = MultiBot.EnsureBridgeUnitFrame(name) or unitFrame
+        end
         if unitButton then
             visibleCount = visibleCount + 1
             unitButton.setPoint(0, (unitsFrame.size + 2) * (visibleCount - 1))
