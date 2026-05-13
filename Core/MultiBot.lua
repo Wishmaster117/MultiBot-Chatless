@@ -1581,10 +1581,58 @@ local function RequestBridgeUnitsRelayout()
   end
 end
 
+local function ShouldRebuildBridgeUnitFrame(unitFrame, button, combat, normal)
+  if not unitFrame or not button then
+    return true
+  end
+
+  if unitFrame._mbBridgeBuilt ~= true then
+    return true
+  end
+
+  if unitFrame._mbBridgeClass ~= button.class then
+    return true
+  end
+
+  if unitFrame._mbBridgeCombat ~= combat then
+    return true
+  end
+
+  if unitFrame._mbBridgeNormal ~= normal then
+    return true
+  end
+
+  return false
+end
+
+local function MarkBridgeUnitFrameBuilt(unitFrame, button, combat, normal)
+  if not unitFrame or not button then
+    return
+  end
+
+  unitFrame._mbBridgeBuilt = true
+  unitFrame._mbBridgeClass = button.class
+  unitFrame._mbBridgeCombat = combat
+  unitFrame._mbBridgeNormal = normal
+end
+
+local function EnsureBridgeActiveIndex(button, name)
+  if not button or not button.class or button.class == "" then
+    return
+  end
+
+  MultiBot.index.classes.actives[button.class] = MultiBot.index.classes.actives[button.class] or {}
+  InsertBridgeNameUnique(MultiBot.index.classes.actives[button.class], name)
+  InsertBridgeNameUnique(MultiBot.index.actives, name)
+end
+
 function MultiBot.ApplyBridgeBotState(name, combat, normal)
   if type(name) ~= "string" or name == "" then
     return false
   end
+
+  combat = combat or ""
+  normal = normal or ""
 
   if not (MultiBot.frames and MultiBot.frames["MultiBar"]
           and MultiBot.frames["MultiBar"].frames
@@ -1598,6 +1646,9 @@ function MultiBot.ApplyBridgeBotState(name, combat, normal)
     return false
   end
 
+  local existingFrame = units.frames and units.frames[name] or nil
+  local shouldRebuildFrame = ShouldRebuildBridgeUnitFrame(existingFrame, button, combat, normal)
+
   button.combat = combat or ""
   button.normal = normal or ""
   button.waitFor = ""
@@ -1609,6 +1660,17 @@ function MultiBot.ApplyBridgeBotState(name, combat, normal)
     return true
   end
 
+  if not shouldRebuildFrame then
+    EnsureBridgeActiveIndex(button, name)
+    if button.setEnable then
+      button.setEnable()
+    end
+
+    RequestBridgeUnitsRelayout()
+    return true
+  end
+
+  local wasShown = existingFrame and existingFrame.IsShown and existingFrame:IsShown()
   local unitFrame = units.addFrame(name, -34, 2)
   if unitFrame and unitFrame.Hide then
     unitFrame:Hide()
@@ -1626,15 +1688,17 @@ function MultiBot.ApplyBridgeBotState(name, combat, normal)
     MultiBot.addEvery(unitFrame, button.combat, button.normal)
   end
 
-  MultiBot.index.classes.actives[button.class] = MultiBot.index.classes.actives[button.class] or {}
-  InsertBridgeNameUnique(MultiBot.index.classes.actives[button.class], name)
-  InsertBridgeNameUnique(MultiBot.index.actives, name)
+  MarkBridgeUnitFrameBuilt(unitFrame, button, button.combat, button.normal)
+
+  EnsureBridgeActiveIndex(button, name)
 
   if button.setEnable then
     button.setEnable()
   end
 
-  if unitFrame and unitFrame.Hide then
+  if wasShown and unitFrame and unitFrame.Show then
+    unitFrame:Show()
+  elseif unitFrame and unitFrame.Hide then
     unitFrame:Hide()
   end
 

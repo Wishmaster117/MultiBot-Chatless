@@ -2091,12 +2091,32 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			tButton.waitFor = "IGNORE"
 			tButton.normal = string.sub(arg1, 13)
 
-			local tFrame = MultiBot.frames["MultiBar"].frames["Units"].addFrame(arg2, tButton.x - tButton.size - 2, tButton.y + 2)
+			local tUnitsFrame = MultiBot.frames["MultiBar"].frames["Units"]
+			local tExistingFrame = tUnitsFrame.frames and tUnitsFrame.frames[arg2] or nil
+			local tCombat = tButton.combat or ""
+			local tNormal = tButton.normal or ""
+
+			if tExistingFrame
+					and tExistingFrame._mbLegacyBuilt == true
+					and tExistingFrame._mbLegacyClass == tButton.class
+					and tExistingFrame._mbLegacyCombat == tCombat
+					and tExistingFrame._mbLegacyNormal == tNormal then
+				tButton.setEnable()
+				SendChatMessage("ss ?", "WHISPER", nil, arg2)
+				return
+			end
+
+			local tWasShown = tExistingFrame and tExistingFrame.IsShown and tExistingFrame:IsShown()
+			local tFrame = tUnitsFrame.addFrame(arg2, tButton.x - tButton.size - 2, tButton.y + 2)
 			tFrame.class = tButton.class
 			tFrame.name = tButton.name
 
 			MultiBot["add" .. tButton.class](tFrame, tButton.combat, tButton.normal)
 			MultiBot.addEvery(tFrame, tButton.combat, tButton.normal)
+			tFrame._mbLegacyBuilt = true
+			tFrame._mbLegacyClass = tButton.class
+			tFrame._mbLegacyCombat = tCombat
+			tFrame._mbLegacyNormal = tNormal
 
 			if(MultiBot.index.classes.actives[tButton.class] == nil) then MultiBot.index.classes.actives[tButton.class] = {} end
 			if(MultiBot.isActive(tButton.name) == false) then
@@ -2105,6 +2125,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			end
 
 			tButton.setEnable()
+			if tWasShown and tFrame.Show then tFrame:Show() end
 			SendChatMessage("ss ?", "WHISPER", nil, arg2)
 			return
 		end
