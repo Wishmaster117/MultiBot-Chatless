@@ -578,10 +578,6 @@ refreshStrategiesForActiveBots = function(unitsButton)
             return
         end
 
-        local unitsFrame = MultiBot.frames
-            and MultiBot.frames["MultiBar"]
-            and MultiBot.frames["MultiBar"].frames
-            and MultiBot.frames["MultiBar"].frames[UNITS_FRAME_NAME]
         local button = unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]
 
         if button then
@@ -600,7 +596,7 @@ refreshStrategiesForActiveBots = function(unitsButton)
 
         return
     end
-	
+
     if IsInRaid() then
         for index = 1, GetNumGroupMembers() do
             refreshStrategiesFor(UnitName("raid" .. index))
