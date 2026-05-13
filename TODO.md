@@ -18,6 +18,10 @@
 * Refaire uns passe pour que toutes les frames respectent le strata de la config.
 * Retravailler la frame pvp stats qu'elle ressemble aux autres, et ajuster l'alignement du texte
 * Faire une UI pour enchanter les objets à moins qu'on arrive à faire le bot caster le spell sur la fenêtre de trade.
+* Refaire le layout de la frame pvp stats pour harmoniser avec les autres frames
+* voire si on peux ajouter l'avancement de la quête d'un bot
+
+
 ## Informations bot
 * Dans les frames métier ajout d'un bouton pour faire le bot acheter les composants manquants pour crafter l'item.
 * Infos personnage : onglets style Blizzard pour compétences, réputations et monnaies.
