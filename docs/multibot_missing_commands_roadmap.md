@@ -34,7 +34,7 @@ Le principe reste le même que pour Inventory, Spellbook, Glyphs, Talents, Stats
 | Character Info / Monnaies | Fait | Onglet monnaies alimenté par `GET~BOT_EMBLEMS`, avec emblèmes et argent du bot. |
 | Profession recipes | Fait | Nouvelle frame recettes par métier via `GET~PROFESSION_RECIPES`, composants, compte craftable, recettes à résultat direct ou indirect. |
 | Profession recipe craft | Fait | Bouton `Créer` via `RUN~CRAFT_RECIPE`, support recettes classiques et résultats aléatoires/indirects, erreurs détaillées. |
-| Bot bank / Guild bank / Vendor buy | Fait/Partiel | `GET~BANK`, `GET~GBANK` et `RUN~ITEM_ACTION` pour banque bot, banque de guilde bot, achat vendeur et actions inventaire avancées validées. |
+| Bot bank / Guild bank / Vendor buy | Fait/Partiel | `GET~BANK`, `GET~GBANK` et `RUN~ITEM_ACTION` pour banque bot, banque de guilde bot avec retrait protégé, achat vendeur et actions inventaire avancées validées. |
 | RTI / Target Icons | Fait | UI complète + bridge `RUN~RTI`, scopes `ALL`, `GROUP`, `BOT`. |
 | Pull Control | Fait | Mini-frame MainBar + bridge `RUN~COMBAT`, séquences de commandes, scopes et presets. |
 | Combat Strategies | Fait | Toggles individuels dans les EveryBars + mini-frame Party/Raid, via `RUN~COMBAT`. |
@@ -253,15 +253,15 @@ Fonctionnalités terminées :
 - dépôt dans la banque du bot ;
 - retrait depuis la banque du bot ;
 - dépôt en banque de guilde du bot ;
+- retrait depuis la banque de guilde du bot, avec garde-fous sur les droits de retrait ;
 - achat de composants chez un vendeur proche ;
 - messages d'échec plus précis, notamment vendeur sans monnaie compatible ou banquier introuvable ;
-- consultation de la banque de guilde du bot sans exiger que le joueur soit dans la même guilde.
+- consultation de la banque de guilde du bot sans exiger que le joueur soit dans la même guilde ;
+- harmonisation visuelle des frames banque bot et BDG avec fond interne sombre.
 
 À garder pour plus tard :
 
-- retrait banque de guilde, si l'UI doit l'exposer ;
 - affichage de l'argent de guilde ;
-- harmonisation visuelle finale des frames banque et BDG.
 
 ---
 
@@ -587,7 +587,7 @@ Pas besoin de parsing automatique de réponses longues, sauf si une future UI ve
 
 ### Pourquoi
 
-L'inventaire bridge-first est déjà en place, le craft de recettes métier passe par le bridge, et les actions banque/guild bank/buy principales sont maintenant couvertes. Les commandes restantes sont des améliorations secondaires autour des items ponctuels, de la vente, de l'ouverture d'objets, du retrait BDG et des enchantements ciblant un item.
+L'inventaire bridge-first est déjà en place, le craft de recettes métier passe par le bridge, et les actions banque/guild bank/buy principales sont maintenant couvertes. Les commandes restantes sont des améliorations secondaires autour des items ponctuels, de la vente, de l'ouverture d'objets et des enchantements ciblant un item.
 
 ### Commandes à couvrir
 
@@ -604,7 +604,7 @@ L'inventaire bridge-first est déjà en place, le craft de recettes métier pass
 | `bank [item]` | Fait via bridge | Basse | Dépôt banque bot via action item |
 | `bank -[item]` | Fait via bridge | Basse | Retrait depuis la frame banque bot |
 | `gb [item]` | Fait via bridge | Basse | Dépôt banque de guilde du bot |
-| `gb -[item]` | Manquant / à étudier | Basse | Retrait BDG à exposer seulement avec garde-fous |
+| `gb -[item]` | Fait via bridge | Basse | Retrait BDG depuis la frame banque de guilde avec garde-fous de droits |
 | `b [item]` | Fait via bridge | Basse | Achat vendeur proche depuis composants manquants |
 
 ---
@@ -718,7 +718,7 @@ Ces commandes sont plutôt serveur/admin/debug ou trop dangereuses pour une UI u
 
 ## Point logique suivant
 
-Le prochain bloc logique conseillé est **Roll + migration optionnelle des ventes/open items vers bridge + retrait BDG + étude des enchantements d'items**.
+Le prochain bloc logique conseillé est **Roll + migration optionnelle des ventes/open items vers bridge + étude des enchantements d'items**.
 
 Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, Character Info, Reputations, Monnaies, Profession Recipes, Craft, Loot Master et Items avancés banque/guild bank/buy couvrent maintenant le ciblage, le pull, les stratégies combat, le positionnement collectif, les profils de loot, les compétences, les réputations, les monnaies, les recettes métier, le craft, la préparation du master loot et les actions banque/achat principales. Après vérification du code actuel, la vente grise, la vente vendor et `open items` existent déjà côté addon, mais restent en legacy whisper et ne sont pas encore bridge-first.
 
@@ -730,7 +730,7 @@ Raison : les blocs RTI, Pull Control, Combat Strategies, Disperse, Loot Rules, C
 - `s vendor` : Déjà présent côté addon inventaire, legacy whisper item par item, pas encore bridge-first ;
 - `open items` : Déjà présent côté addon, legacy whisper ;
 - banque bot : Consultation, dépôt et retrait via bridge ;
-- banque de guilde bot : Consultation et dépôt via bridge, retrait à étudier ;
+- banque de guilde bot : Consultation, dépôt et retrait via bridge, avec garde-fous de droits ;
 - achat vendeur : Disponible via bridge depuis les composants manquants de recette ;
 - enchantement d'un item précis : manquant / à étudier avec une UI dédiée ;
 - `ll [item]` / `ll -[item]` : manquant, amélioration possible depuis l'inventaire.
@@ -741,7 +741,6 @@ Proposition de prochaine itération, plus tard :
 - ne pas recréer de boutons `s *`, `s vendor` ou `open items`, car ils existent déjà côté addon ;
 - décider si les ventes existantes doivent passer par un endpoint dédié ou par un endpoint existant whitelisté ;
 - éviter toute vente automatique dangereuse sans action explicite de l'utilisateur ;
-- décider si le retrait BDG doit être exposé, et avec quels garde-fous ;
 - étudier une UI d'enchantement d'item séparée du craft métier classique, car elle doit cibler un item et prévoir plus de garde-fous ;
 - garder les commandes informatives manuelles inchangées ;
 - noter que `Quest` et `Skill` devront être remplacés plus tard par `Disenchant`, ou devenir de vrais profils ajoutés côté `mod-playerbots` avant exposition définitive.

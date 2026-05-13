@@ -548,7 +548,7 @@ function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, res
         if MultiBot.RefreshBotBank and (action == "BANK_DEPOSIT" or action == "BANK_WITHDRAW") then
             MultiBot.RefreshBotBank(botName, 0.65)
         end
-        if action == "GBANK_DEPOSIT" and MultiBot.RefreshBotGuildBank then
+        if (action == "GBANK_DEPOSIT" or action == "GBANK_WITHDRAW") and MultiBot.RefreshBotGuildBank then
             MultiBot.RefreshBotGuildBank(botName, 0.65)
         end
         if action == "BUY_ITEM" and MultiBot.professionRecipeFrame and MultiBot.professionRecipeFrame:IsShown()
@@ -573,6 +573,17 @@ function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, res
     end
 
     local reasonText = getInventoryItemActionReason(reason)
+    if (action == "BANK_WITHDRAW" or action == "GBANK_WITHDRAW")
+        and MultiBot.bankFrame and MultiBot.bankFrame.IsShown and MultiBot.bankFrame:IsShown()
+        and MultiBot.bankFrame.botName == botName then
+        if MultiBot.bankFrame.status then
+            MultiBot.bankFrame.status:SetText(reasonText ~= "" and reasonText or tostring(reason or ""))
+        end
+        if MultiBot.bankFrame.render then
+            MultiBot.bankFrame:render()
+        end
+    end
+
     if action == "BUY_ITEM" and MultiBot.professionRecipeFrame and MultiBot.professionRecipeFrame:IsShown()
         and MultiBot.professionRecipeFrame.botName == botName
         and MultiBot.professionRecipeFrame.status then

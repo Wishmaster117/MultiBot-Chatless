@@ -21,8 +21,6 @@
 ## Informations bot
 * Dans les frames métier ajout d'un bouton pour faire le bot acheter les composants manquants pour crafter l'item.
 * Infos personnage : onglets style Blizzard pour compétences, réputations et monnaies.
-* Ajouter un bouton pour abandonner les quêtes dans la frame de quêtes finies et en cours des bots
-* Ajouter un bouton pour retirer des objets de la banque de guilde
  
 
 ## Inventaire Bot étendu
@@ -32,9 +30,6 @@
 * Ajout d'une frame pour afficher le contenu de la banque de guilde.
 
 ** TODO
-* Voire si on tient compte des droits de guilde pour les retraits et dépôts, et si les rangs des bots évoluent dans playerbots.
-* Uniformiser le layout des frames de banque bot et BDG
-* Ajouter un bouton retrait à la frame BDG
 * Afficher les sous de la guilde dans la frame BDG
 
 ## Frame Loot
@@ -112,7 +107,8 @@
 * Réputations bridge-first dans la frame Infos personnage.
 * Monnaies / emblèmes bridge-first dans la frame Infos personnage, avec argent du bot.
 * Banque bot bridge-first avec consultation, dépôt et retrait.
-* Banque de guilde bot bridge-first avec consultation et dépôt.
+* Banque de guilde bot bridge-first avec consultation, dépôt et retrait protégé par les droits de guilde.
+* Layout des frames banque bot et BDG uniformisé avec fond interne sombre.
 * Achat vendeur bridge-first depuis les composants manquants de recette métier.
 * Profession recipes bridge-first.
 * Craft de recettes métier via bridge `RUN~CRAFT_RECIPE`.
