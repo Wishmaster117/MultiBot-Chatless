@@ -1331,6 +1331,50 @@ local function IsBridgeRosterBotActive(botName)
   return false
 end
 
+local function HideButtonUnitFrame(button)
+  if not button or not button.parent or not button.parent.frames then
+    return
+  end
+
+  local unitFrame = button.parent.frames[button.name]
+  if unitFrame and unitFrame.Hide then
+    unitFrame:Hide()
+  end
+end
+
+function MultiBot.BindUnitToggleHandlers(button, options)
+  if not button then
+    return nil
+  end
+
+  local requireEnabledStateOnRight = options and options.requireEnabledStateOnRight
+
+  button.doRight = function(unitButton)
+    if requireEnabledStateOnRight and unitButton.state == false then
+      return
+    end
+
+    SendChatMessage(".playerbot bot remove " .. unitButton.name, "SAY")
+    HideButtonUnitFrame(unitButton)
+    unitButton.setDisable()
+  end
+
+  button.doLeft = function(unitButton)
+    if unitButton.state then
+      if unitButton.parent and unitButton.parent.frames and unitButton.parent.frames[unitButton.name] ~= nil then
+        MultiBot.ShowHideSwitch(unitButton.parent.frames[unitButton.name])
+      end
+      return
+    end
+
+    SendChatMessage(".playerbot bot add " .. unitButton.name, "SAY")
+    unitButton.setEnable()
+  end
+
+  button._mbUnitToggleBound = true
+  return button
+end
+
 function MultiBot.SyncBridgeRosterToPlayers(roster)
   if type(roster) ~= "table" then
     return false
@@ -1405,6 +1449,10 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
         button.hpPct = tonumber(entry.hpPct or 0) or 0
         button.mpPct = tonumber(entry.mpPct or 0) or 0
         button.bridge = entry
+
+        if MultiBot.BindUnitToggleHandlers then
+          MultiBot.BindUnitToggleHandlers(button, { requireEnabledStateOnRight = true })
+        end
 
         if isActive then
           if MultiBot.index.classes.actives[botClass] == nil then
@@ -1626,6 +1674,94 @@ local function EnsureBridgeActiveIndex(button, name)
   InsertBridgeNameUnique(MultiBot.index.actives, name)
 end
 
+local function IsBridgeUnitDisplayedNow(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+
+  local multiBar = MultiBot.frames and MultiBot.frames["MultiBar"] or nil
+  local unitsButton = multiBar and multiBar.buttons and multiBar.buttons["Units"] or nil
+  local visibleNames = unitsButton and unitsButton._visibleNames or nil
+  if type(visibleNames) ~= "table" then
+    return false
+  end
+
+  for index = 1, #visibleNames do
+    if visibleNames[index] == name then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function BuildBridgeUnitFrame(units, button, name, combat, normal, preserveShown)
+  if not (units and button and button.class and button.class ~= "") then
+    return nil
+  end
+
+  local existingFrame = units.frames and units.frames[name] or nil
+  local wasShown = preserveShown and existingFrame and existingFrame.IsShown and existingFrame:IsShown()
+  local unitFrame = units.addFrame(name, -34, 2)
+  if not unitFrame then
+    return nil
+  end
+
+  if unitFrame.Hide then
+    unitFrame:Hide()
+  end
+
+  unitFrame.class = button.class
+  unitFrame.name = button.name or name
+
+  local classBuilder = MultiBot["add" .. button.class]
+  if type(classBuilder) == "function" then
+    classBuilder(unitFrame, combat, normal)
+  end
+
+  if MultiBot.addEvery then
+    MultiBot.addEvery(unitFrame, combat, normal)
+  end
+
+  MarkBridgeUnitFrameBuilt(unitFrame, button, combat, normal)
+
+  if wasShown and unitFrame.Show then
+    unitFrame:Show()
+  elseif unitFrame.Hide then
+    unitFrame:Hide()
+  end
+
+  return unitFrame
+end
+
+function MultiBot.EnsureBridgeUnitFrame(name)
+  if type(name) ~= "string" or name == "" then
+    return nil
+  end
+
+  if not (MultiBot.frames and MultiBot.frames["MultiBar"]
+          and MultiBot.frames["MultiBar"].frames
+          and MultiBot.frames["MultiBar"].frames["Units"]) then
+    return nil
+  end
+
+  local units = MultiBot.frames["MultiBar"].frames["Units"]
+  local button = units.buttons and units.buttons[name] or nil
+  if not button or not button.state or not button.class or button.class == "" then
+    return nil
+  end
+
+  local combat = button.combat or ""
+  local normal = button.normal or ""
+  local existingFrame = units.frames and units.frames[name] or nil
+
+  if not ShouldRebuildBridgeUnitFrame(existingFrame, button, combat, normal) then
+    return existingFrame
+  end
+
+  return BuildBridgeUnitFrame(units, button, name, combat, normal, false)
+end
+
 function MultiBot.ApplyBridgeBotState(name, combat, normal)
   if type(name) ~= "string" or name == "" then
     return false
@@ -1670,36 +1806,14 @@ function MultiBot.ApplyBridgeBotState(name, combat, normal)
     return true
   end
 
-  local wasShown = existingFrame and existingFrame.IsShown and existingFrame:IsShown()
-  local unitFrame = units.addFrame(name, -34, 2)
-  if unitFrame and unitFrame.Hide then
-    unitFrame:Hide()
-  end
-
-  unitFrame.class = button.class
-  unitFrame.name = button.name or name
-
-  local classBuilder = MultiBot["add" .. button.class]
-  if type(classBuilder) == "function" then
-    classBuilder(unitFrame, button.combat, button.normal)
-  end
-
-  if MultiBot.addEvery then
-    MultiBot.addEvery(unitFrame, button.combat, button.normal)
-  end
-
-  MarkBridgeUnitFrameBuilt(unitFrame, button, button.combat, button.normal)
-
   EnsureBridgeActiveIndex(button, name)
 
   if button.setEnable then
     button.setEnable()
   end
 
-  if wasShown and unitFrame and unitFrame.Show then
-    unitFrame:Show()
-  elseif unitFrame and unitFrame.Hide then
-    unitFrame:Hide()
+  if existingFrame or IsBridgeUnitDisplayedNow(name) then
+    BuildBridgeUnitFrame(units, button, name, button.combat, button.normal, true)
   end
 
   RequestBridgeUnitsRelayout()

@@ -943,9 +943,13 @@ local function hideButtonUnitFrame(button)
 end
 
 local function bindUnitToggleHandlers(button, options)
+	if MultiBot.BindUnitToggleHandlers then
+		return MultiBot.BindUnitToggleHandlers(button, options)
+	end
+
 	if not button then return end
 
-local requireEnabledStateOnRight = options and options.requireEnabledStateOnRight
+	local requireEnabledStateOnRight = options and options.requireEnabledStateOnRight
 
 	button.doRight = function(pButton)
 		if requireEnabledStateOnRight and pButton.state == false then
