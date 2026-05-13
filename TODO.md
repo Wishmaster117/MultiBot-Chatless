@@ -52,7 +52,6 @@
 
 ## Améliorations UI encore ouvertes
 
-* Uniformiser le template des frames de quêtes avec le style d'Itemus.
 * Uniformiser le template de la frame reward avec le style d'Itemus.
 * Ajouter une option pour choisir la taille des icônes de la main bar et des Quick Shaman / Quick Hunter.
 * Voir quelles autres options utiles peuvent être ajoutées à la frame options de MultiBot.
@@ -102,6 +101,7 @@
   * incompleted ;
   * completed ;
   * all.
+* Frames de quêtes `all`, `completed` et `incompleted` uniformisées avec fond interne sombre, marges cohérentes et bouton `Abandonner` par quête de bot.
 * Outfits bridge-first.
 * Character Info bridge-first.
 * Réputations bridge-first dans la frame Infos personnage.

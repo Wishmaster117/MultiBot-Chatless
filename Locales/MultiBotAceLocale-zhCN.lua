@@ -517,6 +517,7 @@ local zhCNValues = {
   ["tips.quests.alllist"] = "机器人所有任务",
   ["tips.quests.compheader"] = "** 已完成任务 **",
   ["tips.quests.incompheader"] = "** 未完成任务 **",
+  ["tips.quests.drop"] = "放弃",
   ["tips.quests.botsword"] = "机器人：",
   ["tips.quests.gobsmaster"] = "使用游戏对象菜单\n|cffffffff此按钮打开使用游戏对象的菜单。|r\n\n|cffff0000左键点击打开|r\n|cff999999（执行顺序：系统）|r",
   ["tips.quests.gobenter"] = "使用游戏对象\n|cffffffff此按钮弹出窗口输入游戏对象名称。\n\n|cffff0000左键点击打开输入窗口|r\n|cff999999（执行顺序：机器人）|r",

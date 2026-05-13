@@ -516,6 +516,7 @@ local koKRValues = {
   ["tips.quests.alllist"] = "모든 봇의 퀘스트 목록",
   ["tips.quests.compheader"] = "** 완료한 퀘스트 **",
   ["tips.quests.incompheader"] = "** 미완료 퀘스트 **",
+  ["tips.quests.drop"] = "포기",
   ["tips.quests.botsword"] = "봇 : ",
   ["tips.quests.gobsmaster"] = "게임 오브젝트 메뉴 열기\n|cffffffff이 버튼을 누르면 게임 오브젝트 사용 메뉴를 엽니다.|r\n\n|cffff0000왼쪽 클릭: 열기|r\n|cff999999(실행 순서: 시스템)|r",
   ["tips.quests.gobenter"] = "게임 오브젝트 사용\n|cffffffff이 버튼을 누르면 게임 오브젝트 이름을 입력할 수 있습니다.\n\n|cffff0000왼쪽 클릭: 입력창 열기|r\n|cff999999(실행 순서: 봇)|r",
