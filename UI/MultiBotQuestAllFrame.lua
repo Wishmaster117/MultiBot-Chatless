@@ -72,6 +72,11 @@ local function createQuestRow(self, questID, text)
     row:SetFullWidth(true)
     row:SetLayout("Flow")
 
+    local spacer = self.aceGUI:Create("Label")
+    spacer:SetText("")
+    spacer:SetWidth(Shared.QUEST_ROW_LEFT_PADDING or 12)
+    row:AddChild(spacer)
+
     local icon = self.aceGUI:Create("Icon")
     icon:SetImage(Shared.ICON_BOT_QUEST or "Interface\\Icons\\inv_misc_note_02")
     icon:SetImageSize(12, 12)
@@ -195,6 +200,7 @@ function MultiBot.InitializeQuestAllFrame()
     window:SetHeight(460)
     window:EnableResize(false)
     window:SetLayout("Fill")
+    Shared.ApplyWindowContentStyle(window, 0.90)
     local strataLevel = MultiBot.GetGlobalStrataLevel and MultiBot.GetGlobalStrataLevel()
     if strataLevel then
         window.frame:SetFrameStrata(strataLevel)
@@ -209,6 +215,8 @@ function MultiBot.InitializeQuestAllFrame()
     content:SetFullHeight(true)
     content:SetLayout("List")
     window:AddChild(content)
+
+    Shared.AddTopPadding(aceGUI, content)
 
     local summary = aceGUI:Create("Label")
     summary:SetFullWidth(true)

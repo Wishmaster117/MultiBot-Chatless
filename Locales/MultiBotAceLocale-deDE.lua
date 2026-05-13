@@ -517,6 +517,7 @@ local deDEValues = {
   ["tips.quests.alllist"] = "Alle Quests des/der Bot(s)",
   ["tips.quests.compheader"] = "** Abgeschlossene Quests **",
   ["tips.quests.incompheader"] = "** Unvollständige Quests **",
+  ["tips.quests.drop"] = "Aufgeben",
   ["tips.quests.botsword"] = "Bots : ",
   ["tips.quests.gobsmaster"] = "GameObjects-Menü öffnen\n|cffffffffDieser Button öffnet das GameObjects-Menü.|r\n\n|cffff0000Linksklick zum Öffnen|r\n|cff999999(Ausführungsreihenfolge: System)|r",
   ["tips.quests.gobenter"] = "GameObject benutzen\n|cffffffffDieser Button öffnet ein Feld zur Eingabe des GameObject-Namens.\n\n|cffff0000Linksklick zum Öffnen des Eingabefeldes|r\n|cff999999(Ausführungsreihenfolge: Bot)|r",

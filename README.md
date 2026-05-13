@@ -211,7 +211,7 @@ The goal is to remove automatic UI-refresh spam.
   </tr>
   <tr>
     <td>Quests</td>
-    <td><strong>Bridge-first</strong> incompleted, completed and all quest lists</td>
+    <td><strong>Bridge-first</strong> incompleted, completed and all quest lists with dark result frames and per-bot abandon buttons</td>
   </tr>
   <tr>
     <td>Game object search</td>

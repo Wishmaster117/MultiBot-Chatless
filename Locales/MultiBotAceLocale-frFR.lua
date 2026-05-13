@@ -517,6 +517,7 @@ local frFRValues = {
   ["tips.quests.alllist"] = "Toutes les quêtes du/des bot(s)",
   ["tips.quests.compheader"] = "** Quêtes Terminées **",
   ["tips.quests.incompheader"] = "** Quêtes Incomplètes **",
+  ["tips.quests.drop"] = "Abandonner",
   ["tips.quests.botsword"] = "Bots : ",
   ["tips.quests.gobsmaster"] = "Menu Objets du Jeu\n|cffffffffCe bouton ouvre le menu pour utiliser des objets du jeu.|r\n\n|cffff0000Clic-Gauche pour ouvrir|r\n|cff999999(Ordre d'exécution : Système)|r",
   ["tips.quests.gobenter"] = "Utiliser un Objet du Jeu\n|cffffffffCe bouton ouvre une fenêtre pour entrer le nom de l'objet du jeu.\n\n|cffff0000Clic-Gauche pour ouvrir la fenêtre|r\n|cff999999(Ordre d'exécution : Bot)|r",

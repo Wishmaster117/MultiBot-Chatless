@@ -517,6 +517,7 @@ local esESValues = {
   ["tips.quests.alllist"] = "Todas las misiones del/de los bot(s)",
   ["tips.quests.compheader"] = "** Misiones completadas **",
   ["tips.quests.incompheader"] = "** Misiones incompletas **",
+  ["tips.quests.drop"] = "Abandonar",
   ["tips.quests.botsword"] = "Bots : ",
   ["tips.quests.gobsmaster"] = "Menú de Objetos del Juego\n|cffffffffEste botón abre el menú para usar objetos del juego.|r\n\n|cffff0000Clic izquierdo para abrir|r\n|cff999999(Orden de ejecución: Sistema)|r",
   ["tips.quests.gobenter"] = "Usar objeto del juego\n|cffffffffEste botón abre un cuadro para ingresar el nombre del objeto del juego.\n\n|cffff0000Clic izquierdo para abrir el cuadro|r\n|cff999999(Orden de ejecución: Bot)|r",

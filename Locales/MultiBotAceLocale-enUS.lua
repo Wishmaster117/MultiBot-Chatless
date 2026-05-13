@@ -519,6 +519,7 @@ local enUSValues = {
   ["tips.quests.alllist"] = "All Quests for Bot(s)",
   ["tips.quests.compheader"] = "** Complete Quests **",
   ["tips.quests.incompheader"] = "** Incomplete Quests **",
+  ["tips.quests.drop"] = "Abandon",
   ["tips.quests.botsword"] = "Bots : ",
   ["tips.quests.gobsmaster"] = "Game Objects Menu\n|cffffffffOpens the Use Game Objects Menu.|r\n\n|cffff0000Left-click to Open|r\n|cff999999(Executed by: System)|r",
   ["tips.quests.gobenter"] = "Use Game Object\n|cffffffffOpens a prompt to enter Game Object Name.\n\n|cffff0000Left-click to open prompt|r\n|cff999999(Executed by: Bot)|r",

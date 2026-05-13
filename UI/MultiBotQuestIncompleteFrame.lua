@@ -54,6 +54,15 @@ local function resolveBotQuestBucket(store, botName)
     return EMPTY_TABLE
 end
 
+local function dropBotQuest(botName, entry)
+    if not Shared.SendDropQuest(botName, entry) then
+        return
+    end
+
+    Shared.RemoveQuestEntryFromBucket(resolveBotQuestBucket(getBotQuestsIncompletedStore(), botName), entry)
+    MultiBot.BuildBotQuestList(botName)
+end
+
 function MultiBot.BuildBotQuestList(botName)
     local frame = MultiBot.InitializeQuestIncompleteFrame and MultiBot.InitializeQuestIncompleteFrame()
     if not frame then
@@ -64,7 +73,13 @@ function MultiBot.BuildBotQuestList(botName)
 
     frame:Show()
     Shared.RenderQuestEntries(frame, entries, {
-        summaryText = botName and ("|cff80ff80" .. botName .. "|r") or (MultiBot.L("tips.quests.incomplist") or ""),
+        summaryText = botName and ((Shared.QUEST_SUMMARY_PREFIX or "   ") .. "|cff80ff80" .. botName .. "|r") or (MultiBot.L("tips.quests.incomplist") or ""),
+        rowOptions = botName and {
+            leftPadding = Shared.QUEST_ROW_LEFT_PADDING or 12,
+            onDrop = function(entry)
+                dropBotQuest(botName, entry)
+            end,
+        } or nil,
     })
 end
 
@@ -75,6 +90,9 @@ function MultiBot.BuildAggregatedQuestList()
     frame:Show()
     Shared.RenderQuestEntries(frame, entries, {
         summaryText = "",
+        rowOptions = {
+            leftPadding = Shared.QUEST_ROW_LEFT_PADDING or 12,
+        },
     })
 end
 
@@ -100,6 +118,7 @@ function MultiBot.InitializeQuestIncompleteFrame()
     window:SetHeight(420)
     window:EnableResize(false)
     window:SetLayout("Fill")
+    Shared.ApplyWindowContentStyle(window, 0.90)
     local strataLevel = MultiBot.GetGlobalStrataLevel and MultiBot.GetGlobalStrataLevel()
     if strataLevel then
         window.frame:SetFrameStrata(strataLevel)
@@ -114,6 +133,8 @@ function MultiBot.InitializeQuestIncompleteFrame()
     content:SetFullHeight(true)
     content:SetLayout("List")
     window:AddChild(content)
+
+    Shared.AddTopPadding(aceGUI, content)
 
     local summary = aceGUI:Create("Label")
     summary:SetFullWidth(true)
