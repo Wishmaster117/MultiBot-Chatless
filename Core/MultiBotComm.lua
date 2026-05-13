@@ -2399,6 +2399,27 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if opcode == "GBANK_RIGHTS" then
+    local botName, rest = splitOnce(payload or "", "~")
+    local token, rest2 = splitOnce(rest or "", "~")
+    local canWithdraw, remaining = splitOnce(rest2 or "", "~")
+    botName = trim(urlDecodeField(botName))
+    canWithdraw = trim(canWithdraw)
+    remaining = tonumber(remaining or "0") or 0
+    state.connected = true
+    state.lastError = nil
+
+    local active = getActiveGuildBankRequest(botName, token)
+    if active then
+      active.rights = {
+        canWithdraw = canWithdraw == "1" or string.lower(canWithdraw) == "true",
+        remaining = remaining,
+      }
+    end
+
+    return true
+  end
+
   if opcode == "GBANK_END" then
     local botName, token = splitOnce(payload or "", "~")
     botName = trim(urlDecodeField(botName))
@@ -2410,7 +2431,7 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
       local key = string.lower(botName)
       state.guildBankItems[key] = active.items or {}
       if MultiBot.OnBridgeGuildBankItems then
-        MultiBot.OnBridgeGuildBankItems(botName, state.guildBankItems[key], active.error, token)
+        MultiBot.OnBridgeGuildBankItems(botName, state.guildBankItems[key], active.error, token, active.rights)
       end
     end
 

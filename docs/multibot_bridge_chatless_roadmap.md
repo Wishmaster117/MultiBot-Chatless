@@ -146,9 +146,9 @@ Le but n’est pas de supprimer ces commandes. Le but est de ne plus les lancer 
 - [x] Endpoint côté bridge : `GET~BANK~<bot>~<token>`
 - [x] Réponses en paquets courts : `BANK_BEGIN`, `BANK_ITEM`, `BANK_ERROR`, `BANK_END`
 - [x] Endpoint côté bridge : `GET~GBANK~<bot>~<token>`
-- [x] Réponses en paquets courts : `GBANK_BEGIN`, `GBANK_ITEM`, `GBANK_ERROR`, `GBANK_END`
+- [x] Réponses en paquets courts : `GBANK_BEGIN`, `GBANK_RIGHTS`, `GBANK_ITEM`, `GBANK_ERROR`, `GBANK_END`
 - [x] Endpoint côté bridge : `RUN~ITEM_ACTION~<bot>~<token>~<action>~<itemId>~<count>`
-- [x] Actions validées : dépôt banque bot, retrait banque bot, dépôt banque de guilde et achat vendeur
+- [x] Actions validées : dépôt banque bot, retrait banque bot, dépôt banque de guilde, retrait banque de guilde et achat vendeur
 - [x] Consultation BDG basée sur la guilde du bot, sans exiger que le joueur soit dans la même guilde
 - [x] Détection des banquiers neutres avec flags compatibles Dalaran
 - [x] Messages d'erreur structurés pour banquier introuvable, droits BDG, vendeur introuvable, objet non vendu et monnaie spéciale
@@ -283,7 +283,7 @@ Avec beaucoup de bots, éviter les réponses globales trop grosses.
 - `GET~BOT_EMBLEMS` répond en paquets `BOT_EMBLEMS_BEGIN` / `BOT_EMBLEM_ITEM` / `BOT_EMBLEMS_MONEY` / `BOT_EMBLEMS_END` ;
 - `GET~PROFESSION_RECIPES` répond en paquets `PROFESSION_RECIPES_BEGIN` / `PROFESSION_RECIPES_ITEM` / `PROFESSION_RECIPES_END` ;
 - `GET~BANK` répond en paquets `BANK_BEGIN` / `BANK_ITEM` / `BANK_ERROR` / `BANK_END` ;
-- `GET~GBANK` répond en paquets `GBANK_BEGIN` / `GBANK_ITEM` / `GBANK_ERROR` / `GBANK_END` ;
+- `GET~GBANK` répond en paquets `GBANK_BEGIN` / `GBANK_RIGHTS` / `GBANK_ITEM` / `GBANK_ERROR` / `GBANK_END` ;
 - un paquet global vide peut seulement servir de réponse vide si aucun bot n’est disponible.
 
 ---
@@ -330,7 +330,7 @@ Le craft de recette passe par `RUN~CRAFT_RECIPE`. Les recettes à résultat alé
 
 Les extensions inventaire banque, banque de guilde et achat vendeur sont maintenant bridge-first pour les chemins validés. La banque du bot et la banque de guilde du bot peuvent être consultées via `GET~BANK` et `GET~GBANK`.
 
-Les actions dépôt banque, retrait banque, dépôt banque de guilde et achat vendeur passent par `RUN~ITEM_ACTION`. Le retrait banque de guilde reste à traiter séparément si l'UI doit l'exposer plus tard, car il demande des garde-fous supplémentaires côté droits et logs.
+Les actions dépôt banque, retrait banque, dépôt banque de guilde, retrait banque de guilde et achat vendeur passent par `RUN~ITEM_ACTION`. Le retrait BDG est exposé dans l'UI avec un bouton grisé quand le bot n'a plus de droits de retrait disponibles.
 
 ### Audit chatless final
 
@@ -435,7 +435,7 @@ Le prochain pas logique est maintenant : **audit résiduel + Roll / ventes / ope
 5. tester un craft cuisine sans feu puis avec feu, et vérifier l'erreur localisée ;
 6. vérifier en console qu’il n’y a plus de refresh automatique legacy `stats`, `items`, `spells`, `glyphs`, `talents spec list`, `outfit ?` avec `MultiBot.allowLegacyChatFallback = false` ;
 7. vérifier que les commandes manuelles volontaires restent fonctionnelles : `who`, `co ?`, `nc ?`, `ss ?`, `.playerbot bot add`, `.playerbot bot remove`, actions inventory, `glyph equip`, sélection de spec et actions Outfits ;
-8. poursuivre ensuite avec Roll, ventes existantes, open items bridge-first, retrait BDG et enchantements d'objets si besoin.
+8. poursuivre ensuite avec Roll, ventes existantes, open items bridge-first et enchantements d'objets si besoin.
 
 Après cette stabilisation, il restera surtout un audit de nettoyage : supprimer les debug temporaires, garder les fallbacks legacy uniquement quand ils sont utiles au diagnostic, et retirer les parsers historiques devenus morts.
 

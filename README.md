@@ -101,6 +101,7 @@ GET~OUTFITS
 GET~QUESTS
 GET~GAMEOBJECTS
 RUN~CRAFT_RECIPE
+RUN~ITEM_ACTION
 RUN~OUTFIT
 RUN~RTI
 RUN~COMBAT
@@ -175,7 +176,7 @@ The goal is to remove automatic UI-refresh spam.
   </tr>
   <tr>
     <td>Bot bank / guild bank / vendor buy</td>
-    <td><strong>Bridge-first</strong> bank snapshots, guild bank snapshots, bank deposit/withdraw, guild bank deposit and vendor buy actions</td>
+    <td><strong>Bridge-first</strong> bank snapshots, guild bank snapshots, bank deposit/withdraw, guild bank deposit/withdraw and vendor buy actions</td>
   </tr>
   <tr>
     <td>Profession recipe frame</td>
@@ -470,7 +471,7 @@ Implemented bridge-first / chatless areas:
 - Inventory refresh with icons and item tooltips.
 - Spellbook refresh, with profession/crafting spells separated from the combat spellbook path.
 - Character Info frame through the bridge with Blizzard-style tabs for class, profession, secondary, weapon and armor skills, reputations and currencies/emblems.
-- Bot bank and guild bank snapshots through the bridge, plus bank deposit/withdraw, guild bank deposit and vendor buy item actions.
+- Bot bank and guild bank snapshots through the bridge, plus bank deposit/withdraw, guild bank deposit/withdraw and vendor buy item actions.
 - Profession recipe frame through the bridge, opened from profession and secondary skill rows.
 - Glyph refresh with icons and glyph tooltips.
 - Outfits refresh and actions through the bridge.

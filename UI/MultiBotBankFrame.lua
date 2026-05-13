@@ -10,6 +10,7 @@ local BANK_FRAME_X = -360
 local BANK_ROW_WIDTH = 300
 local BANK_TEXT_WIDTH = 210
 local BANK_WITHDRAW_BUTTON_WIDTH = 70
+local BANK_WITHDRAW_BUTTON_OFFSET_X = -8
 local BANK_REFRESH_DELAY = 0.65
 
 local function L(key, fallback)
@@ -34,6 +35,29 @@ local function setButtonEnabled(button, enabled)
     end
 end
 
+local function addSimpleBackdrop(frame, bgAlpha)
+    if not frame or not frame.SetBackdrop then
+        return
+    end
+
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+
+    if frame.SetBackdropColor then
+        frame:SetBackdropColor(0.06, 0.06, 0.08, bgAlpha or 0.90)
+    end
+
+    if frame.SetBackdropBorderColor then
+        frame:SetBackdropBorderColor(0.35, 0.35, 0.35, 0.95)
+    end
+end
+
 local function createWindow(name, title, width, height, pointX)
     if AceGUI then
         local widget = AceGUI:Create("Window")
@@ -44,6 +68,11 @@ local function createWindow(name, title, width, height, pointX)
         widget.frame:SetPoint("CENTER", UIParent, "CENTER", pointX or 0, 0)
         widget.frame:SetFrameStrata("DIALOG")
         widget:EnableResize(false)
+
+        if widget.content then
+            addSimpleBackdrop(widget.content, 0.90)
+        end
+
         return widget
     end
 
@@ -54,9 +83,15 @@ local function createWindow(name, title, width, height, pointX)
     frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     frame.title:SetPoint("TOP", 0, -7)
     frame.title:SetText(title)
+
+    frame.content = CreateFrame("Frame", nil, frame)
+    frame.content:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -30)
+    frame.content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 10)
+    addSimpleBackdrop(frame.content, 0.90)
+
     return {
         frame = frame,
-        content = frame,
+        content = frame.content,
         SetTitle = function(self, value) self.frame.title:SetText(value) end,
         Show = function(self) self.frame:Show() end,
         Hide = function(self) self.frame:Hide() end,
@@ -172,8 +207,24 @@ local function getBankModeBridgeRequiredText(mode)
     return L("inventory.bank.bridge.required", "Bank bridge is not connected.")
 end
 
-local function canWithdrawFromMode(mode)
-    return mode ~= "gbank"
+local function getWithdrawActionForMode(mode)
+    if mode == "gbank" then
+        return "GBANK_WITHDRAW"
+    end
+
+    return "BANK_WITHDRAW"
+end
+
+local function canWithdrawFromFrame(frame)
+    if not frame then
+        return false
+    end
+
+    if frame.mode == "gbank" then
+        return frame.gbankCanWithdraw == true
+    end
+
+    return true
 end
 
 local function ensureBankFrame()
@@ -209,18 +260,24 @@ local function ensureBankFrame()
         row.text:SetHeight(22)
 
         row.withdrawButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        row.withdrawButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row.withdrawButton:SetPoint("RIGHT", row, "RIGHT", BANK_WITHDRAW_BUTTON_OFFSET_X, 0)
         row.withdrawButton:SetWidth(BANK_WITHDRAW_BUTTON_WIDTH)
         row.withdrawButton:SetHeight(20)
         row.withdrawButton:SetText(L("inventory.bank.withdraw", "Withdraw"))
         row.withdrawButton:SetScript("OnClick", function()
             local item = row.item
-            if not item or not frame.botName or not canWithdrawFromMode(frame.mode) then
+            local action = getWithdrawActionForMode(frame.mode)
+            if not item or not frame.botName or not action then
+                return
+            end
+
+            if not canWithdrawFromFrame(frame) then
+                frame.status:SetText(getBankReasonText("NO_GUILD_BANK_RIGHTS"))
                 return
             end
 
             if MultiBot.Comm and MultiBot.Comm.RunInventoryItemAction then
-                local token = MultiBot.Comm.RunInventoryItemAction(frame.botName, "BANK_WITHDRAW", item.itemId, 0)
+                local token = MultiBot.Comm.RunInventoryItemAction(frame.botName, action, item.itemId, 0)
                 if token then
                     frame.status:SetText(L("inventory.bank.withdraw.pending", "Withdraw requested..."))
                     setButtonEnabled(row.withdrawButton, false)
@@ -279,9 +336,9 @@ local function ensureBankFrame()
             if item then
                 row.icon:SetTexture(MultiBot.SafeTexturePath(item.icon))
                 row.text:SetText((item.name or ("item:" .. item.itemId)) .. " |cff999999x" .. tostring(item.count or 1) .. "|r")
-                if canWithdrawFromMode(self.mode) then
+                if getWithdrawActionForMode(self.mode) then
                     row.withdrawButton:SetText(L("inventory.bank.withdraw", "Withdraw"))
-                    setButtonEnabled(row.withdrawButton, true)
+                    setButtonEnabled(row.withdrawButton, canWithdrawFromFrame(self))
                     row.withdrawButton:Show()
                 else
                     row.withdrawButton:Hide()
@@ -304,9 +361,11 @@ local function ensureBankFrame()
         frame:render()
     end)
 
-    frame.setItems = function(self, botName, lines, errorReason, mode)
+    frame.setItems = function(self, botName, lines, errorReason, mode, guildBankRights)
         self.botName = botName
         self.mode = mode or self.mode or "bank"
+        self.gbankCanWithdraw = self.mode == "gbank" and type(guildBankRights) == "table" and guildBankRights.canWithdraw == true
+        self.gbankWithdrawRemaining = self.mode == "gbank" and type(guildBankRights) == "table" and tonumber(guildBankRights.remaining or 0) or 0
         self.items = {}
         self.page = 1
         setWindowTitle(self, getBankModeTitle(self.mode) .. " - " .. tostring(botName or ""))
@@ -341,6 +400,8 @@ function MultiBot.OpenBotBank(botName)
     local frame = ensureBankFrame()
     frame.botName = botName
     frame.mode = "bank"
+    frame.gbankCanWithdraw = false
+    frame.gbankWithdrawRemaining = 0
     frame.items = {}
     frame.page = 1
     setWindowTitle(frame, getBankModeTitle(frame.mode) .. " - " .. botName)
@@ -365,6 +426,8 @@ function MultiBot.OpenBotGuildBank(botName)
     local frame = ensureBankFrame()
     frame.botName = botName
     frame.mode = "gbank"
+    frame.gbankCanWithdraw = false
+    frame.gbankWithdrawRemaining = 0
     frame.items = {}
     frame.page = 1
     setWindowTitle(frame, getBankModeTitle(frame.mode) .. " - " .. botName)
@@ -428,8 +491,8 @@ function MultiBot.OnBridgeBankItems(botName, lines, errorReason)
     ensureBankFrame():setItems(botName, lines or {}, errorReason, "bank")
 end
 
-function MultiBot.OnBridgeGuildBankItems(botName, lines, errorReason)
-    ensureBankFrame():setItems(botName, lines or {}, errorReason, "gbank")
+function MultiBot.OnBridgeGuildBankItems(botName, lines, errorReason, token, guildBankRights)
+    ensureBankFrame():setItems(botName, lines or {}, errorReason, "gbank", guildBankRights)
 end
 
 function MultiBot.InitializeBankFrame()
