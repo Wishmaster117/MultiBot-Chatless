@@ -1429,8 +1429,12 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
     local _, playerClassToken = UnitClass("player")
     local playerClass = MultiBot.toClass(playerClassToken or "UNKNOWN")
     local selfButton = MultiBot.addSelf(playerClass, playerName)
-    if selfButton and selfButton.setDisable then
-      selfButton.setDisable()
+    if selfButton then
+      if selfButton.setDisable then selfButton.setDisable() end
+      selfButton.doLeft = function(pButton)
+      SendChatMessage(".playerbot bot self", "SAY")
+      MultiBot.OnOffSwitch(pButton)
+      end
     end
   end
 
