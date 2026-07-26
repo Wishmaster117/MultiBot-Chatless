@@ -399,6 +399,31 @@ function Comm.RunPositionCommand(scope, target, command)
   return Comm.Send("RUN", "POSITION~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
 end
 
+function Comm.RunFormationCommand(scope, target, command)
+  local state = ensureBridgeState()
+
+  if not state.connected then
+    return false
+  end
+
+  command = trim(command or "")
+  if command == "" then
+    return false
+  end
+
+  scope = string.upper(trim(scope or "ALL"))
+  target = trim(target or "")
+
+  if scope ~= "ALL" and scope ~= "GROUP" and scope ~= "BOT" then
+    return false
+  end
+
+  state.formationSeq = (tonumber(state.formationSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-formation-" .. tostring(state.formationSeq)
+
+  return Comm.Send("RUN", "FORMATION~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
+end
+
 function Comm.RequestOutfits(name)
   local state = ensureBridgeState()
   name = trim(name)
@@ -3098,6 +3123,31 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     debugPrint("ADDON:RX", "COMBAT_ACK", payload or "")
+    return true
+  end
+
+  if opcode == "FORMATION_ACK" then
+    state.connected = true
+    state.lastError = nil
+    debugPrint("ADDON:RX", "FORMATION_ACK", payload or "")
+
+    local rest = select(2, splitOnce(payload or "", "~"))
+    local rest2 = select(2, splitOnce(rest, "~"))
+    local rest3 = select(2, splitOnce(rest2, "~"))
+    local executedText, encodedCommand = splitOnce(rest3, "~")
+    local executed = tonumber(executedText) or 0
+    local command = trim(urlDecodeField(encodedCommand))
+
+    -- Cache what actually took effect. Nothing reads this yet; it is here so the
+    -- UI can later restore the correct icon on reload. executed == 0 means the
+    -- server-side whitelist rejected the command and no bot changed formation.
+    if executed > 0 then
+      local name = string.match(command, "^formation%s+(.+)$")
+      if name then
+        state.formation = name
+      end
+    end
+
     return true
   end
 

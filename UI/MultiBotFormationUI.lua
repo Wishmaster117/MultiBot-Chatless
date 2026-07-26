@@ -17,7 +17,40 @@ local FORMATION_BUTTONS = {
     { name = "Circle", icon = "Interface\\AddOns\\MultiBot\\Icons\\formation_circle.blp", cmd = "formation circle" },
     { name = "Chaos", icon = "Interface\\AddOns\\MultiBot\\Icons\\formation_chaos.blp", cmd = "formation chaos" },
     { name = "Shield", icon = "Interface\\AddOns\\MultiBot\\Icons\\formation_shield.blp", cmd = "formation shield" },
+    -- Reuses the generic formation icon: there is no formation_far.blp artwork yet.
+    { name = "Far", icon = "Interface\\AddOns\\MultiBot\\Icons\\formation.blp", cmd = "formation far" },
 }
+
+-- Bridge-first. The bridge sets the formation natively, so nothing is sent to
+-- party/raid chat and the bots do not whisper "Formation set to: x" back. The
+-- chat path stays as a fallback so the button still works when the server-side
+-- module is absent or the bridge has not finished its handshake.
+local function applyFormation(button, definition)
+    local parent = button.parent.parent
+    local comm = MultiBot.Comm
+
+    if comm and type(comm.RunFormationCommand) == "function"
+        and comm.RunFormationCommand("ALL", "", definition.cmd) then
+        local frame = parent.frames[FORMATION_FRAME_NAME]
+        local rootButton = parent.buttons[FORMATION_BUTTON_NAME]
+
+        if rootButton and rootButton.setTexture then
+            rootButton.setTexture(button.texture)
+        end
+
+        if frame then
+            frame:Hide()
+
+            if MultiBot.RequestClickBlockerUpdate then
+                MultiBot.RequestClickBlockerUpdate(frame)
+            end
+        end
+
+        return true
+    end
+
+    return MultiBot.SelectToGroup(parent, FORMATION_FRAME_NAME, button.texture, definition.cmd)
+end
 
 local function addFormationButton(frame, definition, column, row)
     frame.addButton(
@@ -27,7 +60,7 @@ local function addFormationButton(frame, definition, column, row)
         definition.icon,
         MultiBot.L("tips.format." .. string.lower(definition.name))
     ).doLeft = function(button)
-        MultiBot.SelectToGroup(button.parent.parent, FORMATION_FRAME_NAME, button.texture, definition.cmd)
+        applyFormation(button, definition)
     end
 end
 
