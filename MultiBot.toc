@@ -19,8 +19,8 @@ Libs\AceDB-3.0\AceDB-3.0.lua
 Libs\AceLocale-3.0\AceLocale-3.0.lua
 Libs\AceTimer-3.0\AceTimer-3.0.lua
 Libs\AceGUI-3.0\AceGUI-3.0.xml
-Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 Libs\libdatabroker-1-1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 Libs\LibDropdown-1.0\LibDropdown-1.0.lua
 
 
