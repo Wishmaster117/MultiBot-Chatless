@@ -162,42 +162,48 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
     end
     -- MENU MISC END-----------------------------------------
 
-	pFrame.addButton("Summon", 94, 0, "ability_hunter_beastcall", MultiBot.L("tips.every.summon"))
-	.doLeft = function(pButton)
-		MultiBot.ActionToTarget("summon", pButton.getName())
+	local isSelfBot = pFrame.getName() == UnitName("player")
+
+	if not isSelfBot then
+		pFrame.addButton("Summon", 94, 0, "ability_hunter_beastcall", MultiBot.L("tips.every.summon"))
+		.doLeft = function(pButton)
+			MultiBot.ActionToTarget("summon", pButton.getName())
+		end
+
+		pFrame.addButton("Uninvite", 124, 0, "inv_misc_grouplooking", MultiBot.L("tips.every.uninvite")).doShow()
+		.doLeft = function(pButton)
+			MultiBot.doSlash("/uninvite", pButton.getName())
+			pButton.getButton("Invite").doShow()
+			pButton.doHide()
+		end
+
+		pFrame.addButton("Invite", 124, 0, "inv_misc_groupneedmore", MultiBot.L("tips.every.invite")).doHide()
+		.doLeft = function(pButton)
+			MultiBot.doSlash("/invite", pButton.getName())
+			pButton.getButton("Uninvite").doShow()
+			pButton.doHide()
+		end
 	end
 
-	pFrame.addButton("Uninvite", 124, 0, "inv_misc_grouplooking", MultiBot.L("tips.every.uninvite")).doShow()
-	.doLeft = function(pButton)
-		MultiBot.doSlash("/uninvite", pButton.getName())
-		pButton.getButton("Invite").doShow()
-		pButton.doHide()
-	end
+	local everyActionStartX = isSelfBot and 94 or 154
 
-	pFrame.addButton("Invite", 124, 0, "inv_misc_groupneedmore", MultiBot.L("tips.every.invite")).doHide()
-	.doLeft = function(pButton)
-		MultiBot.doSlash("/invite", pButton.getName())
-		pButton.getButton("Uninvite").doShow()
-		pButton.doHide()
-	end
-
-	pFrame.addButton("Food", 154, 0, "inv_drink_24_sealwhey", MultiBot.L("tips.every.food")).setDisable()
+	pFrame.addButton("Food", everyActionStartX, 0, "inv_drink_24_sealwhey", MultiBot.L("tips.every.food")).setDisable()
 	.doLeft = function(pButton)
 		MultiBot.OnOffActionToTarget(pButton, "nc +food,?", "nc -food,?", pButton.getName())
 	end
 
-	pFrame.addButton("Loot", 184, 0, "inv_misc_coin_16", MultiBot.L("tips.every.loot")).setDisable()
+	pFrame.addButton("Loot", everyActionStartX + 30, 0, "inv_misc_coin_16", MultiBot.L("tips.every.loot")).setDisable()
 	.doLeft = function(pButton)
 		MultiBot.OnOffActionToTarget(pButton, "nc +loot,?", "nc -loot,?", pButton.getName())
 	end
 
-	pFrame.addButton("Gather", 214, 0, "trade_mining", MultiBot.L("tips.every.gather")).setDisable()
+	pFrame.addButton("Gather", everyActionStartX + 60, 0, "trade_mining", MultiBot.L("tips.every.gather")).setDisable()
 	.doLeft = function(pButton)
 		MultiBot.OnOffActionToTarget(pButton, "nc +gather,?", "nc -gather,?", pButton.getName())
 	end
 
 	-- Selfbot is not allowed to use these Tools --
-	if(pFrame.getName() == UnitName("player")) then return end
+	if(isSelfBot) then return end
 
 	pFrame.addButton("Inventory", 244, 0, "inv_misc_bag_08", MultiBot.L("tips.every.inventory")).setDisable()
 	.doLeft = function(pButton)
