@@ -189,18 +189,35 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("Food", everyActionStartX, 0, "inv_drink_24_sealwhey", MultiBot.L("tips.every.food")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "nc +food,?", "nc -food,?", pButton.getName())
+		if(isSelfBot) then
+			MultiBot.OnOffSelfBotStrategy(pButton, "nc +food,?", "nc -food,?")
+		else
+			MultiBot.OnOffActionToTarget(pButton, "nc +food,?", "nc -food,?", pButton.getName())
+		end
 	end
 
 	pFrame.addButton("Loot", everyActionStartX + 30, 0, "inv_misc_coin_16", MultiBot.L("tips.every.loot")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "nc +loot,?", "nc -loot,?", pButton.getName())
+		if(isSelfBot) then
+			MultiBot.OnOffSelfBotStrategy(pButton, "nc +loot,?", "nc -loot,?")
+		else
+			MultiBot.OnOffActionToTarget(pButton, "nc +loot,?", "nc -loot,?", pButton.getName())
+		end
 	end
 
 	pFrame.addButton("Gather", everyActionStartX + 60, 0, "trade_mining", MultiBot.L("tips.every.gather")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "nc +gather,?", "nc -gather,?", pButton.getName())
+		if(isSelfBot) then
+			MultiBot.OnOffSelfBotStrategy(pButton, "nc +gather,?", "nc -gather,?")
+		else
+			MultiBot.OnOffActionToTarget(pButton, "nc +gather,?", "nc -gather,?", pButton.getName())
+		end
 	end
+
+	-- Common EveryBar strategy state must be initialized before the SelfBot-only early return.
+	if(MultiBot.hasStrategy(pNormal, "food")) then pFrame.getButton("Food").setEnable() end
+	if(MultiBot.hasStrategy(pNormal, "loot")) then pFrame.getButton("Loot").setEnable() end
+	if(MultiBot.hasStrategy(pNormal, "gather")) then pFrame.getButton("Gather").setEnable() end
 
 	-- Selfbot is not allowed to use these Tools --
 	if(isSelfBot) then return end
@@ -359,10 +376,6 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
     end
 
 -- STRATEGIES --
-
-	if(MultiBot.hasStrategy(pNormal, "food")) then pFrame.getButton("Food").setEnable() end
-	if(MultiBot.hasStrategy(pNormal, "loot")) then pFrame.getButton("Loot").setEnable() end
-	if(MultiBot.hasStrategy(pNormal, "gather")) then pFrame.getButton("Gather").setEnable() end
 end
 
 local function sendCommonCombatStrategy(pButton, command)

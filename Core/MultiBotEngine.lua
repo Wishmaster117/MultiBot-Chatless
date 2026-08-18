@@ -616,6 +616,91 @@ local function _mbRouteStrategyMutation(action, commandScope, target)
 	return MB_STRATEGY_ROUTE_BLOCKED
 end
 
+local function _mbCanUseBridgeSelfStrategyMutation()
+	return MultiBot.bridge
+		and MultiBot.bridge.connected == true
+		and MultiBot.bridge.selfBotCapable == true
+		and MultiBot.bridge.selfStrategyCapable == true
+		and MultiBot.bridge.selfBotLastActive == true
+		and MultiBot.Comm
+		and type(MultiBot.Comm.RunSelfStrategyCommand) == "function"
+end
+
+local function _mbSelfStrategyUnavailableReason()
+	if(not MultiBot.bridge) then return "SELF_STRATEGY_BRIDGE_UNAVAILABLE" end
+	if(MultiBot.bridge.connected ~= true) then return "SELF_STRATEGY_NOT_CONNECTED" end
+	if(MultiBot.bridge.selfBotCapable ~= true) then return "SELF_BOT_CAPABILITY_UNAVAILABLE" end
+	if(MultiBot.bridge.selfStrategyCapable ~= true) then return "SELF_STRATEGY_CAPABILITY_UNAVAILABLE" end
+	if(MultiBot.bridge.selfBotLastActive ~= true) then return "SELF_STRATEGY_NOT_ACTIVE" end
+	if(not MultiBot.Comm or type(MultiBot.Comm.RunSelfStrategyCommand) ~= "function") then
+		return "SELF_STRATEGY_CLIENT_UNAVAILABLE"
+	end
+	return "SELF_STRATEGY_UNAVAILABLE"
+end
+
+local function _mbRefreshSelfStrategyState()
+	if(not MultiBot.bridge or MultiBot.bridge.connected ~= true or not MultiBot.Comm) then return end
+	if(type(MultiBot.Comm.RequestSelfStrategyState) == "function") then
+		MultiBot.Comm.RequestSelfStrategyState()
+	end
+end
+
+local function _mbRouteSelfStrategyMutation(action)
+	local mutationScope, changes = _mbParseStrategyMutation(action)
+	if(not mutationScope) then return MB_STRATEGY_ROUTE_NOT_STRATEGY end
+
+	local subject = UnitName("player") or "self"
+	if(not _mbCanUseBridgeSelfStrategyMutation()) then
+		_mbWarnStrategyMutationBlocked("SELF", subject, _mbSelfStrategyUnavailableReason())
+		_mbRefreshSelfStrategyState()
+		return MB_STRATEGY_ROUTE_BLOCKED
+	end
+
+	local stateScope = mutationScope == "nc" and "N" or "C"
+	local token = MultiBot.Comm.RunSelfStrategyCommand(stateScope, changes, function(result)
+		if(type(result) ~= "table") then
+			_mbWarnStrategyMutationBlocked("SELF", subject, "SELF_STRATEGY_INVALID_RESULT")
+			_mbRefreshSelfStrategyState()
+			return
+		end
+
+		if(result.status ~= "ok") then
+			local reason = result.reason
+			if(type(reason) ~= "string" or reason == "") then
+				reason = result.status or "SELF_STRATEGY_REJECTED"
+			end
+			_mbWarnStrategyMutationBlocked("SELF", subject, reason)
+		end
+
+		_mbRefreshSelfStrategyState()
+	end)
+
+	if(token ~= false and token ~= nil) then
+		return MB_STRATEGY_ROUTE_BRIDGE
+	end
+
+	_mbWarnStrategyMutationBlocked("SELF", subject, _mbStrategyLastError("SELF_STRATEGY_SEND_FAILED"))
+	_mbRefreshSelfStrategyState()
+	return MB_STRATEGY_ROUTE_BLOCKED
+end
+
+MultiBot.OnOffSelfBotStrategy = function(pButton, pOn, pOff)
+	local wasEnabled = pButton.state == true
+	local action = wasEnabled and pOff or pOn
+	local mutationScope = _mbParseStrategyMutation(action)
+	if(not mutationScope) then
+		return wasEnabled
+	end
+
+	local route = _mbRouteSelfStrategyMutation(action)
+	if(route == MB_STRATEGY_ROUTE_BRIDGE) then
+		-- The authoritative STATE response rebuilds the final visual state.
+		return not wasEnabled
+	end
+
+	-- SelfBot never falls through to the legacy bot whisper route.
+	return wasEnabled
+end
 MultiBot.ActionToTarget = function(pAction, oTarget)
 	local tName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
 

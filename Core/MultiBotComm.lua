@@ -270,6 +270,7 @@ local function ensureBridgeState()
   state.pendingStateRefreshAll = state.pendingStateRefreshAll or false
   state.pendingStateRefreshByBot = state.pendingStateRefreshByBot or {}
   state.strategyMutationCapable = state.strategyMutationCapable or false
+  state.selfStrategyCapable = state.selfStrategyCapable or false
   state.outfitCapable = state.outfitCapable or false
   state.inventoryCapable = state.inventoryCapable or false
   state.inventoryExactCapable = state.inventoryExactCapable or false
@@ -297,6 +298,8 @@ local function ensureBridgeState()
   state.groupRollCommands = state.groupRollCommands or {}
   state.strategyMutationSeq = state.strategyMutationSeq or 0
   state.strategyMutationCommands = state.strategyMutationCommands or {}
+  state.selfStrategySeq = state.selfStrategySeq or 0
+  state.selfStrategyCommands = state.selfStrategyCommands or {}
   state.weaponEnchantDebugSeq = state.weaponEnchantDebugSeq or 0
   state.details = state.details or {}
   state.professions = state.professions or {}
@@ -669,6 +672,43 @@ function Comm.RequestState(name)
   return token
 end
 
+function Comm.RequestSelfStrategyState()
+  local state = ensureBridgeState()
+  local name = getPlayerName()
+
+  if not name
+      or not state.connected
+      or state.selfStrategyCapable ~= true
+      or state.selfBotLastActive ~= true
+      or state.stateFramingCapable ~= true then
+    state.lastError = "SELF_STRATEGY_STATE_UNAVAILABLE"
+    return false
+  end
+
+  local token = beginStateRequest(state, name, false)
+  if not token then
+    state.lastError = "SELF_STRATEGY_STATE_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  if not Comm.Send("GET", "SELF_STRATEGY_STATE~" .. token) then
+    clearStateRequest(state, token)
+    state.lastError = "SELF_STRATEGY_STATE_SEND_FAILED"
+    return false
+  end
+
+  local request = state.stateRequests[token]
+  if type(request) == "table" then
+    local botKey = string.lower(name)
+    local requestOrder = tonumber(request.order) or 0
+    local latestOrder = tonumber(state.stateLatestOrderByBot[botKey]) or 0
+    if requestOrder > latestOrder then
+      state.stateLatestOrderByBot[botKey] = requestOrder
+    end
+  end
+
+  return token
+end
 function Comm.RequestStates()
   local state = ensureBridgeState()
   if not state.capabilitiesResolved then
@@ -803,6 +843,7 @@ maybeResolveCapabilityFallback = function(generation)
     state.capabilityBatchActive = false
     state.stateFramingCapable = false
     state.strategyMutationCapable = false
+state.selfStrategyCapable = false
     state.outfitCapable = false
     state.inventoryCapable = false
     state.inventoryExactCapable = false
@@ -1114,6 +1155,103 @@ function Comm.RunStrategyCommand(scope, target, stateScope, changes, callback)
   return token
 end
 
+local function finishSelfStrategyCommand(token, result)
+  local state = ensureBridgeState()
+  local pending = state.selfStrategyCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.selfStrategyCommands[token] = nil
+  result = type(result) == "table" and result or {}
+  result.token = token
+  result.stateScope = result.stateScope or pending.stateScope
+  result.changes = result.changes or pending.changes
+
+  if type(pending.callback) == "function" then
+    pending.callback(result)
+  end
+
+  if MultiBot.OnSelfStrategyMutationApplied then
+    MultiBot.OnSelfStrategyMutationApplied(result)
+  end
+
+  return true
+end
+
+function Comm.RunSelfStrategyCommand(stateScope, changes, callback)
+  local state = ensureBridgeState()
+
+  if not state.connected then
+    state.lastError = "SELF_STRATEGY_NOT_CONNECTED"
+    return false
+  end
+  if state.selfBotCapable ~= true then
+    state.lastError = "SELF_BOT_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+  if state.selfStrategyCapable ~= true then
+    state.lastError = "SELF_STRATEGY_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+  if state.selfBotLastActive ~= true then
+    state.lastError = "SELF_STRATEGY_NOT_ACTIVE"
+    return false
+  end
+
+  stateScope = string.upper(trim(stateScope or ""))
+  changes = validateStrategyMutationChanges(changes)
+
+  if stateScope ~= "C" and stateScope ~= "N" then
+    state.lastError = "SELF_STRATEGY_INVALID_STATE_SCOPE"
+    return false
+  end
+  if not changes then
+    state.lastError = "SELF_STRATEGY_INVALID_CHANGES"
+    return false
+  end
+  if countTableEntries(state.selfStrategyCommands) >= STRATEGY_MUTATION_MAX_ACTIVE then
+    state.lastError = "SELF_STRATEGY_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  state.selfStrategySeq = (tonumber(state.selfStrategySeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-self-strategy-" .. tostring(state.selfStrategySeq)
+  state.selfStrategyCommands[token] = {
+    stateScope = stateScope,
+    changes = changes,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "SELF_STRATEGY~"
+    .. token .. "~"
+    .. stateScope .. "~"
+    .. urlEncodeField(changes)
+
+  if not Comm.Send("RUN", payload) then
+    state.selfStrategyCommands[token] = nil
+    state.lastError = "SELF_STRATEGY_SEND_FAILED"
+    return false
+  end
+
+  if MultiBot and type(MultiBot.TimerAfter) == "function" then
+    MultiBot.TimerAfter(STRATEGY_MUTATION_TIMEOUT_SECONDS, function()
+      local bridge = ensureBridgeState()
+      if not bridge.selfStrategyCommands[token] then
+        return
+      end
+
+      bridge.lastError = "SELF_STRATEGY_TIMEOUT~" .. token
+      finishSelfStrategyCommand(token, {
+        status = "timeout",
+        reason = "TIMEOUT",
+      })
+    end)
+  end
+
+  return token
+end
 function Comm.RunLootCommand(scope, target, command)
   local state = ensureBridgeState()
 
@@ -1698,6 +1836,11 @@ function Comm.HandleSelfBotAddonMessage(opcode, payload, state)
     reason = reason,
     desiredState = type(pending) == "table" and pending.desiredState or nil,
   })
+  if status == "OK" and activeText == "1" and state.selfStrategyCapable == true
+      and type(Comm.RequestSelfStrategyState) == "function" then
+    Comm.RequestSelfStrategyState()
+  end
+
   debugPrint("ADDON:RX", opcode, token, status, activeText, reason)
   return true
 end
@@ -3114,6 +3257,7 @@ function Comm.MarkDisconnected(reason)
   state.formationCommands = {}
   state.formationQueryActive = nil
   state.strategyMutationCapable = false
+state.selfStrategyCapable = false
   state.outfitCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
@@ -3143,6 +3287,18 @@ function Comm.MarkDisconnected(reason)
   if MultiBot.RefreshEnchantingEveryButtons then
     MultiBot.RefreshEnchantingEveryButtons()
   end
+
+  local pendingSelfStrategyTokens = {}
+  for token in pairs(state.selfStrategyCommands or {}) do
+    pendingSelfStrategyTokens[#pendingSelfStrategyTokens + 1] = token
+  end
+  for _, token in ipairs(pendingSelfStrategyTokens) do
+    finishSelfStrategyCommand(token, {
+      status = "error",
+      reason = "DISCONNECTED",
+    })
+  end
+  state.selfStrategyCommands = {}
 
   local pendingTokens = {}
   for token in pairs(state.strategyMutationCommands or {}) do
@@ -5037,6 +5193,66 @@ function Comm.HandleInventoryBuybackAddonMessage(opcode, payload, state)
 end
 -- MB_VENDOR_BUYBACK_V1_RX_HELPER_END
 
+-- MB_SELFBOT_STRATEGY_V1_RX_HELPER_BEGIN
+function Comm.HandleSelfStrategyAddonMessage(opcode, payload, state)
+  if opcode ~= "SELF_STRATEGY_ACK" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  local fields = splitFields(payload or "")
+  if #fields ~= 4 then
+    state.lastError = "SELF_STRATEGY_ACK_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local stateScope = string.upper(trim(fields[2]))
+  local status = string.upper(trim(fields[3]))
+  local reason = urlDecodeFieldStrict(fields[4], 64, false)
+  local pending = state.selfStrategyCommands[token]
+
+  if not isValidStateToken(token)
+      or (stateScope ~= "C" and stateScope ~= "N")
+      or (status ~= "OK" and status ~= "ERR")
+      or reason == nil
+      or type(pending) ~= "table"
+      or pending.stateScope ~= stateScope then
+    state.lastError = "SELF_STRATEGY_ACK_INVALID"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("SELF_STRATEGY_" .. reason)
+  debugPrint("ADDON:RX", "SELF_STRATEGY_ACK", token, stateScope, status, reason)
+  finishSelfStrategyCommand(token, {
+    status = status == "OK" and "ok" or "failed",
+    stateScope = stateScope,
+    reason = reason,
+  })
+  return true
+end
+
+function Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state)
+  if requestType ~= "SELF_STRATEGY" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(token)
+  local pending = state.selfStrategyCommands[token]
+  if type(pending) ~= "table" then
+    return true
+  end
+
+  finishSelfStrategyCommand(token, {
+    status = "error",
+    stateScope = pending.stateScope,
+    reason = reason or "PROTOCOL_ERROR",
+  })
+  return true
+end
+-- MB_SELFBOT_STRATEGY_V1_RX_HELPER_END
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   if prefix ~= Comm.prefix then
     return false
@@ -5098,6 +5314,7 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   if opcode == "CAPS_BEGIN" then
     state.stateFramingCapable = false
     state.strategyMutationCapable = false
+state.selfStrategyCapable = false
     state.outfitCapable = false
     state.inventoryCapable = false
     state.inventoryExactCapable = false
@@ -5123,6 +5340,7 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     if not state.capabilityBatchActive then
       state.stateFramingCapable = false
       state.strategyMutationCapable = false
+state.selfStrategyCapable = false
       state.outfitCapable = false
       state.inventoryCapable = false
       state.inventoryExactCapable = false
@@ -5146,6 +5364,8 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
         state.stateFramingCapable = true
       elseif capability == STRATEGY_MUTATION_CAPABILITY then
         state.strategyMutationCapable = true
+      elseif capability == "SELF_STRATEGY_V1" then
+        state.selfStrategyCapable = true
       elseif capability == OUTFIT_CAPABILITY then
         state.outfitCapable = true
       elseif capability == INVENTORY_CAPABILITY then
@@ -5274,6 +5494,12 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
   -- MB_ISSUE33_SELF_BOT_V1_RX_END
+
+  -- MB_SELFBOT_STRATEGY_V1_RX_BEGIN
+  if Comm.HandleSelfStrategyAddonMessage(opcode, payload, state) then
+    return true
+  end
+  -- MB_SELFBOT_STRATEGY_V1_RX_END
 
   if opcode == "ROSTER" then
     state.connected = true
@@ -7260,6 +7486,8 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
       if requestType and isValidStateToken(token) and reason then
         if Comm.HandleSelfBotProtocolError(requestType, token, reason, state) then
           return true
+        elseif Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state) then
+          return true
         elseif requestType == "GROUP_ROLL" and state.groupRollCommands[token] then
           finishGroupRollCommand(token, {
             status = "error",
@@ -7322,6 +7550,7 @@ function Comm.OnPlayerEnteringWorld()
   state.pendingStateRefreshAll = false
   state.pendingStateRefreshByBot = {}
   state.strategyMutationCapable = false
+state.selfStrategyCapable = false
   state.outfitCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
