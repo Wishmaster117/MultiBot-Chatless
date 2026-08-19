@@ -1160,6 +1160,20 @@ MultiBot.OnOffActionToTarget = function(pButton, pOn, pOff, pTarget)
 	end
 end
 
+MultiBot.OnOffUnitStrategy = function(pButton, pOn, pOff, pTarget)
+	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
+	local playerName = UnitName("player")
+
+	if(MultiBot.bridge
+		and MultiBot.bridge.selfBotLastActive == true
+		and targetName ~= nil
+		and playerName ~= nil
+		and targetName == playerName) then
+		return MultiBot.OnOffSelfBotStrategy(pButton, pOn, pOff)
+	end
+
+	return MultiBot.OnOffActionToTarget(pButton, pOn, pOff, targetName)
+end
 MultiBot.OnOffSwitch = function(pButton)
 	if(pButton.state) then
 		pButton.setDisable()
