@@ -47,6 +47,7 @@ local GROUP_ROLL_MAX_ITEM_LINK_LENGTH = 160
 local STATE_TIMEOUT_SECONDS = 5.0
 local STATES_TIMEOUT_SECONDS = 15.0
 local STRATEGY_MUTATION_TIMEOUT_SECONDS = 5.0
+local SELF_STRATEGY_MUTATION_TIMEOUT_SECONDS = 10.0
 local STRATEGY_MUTATION_MAX_ACTIVE = 32
 local STRATEGY_MUTATION_MAX_CHANGES_LENGTH = 160
 local STRATEGY_MUTATION_MAX_OPERATIONS = 32
@@ -290,6 +291,9 @@ local function ensureBridgeState()
   state.selfBotStateActive = state.selfBotStateActive or nil
   state.selfBotCommandSeq = state.selfBotCommandSeq or 0
   state.selfBotCommandActive = state.selfBotCommandActive or nil
+  state.selfBotMountNormalized = state.selfBotMountNormalized == true
+  state.selfBotMountNormalizePending = state.selfBotMountNormalizePending == true
+  state.selfBotMountNormalizeEpoch = tonumber(state.selfBotMountNormalizeEpoch) or 0
   state.enchantTradeSeq = state.enchantTradeSeq or 0
   state.enchantTradeActive = state.enchantTradeActive or nil
   state.enchantTradeCommands = state.enchantTradeCommands or {}
@@ -1236,7 +1240,7 @@ function Comm.RunSelfStrategyCommand(stateScope, changes, callback)
   end
 
   if MultiBot and type(MultiBot.TimerAfter) == "function" then
-    MultiBot.TimerAfter(STRATEGY_MUTATION_TIMEOUT_SECONDS, function()
+    MultiBot.TimerAfter(SELF_STRATEGY_MUTATION_TIMEOUT_SECONDS, function()
       local bridge = ensureBridgeState()
       if not bridge.selfStrategyCommands[token] then
         return
@@ -1780,6 +1784,53 @@ local function finishSelfBotRequest(kind, token, result)
   return true
 end
 
+local function normalizeSelfBotMountStrategy(state)
+  state = type(state) == "table" and state or ensureBridgeState()
+
+  if state.connected ~= true
+      or state.selfBotLastActive ~= true
+      or state.selfStrategyCapable ~= true
+      or type(Comm.RunSelfStrategyCommand) ~= "function" then
+    return false
+  end
+
+  if state.selfBotMountNormalized == true or state.selfBotMountNormalizePending == true then
+    return true
+  end
+
+  local generation = tonumber(state.connectionGeneration) or 0
+  local epoch = tonumber(state.selfBotMountNormalizeEpoch) or 0
+  state.selfBotMountNormalizePending = true
+
+  local token = Comm.RunSelfStrategyCommand("N", "-mount", function(result)
+    local bridge = ensureBridgeState()
+    if (tonumber(bridge.connectionGeneration) or 0) ~= generation
+        or (tonumber(bridge.selfBotMountNormalizeEpoch) or 0) ~= epoch then
+      return
+    end
+
+    bridge.selfBotMountNormalizePending = false
+    if bridge.selfBotLastActive == true
+        and type(result) == "table"
+        and result.status == "ok" then
+      bridge.selfBotMountNormalized = true
+      debugPrint("SELFBOT:MOUNT_NORMALIZE", "OK")
+    else
+      bridge.selfBotMountNormalized = false
+      debugPrint("SELFBOT:MOUNT_NORMALIZE", "FAILED",
+        type(result) == "table" and tostring(result.reason or result.status or "UNKNOWN") or "INVALID_RESULT")
+    end
+  end)
+
+  if token == false or token == nil then
+    state.selfBotMountNormalizePending = false
+    return false
+  end
+
+  debugPrint("SELFBOT:MOUNT_NORMALIZE", "SENT", tostring(token))
+  return true
+end
+
 -- Keep SELF_BOT response parsing outside Comm.HandleAddonMessage. WoW 3.3.5a
 -- uses Lua 5.1, whose function upvalue limit is 60; the main dispatcher is
 -- already close to that limit.
@@ -1836,6 +1887,14 @@ function Comm.HandleSelfBotAddonMessage(opcode, payload, state)
     reason = reason,
     desiredState = type(pending) == "table" and pending.desiredState or nil,
   })
+  if activeText == "0" then
+    state.selfBotMountNormalizeEpoch = (tonumber(state.selfBotMountNormalizeEpoch) or 0) + 1
+    state.selfBotMountNormalizePending = false
+    state.selfBotMountNormalized = false
+  elseif state.selfStrategyCapable == true then
+    normalizeSelfBotMountStrategy(state)
+  end
+
   if status == "OK" and activeText == "1" and state.selfStrategyCapable == true
       and type(Comm.RequestSelfStrategyState) == "function" then
     Comm.RequestSelfStrategyState()
@@ -3122,6 +3181,9 @@ function Comm.MarkDisconnected(reason)
   state.selfBotStateActive = nil
   state.selfBotCommandActive = nil
   state.selfBotLastActive = nil
+  state.selfBotMountNormalizeEpoch = (tonumber(state.selfBotMountNormalizeEpoch) or 0) + 1
+  state.selfBotMountNormalizePending = false
+  state.selfBotMountNormalized = false
 
   if type(selfBotStatePending) == "table" and type(selfBotStatePending.callback) == "function" then
     selfBotStatePending.callback({

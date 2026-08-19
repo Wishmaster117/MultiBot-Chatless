@@ -47,12 +47,12 @@ MultiBot.addMage = function(pFrame, pCombat, pNormal)
 
     playbookFrame.addButton("Aoe", 0, 0, "spell_arcane_starfire", MultiBot.L("tips.mage.playbook.aoe")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
 	end
 
 	playbookFrame.addButton("Arcane", 0, 26, "ability_mage_arcanebarrage", MultiBot.L("tips.mage.playbook.arcane")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +arcane,?", "co -arcane,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +arcane,?", "co -arcane,?", pButton.getName())) then
 			pButton.getButton("Frost").setDisable()
 			pButton.getButton("Fire").setDisable()
 		end
@@ -60,7 +60,7 @@ MultiBot.addMage = function(pFrame, pCombat, pNormal)
 
 	playbookFrame.addButton("Frost", 0, 52, "spell_frost_frostbolt02", MultiBot.L("tips.mage.playbook.frost")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +frost,?", "co -frost,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +frost,?", "co -frost,?", pButton.getName())) then
 			pButton.getButton("Arcane").setDisable()
 			pButton.getButton("Fire").setDisable()
 		end
@@ -68,7 +68,7 @@ MultiBot.addMage = function(pFrame, pCombat, pNormal)
 
 	playbookFrame.addButton("Fire", 0, 78, "spell_fire_fireball02", MultiBot.L("tips.mage.playbook.fire")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +fire,?", "co -fire,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +fire,?", "co -fire,?", pButton.getName())) then
 			pButton.getButton("Arcane").setDisable()
 			pButton.getButton("Frost").setDisable()
 		end
@@ -76,7 +76,7 @@ MultiBot.addMage = function(pFrame, pCombat, pNormal)
 	-- missing Frostfire & Firestarter --
 	playbookFrame.addButton("FrostFire", 0, 104, "ability_mage_frostfirebolt", MultiBot.L("tips.mage.playbook.frostfire")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +frostfire,?", "co -frostfire,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +frostfire,?", "co -frostfire,?", pButton.getName())) then
 			pButton.getButton("Arcane").setDisable()
 			pButton.getButton("Frost").setDisable()
 			pButton.getButton("Fire").setDisable()
@@ -85,7 +85,7 @@ MultiBot.addMage = function(pFrame, pCombat, pNormal)
 
 	playbookFrame.addButton("Firestarter", 0, 130, "ability_mage_firestarter", MultiBot.L("tips.mage.playbook.firestarter")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +firestarter,?", "co -firestarter,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +firestarter,?", "co -firestarter,?", pButton.getName())
 	end
 
 	-- STRATEGIES:PLAYBOOK --

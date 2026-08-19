@@ -701,6 +701,67 @@ MultiBot.OnOffSelfBotStrategy = function(pButton, pOn, pOff)
 	-- SelfBot never falls through to the legacy bot whisper route.
 	return wasEnabled
 end
+
+MultiBot.IsSelfBotStrategyTarget = function(pTarget)
+	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
+	local playerName = UnitName("player")
+
+	return MultiBot.bridge
+		and MultiBot.bridge.selfBotLastActive == true
+		and type(targetName) == "string"
+		and targetName ~= ""
+		and type(playerName) == "string"
+		and playerName ~= ""
+		and targetName == playerName
+end
+
+MultiBot.RequestUnitStrategyState = function(pTarget)
+	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
+
+	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RequestSelfStrategyState) == "function") then
+			MultiBot.Comm.RequestSelfStrategyState()
+			return true
+		end
+		return false
+	end
+
+	if(type(targetName) == "string"
+		and targetName ~= ""
+		and MultiBot.bridge
+		and MultiBot.bridge.connected == true
+		and MultiBot.Comm
+		and type(MultiBot.Comm.RequestState) == "function") then
+		MultiBot.Comm.RequestState(targetName)
+		return true
+	end
+
+	return false
+end
+
+MultiBot.ActionToUnitStrategy = function(pAction, oTarget)
+	local targetName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
+
+	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
+		if(not _mbParseStrategyMutation(pAction)) then
+			_mbWarnStrategyMutationBlocked("SELF", targetName, "BAD_OPERATION")
+			_mbRefreshSelfStrategyState()
+			return false, "blocked"
+		end
+
+		local route = _mbRouteSelfStrategyMutation(pAction)
+		if(route == MB_STRATEGY_ROUTE_BRIDGE) then
+			return true, "bridge"
+		end
+
+		return false, "blocked"
+	end
+
+	return MultiBot.ActionToTarget(pAction, targetName)
+end
 MultiBot.ActionToTarget = function(pAction, oTarget)
 	local tName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
 
@@ -788,6 +849,19 @@ end
 
 MultiBot.SelectToTarget = function(pParent, pIndex, pTexture, pAction, oTarget)
 	if(MultiBot.ActionToTarget(pAction, oTarget)) then
+		local tFrame = pParent.frames[pIndex]
+		local tButton = pParent.buttons[pIndex]
+		tButton.setTexture(pTexture)
+		tFrame:Hide()
+		if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(tFrame) end
+		return true
+	end
+
+	return false
+end
+
+MultiBot.SelectToUnitStrategy = function(pParent, pIndex, pTexture, pAction, oTarget)
+	if(MultiBot.ActionToUnitStrategy(pAction, oTarget)) then
 		local tFrame = pParent.frames[pIndex]
 		local tButton = pParent.buttons[pIndex]
 		tButton.setTexture(pTexture)
@@ -1162,13 +1236,8 @@ end
 
 MultiBot.OnOffUnitStrategy = function(pButton, pOn, pOff, pTarget)
 	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
-	local playerName = UnitName("player")
 
-	if(MultiBot.bridge
-		and MultiBot.bridge.selfBotLastActive == true
-		and targetName ~= nil
-		and playerName ~= nil
-		and targetName == playerName) then
+	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
 		return MultiBot.OnOffSelfBotStrategy(pButton, pOn, pOff)
 	end
 

@@ -163,7 +163,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 			end
 		end
 
-		local sent, transport = MultiBot.ActionToTarget(action, target)
+		local sent, transport = MultiBot.ActionToUnitStrategy(action, target)
 		if not sent then return end
 		if transport ~= "bridge" then
 			fStones.activeStone = desired
@@ -258,7 +258,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 			end
 		end
 
-		local sent, transport = MultiBot.ActionToTarget(action, target)
+		local sent, transport = MultiBot.ActionToUnitStrategy(action, target)
 		if not sent then return end
 		if transport ~= "bridge" then
 			fSoul.activeSS = desired
@@ -357,7 +357,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
         end
       end
 
-      local sent, transport = MultiBot.ActionToTarget(action, target)
+      local sent, transport = MultiBot.ActionToUnitStrategy(action, target)
       if not sent then return end
       if transport ~= "bridge" then
         fPets.activePet = desired
@@ -427,7 +427,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
     btnMeta.setDisable()
 
     btnMeta.doLeft = function(pButton)
-      MultiBot.OnOffActionToTarget(pButton, "co +meta melee,?", "co -meta melee,?", pButton.getName())
+      MultiBot.OnOffUnitStrategy(pButton, "co +meta melee,?", "co -meta melee,?", pButton.getName())
     end
 
 	if MultiBot.AddCommonCombatStrategyButtons then
@@ -448,7 +448,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("Tank", -60, 0, "ability_warrior_shieldmastery", MultiBot.L("tips.warlock.tank")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +tank,?", "co -tank,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +tank,?", "co -tank,?", pButton.getName())
 	end
 
    -- CURSES --
@@ -537,7 +537,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
          end
        end
 
-       local sent, transport = MultiBot.ActionToTarget(action, target)
+       local sent, transport = MultiBot.ActionToUnitStrategy(action, target)
        if not sent then return end
        if transport ~= "bridge" then
          fCurses.activeCurse = desired

@@ -159,11 +159,29 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 	end
 
 	local function requestShamanCombatState(target, bridgeSync, sequenceKey, sequence)
-		local previousUpdateAt = getShamanBridgeStateTimestamp(target)
+		local selfStrategyTarget = MultiBot.IsSelfBotStrategyTarget
+			and MultiBot.IsSelfBotStrategyTarget(target)
 
 		local function isCurrent()
 			return isShamanPlaybookSequenceCurrent(sequenceKey, sequence)
 		end
+
+		if(selfStrategyTarget) then
+			local function requestSelfState()
+				if(not isCurrent()) then return end
+				if(MultiBot.Comm and type(MultiBot.Comm.RequestSelfStrategyState) == "function") then
+					MultiBot.Comm.RequestSelfStrategyState()
+				end
+			end
+
+			if(bridgeSync) then
+				scheduleShamanTask(shamanStateRefreshDelay, requestSelfState)
+				scheduleShamanTask(shamanStateRefreshDelay + 0.65, requestSelfState)
+			end
+			return
+		end
+
+		local previousUpdateAt = getShamanBridgeStateTimestamp(target)
 
 		local function requestBridgeState()
 			if(not isCurrent()) then return end
@@ -199,7 +217,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 			local command = commands[index]
 			if(not command) then return end
-			if(not MultiBot.ActionToTarget(command, target)) then return end
+			if(not MultiBot.ActionToUnitStrategy(command, target)) then return end
 
 			if(index < #commands) then
 				scheduleShamanTask(shamanCommandInterval, function()
@@ -221,10 +239,13 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 		local target = pButton.getName()
 		if(not defaults or type(target) ~= "string" or target == "") then return end
 
+		local selfStrategyTarget = MultiBot.IsSelfBotStrategyTarget
+			and MultiBot.IsSelfBotStrategyTarget(target)
 		local bridgeSync = MultiBot.bridge
 			and MultiBot.bridge.connected == true
 			and MultiBot.Comm
-			and MultiBot.Comm.RequestState
+			and ((selfStrategyTarget and type(MultiBot.Comm.RequestSelfStrategyState) == "function")
+				or (not selfStrategyTarget and type(MultiBot.Comm.RequestState) == "function"))
 
 		local commands = { "co -resto,-ele,-enh,+" .. specKey }
 		for _, elementKey in ipairs(shamanElementOrder) do
@@ -249,7 +270,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 		"Aoe", 0, 0, "spell_nature_lightningoverload",
 		MultiBot.L("tips.shaman.playbook.aoe")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
 	end
 
 	playbookFrame.addButton(
@@ -335,7 +356,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("Cure", -90, 0, "Ability_Creature_Poison_02", MultiBot.L("tips.shaman.playbook.cure")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +cure,?", "co -cure,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +cure,?", "co -cure,?", pButton.getName())
 	end
 
 	-- STRATEGIES --

@@ -720,7 +720,7 @@ function ShamanQuick:SelectTotem(row, elementKey, button, definition)
     local isSameSelection = currentButton == button or currentIcon == button.__mbIcon
 
     if isSameSelection then
-        if not MultiBot.ActionToTarget("co -" .. definition.spell .. ",?", row.owner) then
+        if not MultiBot.ActionToUnitStrategy("co -" .. definition.spell .. ",?", row.owner) then
             return
         end
         self:ClearTotemSelection(row, elementKey)
@@ -732,7 +732,7 @@ function ShamanQuick:SelectTotem(row, elementKey, button, definition)
         command = "co -" .. currentButton.__mbSpell .. ",+" .. definition.spell .. ",?"
     end
 
-    if not MultiBot.ActionToTarget(command, row.owner) then
+    if not MultiBot.ActionToUnitStrategy(command, row.owner) then
         return
     end
 

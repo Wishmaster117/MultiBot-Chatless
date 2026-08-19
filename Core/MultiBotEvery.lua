@@ -409,6 +409,13 @@ local function addCommonCombatStrategyButton(pFrame, pCombat, tFrame, buttonName
 	):setDisable()
 
 	button.doLeft = function(self)
+		local botName = self.getName and self.getName() or ""
+		if MultiBot.IsSelfBotStrategyTarget
+			and MultiBot.IsSelfBotStrategyTarget(botName) then
+			MultiBot.OnOffUnitStrategy(self, plusCommand, minusCommand, botName)
+			return
+		end
+
 		if MultiBot.OnOffSwitch(self) then
 			sendCommonCombatStrategy(self, plusCommand)
 		else

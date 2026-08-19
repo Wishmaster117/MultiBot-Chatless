@@ -25,7 +25,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("Dps", 0, 52, "spell_holy_divinepurpose", MultiBot.L("tips.rogue.dps.dps")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +dps,?", "co -dps,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +dps,?", "co -dps,?", pButton.getName())
 	end
 
 	-- STEALTH (maintenir le camouflage HORS COMBAT)
@@ -39,7 +39,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 	tFrame.addButton("Stealthed", 0, 104, "ability_sap", MultiBot.L("tips.rogue.dps.stealthed")).setDisable()
 	.doLeft = function(pButton)
 		-- Pour entrer en mode "stealthed", on coupe dps et on force stealthed ; l'inverse pour repasser en dps.
-		if(MultiBot.OnOffActionToTarget(pButton, "co +stealthed,?", "co -stealthed,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +stealthed,?", "co -stealthed,?", pButton.getName())) then
 			pButton.getButton("Dps")      .setDisable()
 			pButton.getButton("DpsAoe")   .setDisable()
 			pButton.getButton("DpsAssist")   .setDisable()
@@ -49,7 +49,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 	-- BOOST (active les CD offensifs : Adrenaline Rush, Blade Flurry, etc.)
 	tFrame.addButton("Boost", 0, 130, "ability_mage_potentspirit", MultiBot.L("tips.rogue.dps.boost")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +boost,?", "co -boost,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +boost,?", "co -boost,?", pButton.getName())
 	end
 
 	if MultiBot.AddCommonCombatStrategyButtons then

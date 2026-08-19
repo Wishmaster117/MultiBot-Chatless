@@ -1,7 +1,7 @@
 MultiBot.addDruid = function(pFrame, pCombat, pNormal)
 	pFrame.addButton("Heal", 0, 0, "spell_holy_aspiration", MultiBot.L("tips.druid.heal")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +resto,?", "co -resto,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +resto,?", "co -resto,?", pButton.getName())) then
 			pButton.getButton("Caster").setDisable()
 			pButton.getButton("Tank").setDisable()
 			pButton.getButton("Bear").setDisable()
@@ -30,12 +30,12 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("CasterAoe", 0, 0, "spell_arcane_starfire", MultiBot.L("tips.druid.playbook.casterAoe")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
 	end
 
 	tFrame.addButton("Caster", 0, 26, "spell_nature_starfall", MultiBot.L("tips.druid.playbook.caster")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +balance,?", "co -balance,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +balance,?", "co -balance,?", pButton.getName())) then
 			pButton.getButton("Heal").setDisable()
 			pButton.getButton("Tank").setDisable()
 			pButton.getButton("Bear").setDisable()
@@ -46,7 +46,7 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("Cat", 0, 52, "ability_druid_catform", MultiBot.L("tips.druid.playbook.cat")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +cat,?", "co -cat,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +cat,?", "co -cat,?", pButton.getName())) then
 			pButton.getButton("Caster").setDisable()
 			pButton.getButton("Heal").setDisable()
 			pButton.getButton("Tank").setDisable()
@@ -59,7 +59,7 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("Bear", 0, 78, "ability_racial_bearform", MultiBot.L("tips.druid.playbook.bear")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +bear,?", "co -bear,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +bear,?", "co -bear,?", pButton.getName())) then
 			pButton.getButton("Caster").setDisable()
 			pButton.getButton("Heal").setDisable()
 			pButton.getButton("Cat").setDisable()
@@ -108,7 +108,7 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
 
 	tDpsFrame.addButton("Dps", 0, 52, "spell_holy_divinepurpose", MultiBot.L("tips.druid.dps.dps")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +cat,?", "co -cat,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +cat,?", "co -cat,?", pButton.getName())) then
 			pButton.getButton("Caster").setDisable()
 			pButton.getButton("Tank").setDisable()
 			pButton.getButton("Bear").setDisable()
@@ -121,7 +121,7 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
     -- OFF-HEAL --
 	tDpsFrame.addButton("OffHeal", 0, 78, "spell_nature_healingtouch", MultiBot.L("tips.druid.dps.offheal")).setDisable()
         .doLeft = function(pButton)
-            if (MultiBot.OnOffActionToTarget(
+            if (MultiBot.OnOffUnitStrategy(
                     pButton, "co +offheal,?", "co -offheal,?",
                     pButton.getName())) then
 
@@ -149,7 +149,7 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("Tank", -150, 0, "ability_warrior_shieldmastery", MultiBot.L("tips.druid.tank")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +bear,?", "co -bear,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +bear,?", "co -bear,?", pButton.getName())) then
 			pButton.getButton("Caster").setDisable()
 			pButton.getButton("Heal").setDisable()
 			pButton.getButton("Dps").setDisable()
@@ -164,7 +164,7 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("TankFace", -180, 0, "ability_warrior_defensivestance", MultiBot.L("tips.tankFace")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +tank face,?", "co -tank face,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +tank face,?", "co -tank face,?", pButton.getName())
 	end
 
 	-- STRATEGIES --
