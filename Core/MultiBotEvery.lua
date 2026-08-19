@@ -270,8 +270,8 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 			MultiBot.OnOffSelfBotStrategy(pButton, "co +focus,?", "co -focus,?")
 		end
 
-		local function addSelfWaitButton(name, x, y, tip, value)
-			local button = selfCombatFrame.addButton(name, x, y, "Spell_Holy_BorrowedTime", tip)
+		local function addSelfWaitButton(name, posX, posY, tip, value)
+			local button = selfCombatFrame.addButton(name, posX, posY, "Spell_Holy_BorrowedTime", tip)
 			button.doLeft = function()
 				runEverySelfAction("WAIT_ATTACK_TIME", tostring(value))
 			end
