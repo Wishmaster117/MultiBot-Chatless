@@ -32,7 +32,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 	tFrame.addButton("Stealth", 0, 78, "ability_stealth",  MultiBot.L("tips.rogue.dps.stealth")).setDisable()
 	.doLeft = function(pButton)
 		-- "stealth" est une stratégie non-combat : on la pousse côté pNormal
-		MultiBot.OnOffActionToTarget(pButton, "nc +stealth,?", "nc -stealth,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "nc +stealth,?", "nc -stealth,?", pButton.getName())
 	end
 
 	-- STEALTHED (comportement EN CAMOUFLAGE en combat)

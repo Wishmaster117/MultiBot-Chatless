@@ -1,3 +1,25 @@
+local showEveryMessage
+
+local function runEverySelfAction(action, argument)
+  local comm = MultiBot and MultiBot.Comm or nil
+  if not (comm and type(comm.RunSelfAction) == "function") then
+    if showEveryMessage then
+      showEveryMessage("Bridge unavailable: SelfBot action was not sent.")
+    end
+    return false
+  end
+
+  local token = comm.RunSelfAction(action, argument or "", function(result)
+    if type(result) == "table" and result.status ~= "ok" and showEveryMessage then
+      showEveryMessage("SelfBot action failed: " .. tostring(result.reason or "UNKNOWN"))
+    end
+  end)
+  if not token and showEveryMessage then
+    local reason = MultiBot and MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE"
+    showEveryMessage("SelfBot action was not sent: " .. tostring(reason))
+  end
+  return token and true or false
+end
 -- Confirmation popup for Autogear
 if not StaticPopupDialogs["MULTIBOT_AUTOGEAR_CONFIRM"] then
   StaticPopupDialogs["MULTIBOT_AUTOGEAR_CONFIRM"] = {
@@ -6,7 +28,11 @@ if not StaticPopupDialogs["MULTIBOT_AUTOGEAR_CONFIRM"] then
     button2 = CANCEL,
     OnAccept = function(self, data)
       if data and data.target then
-        SendChatMessage("autogear", "WHISPER", nil, data.target)
+        if data.selfAction == true then
+          runEverySelfAction("AUTOGEAR", "")
+        else
+          SendChatMessage("autogear", "WHISPER", nil, data.target)
+        end
       end
     end,
     timeout = 0,
@@ -16,7 +42,7 @@ if not StaticPopupDialogs["MULTIBOT_AUTOGEAR_CONFIRM"] then
   }
 end
 
-local function showEveryMessage(message)
+showEveryMessage = function(message)
   if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
     DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99MultiBot|r " .. tostring(message or ""))
   elseif print then
@@ -76,6 +102,8 @@ end
 
 MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 
+    local isSelfBot = (pFrame.getName() == UnitName("player"))
+
     -- MENU MISC --------------------------------------------
     -- Crée un sous-frame « Misc » au-dessus du bouton
     local tMisc = pFrame.addFrame("Misc",  64,  29)
@@ -97,7 +125,7 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
           end
 		},
 		{ "Autogear", "inv_misc_enggizmos_30", MultiBot.L("tips.every.autogear"), function(b)
-            StaticPopup_Show("MULTIBOT_AUTOGEAR_CONFIRM", b.getName(), nil, { target = b.getName() })
+            StaticPopup_Show("MULTIBOT_AUTOGEAR_CONFIRM", b.getName(), nil, { target = b.getName(), selfAction = isSelfBot })
           end
         },
         -- NEW: Favorite toggle (per-character)
@@ -133,13 +161,19 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
         end
         },
 		{ "Maintenance", "Achievement_Halloween_Smiley_01", MultiBot.L("tips.every.maintenance"), function(b)
-            SendChatMessage("maintenance", "WHISPER", nil, b.getName())
+            if isSelfBot then
+                runEverySelfAction("MAINTENANCE", "")
+            else
+                SendChatMessage("maintenance", "WHISPER", nil, b.getName())
+            end
         end
         },
 	} do
-		local btn = tMisc.addButton(data[1], 0, y, data[2], data[3])
-		btn.doLeft = data[4]
-		y = y + dy
+		if not (isSelfBot and (data[1] == "Wipe" or data[1] == "CharacterInfo")) then
+			local btn = tMisc.addButton(data[1], 0, y, data[2], data[3])
+			btn.doLeft = data[4]
+			y = y + dy
+		end
 	end
 
 
@@ -162,7 +196,6 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
     end
     -- MENU MISC END-----------------------------------------
 
-	local isSelfBot = pFrame.getName() == UnitName("player")
 
 	if not isSelfBot then
 		pFrame.addButton("Summon", 94, 0, "ability_hunter_beastcall", MultiBot.L("tips.every.summon"))
@@ -219,8 +252,39 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 	if(MultiBot.hasStrategy(pNormal, "loot")) then pFrame.getButton("Loot").setEnable() end
 	if(MultiBot.hasStrategy(pNormal, "gather")) then pFrame.getButton("Gather").setEnable() end
 
-	-- Selfbot is not allowed to use these Tools --
-	if(isSelfBot) then return end
+	-- Selfbot is not allowed to use the ordinary bot-only Tools --
+	-- SelfBot keeps a compact chatless Combat menu and never falls through to BOT commands.
+	if(isSelfBot) then
+		local selfCombatFrame = pFrame.addFrame("CombatCommands", everyActionStartX + 90, 29, nil, 58, 114)
+		selfCombatFrame:Hide()
+		selfCombatFrame._mbDropdownManaged = true
+
+		pFrame.addButton("Combat", everyActionStartX + 90, 0, "Ability_Warrior_BattleShout", MultiBot.L("tips.every.combat"))
+		.doLeft = function()
+			MultiBot.ShowHideSwitch(selfCombatFrame)
+		end
+
+		local focusButton = selfCombatFrame.addButton("CombatFocus", -28, 84, "Ability_Hunter_MasterMarksman", MultiBot.L("tips.every.combatfocus"))
+		focusButton.setDisable()
+		focusButton.doLeft = function(pButton)
+			MultiBot.OnOffSelfBotStrategy(pButton, "co +focus,?", "co -focus,?")
+		end
+
+		local function addSelfWaitButton(name, x, y, tip, value)
+			local button = selfCombatFrame.addButton(name, x, y, "Spell_Holy_BorrowedTime", tip)
+			button.doLeft = function()
+				runEverySelfAction("WAIT_ATTACK_TIME", tostring(value))
+			end
+		end
+
+		addSelfWaitButton("CombatWait0", -28, 56, MultiBot.L("tips.every.combatwait0"), 0)
+		addSelfWaitButton("CombatWait3", 0, 56, MultiBot.L("tips.every.combatwait3"), 3)
+		addSelfWaitButton("CombatWait5", -28, 28, MultiBot.L("tips.every.combatwait5"), 5)
+		addSelfWaitButton("CombatWait10", 0, 28, MultiBot.L("tips.every.combatwait10"), 10)
+
+		if(MultiBot.hasStrategy(pCombat, "focus")) then focusButton.setEnable() end
+		return
+	end
 
 	pFrame.addButton("Inventory", 244, 0, "inv_misc_bag_08", MultiBot.L("tips.every.inventory")).setDisable()
 	.doLeft = function(pButton)

@@ -11,7 +11,7 @@ MultiBot.addPriest = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("Buff", -30, 0, "spell_holy_power", MultiBot.L("tips.priest.buff")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "nc +buff,?", "nc -buff,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "nc +buff,?", "nc -buff,?", pButton.getName())
 	end
 
 	-- PLAYBOOK --
@@ -70,7 +70,7 @@ MultiBot.addPriest = function(pFrame, pCombat, pNormal)
    -- (Expose 'rshadow' pour Shadow Protection)
    playbookFrame.addButton("ShadowRes", 0, 128, "spell_shadow_antishadow", MultiBot.L("tips.priest.playbook.rshadow")).setDisable()
    .doLeft = function(pButton)
-       MultiBot.OnOffActionToTarget(pButton, "nc +rshadow,?", "nc -rshadow,?", pButton.getName())
+       MultiBot.OnOffUnitStrategy(pButton, "nc +rshadow,?", "nc -rshadow,?", pButton.getName())
    end
 
 	-- DPS --

@@ -15,7 +15,7 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("Buff", -30, 0, "spell_holy_power", MultiBot.L("tips.druid.buff")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "nc +buff,?", "nc -buff,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "nc +buff,?", "nc -buff,?", pButton.getName())
 	end
 
 	-- PLAYBOOK --

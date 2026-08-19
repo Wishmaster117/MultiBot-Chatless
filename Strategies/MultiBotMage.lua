@@ -9,17 +9,17 @@ MultiBot.addMage = function(pFrame, pCombat, pNormal)
 
     buffFrame.addButton("NonCombatMana", 0, 0, "inv_elemental_primal_mana", MultiBot.L("tips.mage.buff.bmana"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToTarget(pButton.get(), "Buff", pButton.texture, "nc +bmana,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Buff", pButton.texture, "nc +bmana,?", pButton.getName())
         pButton.getButton("Buff").doRight = function(btn)
-            MultiBot.OnOffActionToTarget(btn, "nc +bmana,?", "nc -bmana,?", btn.getName())
+            MultiBot.OnOffUnitStrategy(btn, "nc +bmana,?", "nc -bmana,?", btn.getName())
 		end
 	end
 
     buffFrame.addButton("NonCombatDps", 0, 26, "inv_elemental_primal_nether", MultiBot.L("tips.mage.buff.bdps"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToTarget(pButton.get(), "Buff", pButton.texture, "nc +bdps,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Buff", pButton.texture, "nc +bdps,?", pButton.getName())
         pButton.getButton("Buff").doRight = function(btn)
-            MultiBot.OnOffActionToTarget(btn, "nc +bdps,?", "nc -bdps,?", btn.getName())
+            MultiBot.OnOffUnitStrategy(btn, "nc +bdps,?", "nc -bdps,?", btn.getName())
 		end
 	end
 
@@ -27,11 +27,11 @@ MultiBot.addMage = function(pFrame, pCombat, pNormal)
 
 	if(MultiBot.hasStrategy(pNormal, "bmana")) then
 		tButton.setTexture("inv_elemental_primal_mana").setEnable().doRight = function(pButton)
-			MultiBot.OnOffActionToTarget(pButton, "nc +bmana,?", "nc -bmana,?", pButton.getName())
+			MultiBot.OnOffUnitStrategy(pButton, "nc +bmana,?", "nc -bmana,?", pButton.getName())
 		end
 	elseif(MultiBot.hasStrategy(pNormal, "bdps")) then
 		tButton.setTexture("inv_elemental_primal_nether").setEnable().doRight = function(pButton)
-			MultiBot.OnOffActionToTarget(pButton, "nc +bdps,?", "nc -bdps,?", pButton.getName())
+			MultiBot.OnOffUnitStrategy(pButton, "nc +bdps,?", "nc -bdps,?", pButton.getName())
 		end
 	end
 

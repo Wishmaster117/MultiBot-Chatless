@@ -706,15 +706,12 @@ MultiBot.IsSelfBotStrategyTarget = function(pTarget)
 	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
 	local playerName = UnitName("player")
 
-	return MultiBot.bridge
-		and MultiBot.bridge.selfBotLastActive == true
-		and type(targetName) == "string"
+	return type(targetName) == "string"
 		and targetName ~= ""
 		and type(playerName) == "string"
 		and playerName ~= ""
 		and targetName == playerName
 end
-
 MultiBot.RequestUnitStrategyState = function(pTarget)
 	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
 
