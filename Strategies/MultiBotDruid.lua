@@ -99,7 +99,7 @@ MultiBot.addDruid = function(pFrame, pCombat, pNormal)
     -- Missing HEALER DPS --
 	tDpsFrame.addButton("HealerDps", 0, 104, "INV_Alchemy_Elixir_02", MultiBot.L("tips.druid.dps.healerdps")).setDisable()
     .doLeft = function(pButton)
-      if(MultiBot.OnOffActionToTarget(pButton, "co +healer dps,?", "co -healer dps,?", pButton.getName())) then
+      if(MultiBot.OnOffUnitStrategy(pButton, "co +healer dps,?", "co -healer dps,?", pButton.getName())) then
         pButton.getButton("Dps").setDisable()
         pButton.getButton("OffHeal").setDisable()
         pButton.getButton("Heal").setDisable()
