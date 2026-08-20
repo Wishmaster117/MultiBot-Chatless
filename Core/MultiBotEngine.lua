@@ -616,6 +616,159 @@ local function _mbRouteStrategyMutation(action, commandScope, target)
 	return MB_STRATEGY_ROUTE_BLOCKED
 end
 
+local function _mbCanUseBridgeSelfStrategyMutation()
+	return MultiBot.bridge
+		and MultiBot.bridge.connected == true
+		and MultiBot.bridge.selfBotCapable == true
+		and MultiBot.bridge.selfStrategyCapable == true
+		and MultiBot.bridge.selfBotLastActive == true
+		and MultiBot.Comm
+		and type(MultiBot.Comm.RunSelfStrategyCommand) == "function"
+end
+
+local function _mbSelfStrategyUnavailableReason()
+	if(not MultiBot.bridge) then return "SELF_STRATEGY_BRIDGE_UNAVAILABLE" end
+	if(MultiBot.bridge.connected ~= true) then return "SELF_STRATEGY_NOT_CONNECTED" end
+	if(MultiBot.bridge.selfBotCapable ~= true) then return "SELF_BOT_CAPABILITY_UNAVAILABLE" end
+	if(MultiBot.bridge.selfStrategyCapable ~= true) then return "SELF_STRATEGY_CAPABILITY_UNAVAILABLE" end
+	if(MultiBot.bridge.selfBotLastActive ~= true) then return "SELF_STRATEGY_NOT_ACTIVE" end
+	if(not MultiBot.Comm or type(MultiBot.Comm.RunSelfStrategyCommand) ~= "function") then
+		return "SELF_STRATEGY_CLIENT_UNAVAILABLE"
+	end
+	return "SELF_STRATEGY_UNAVAILABLE"
+end
+
+local function _mbRefreshSelfStrategyState()
+	if(not MultiBot.bridge or MultiBot.bridge.connected ~= true or not MultiBot.Comm) then return end
+	if(type(MultiBot.Comm.RequestSelfStrategyState) == "function") then
+		MultiBot.Comm.RequestSelfStrategyState()
+	end
+end
+
+local function _mbRouteSelfStrategyMutation(action, onComplete)
+	local mutationScope, changes = _mbParseStrategyMutation(action)
+	if(not mutationScope) then return MB_STRATEGY_ROUTE_NOT_STRATEGY, nil end
+
+	local subject = UnitName("player") or "self"
+	if(not _mbCanUseBridgeSelfStrategyMutation()) then
+		_mbWarnStrategyMutationBlocked("SELF", subject, _mbSelfStrategyUnavailableReason())
+		_mbRefreshSelfStrategyState()
+		return MB_STRATEGY_ROUTE_BLOCKED, nil
+	end
+
+	local stateScope = mutationScope == "nc" and "N" or "C"
+	local token = MultiBot.Comm.RunSelfStrategyCommand(stateScope, changes, function(result)
+		local ok = false
+		if(type(result) ~= "table") then
+			_mbWarnStrategyMutationBlocked("SELF", subject, "SELF_STRATEGY_INVALID_RESULT")
+		else
+			ok = result.status == "ok"
+			if(not ok) then
+				local reason = result.reason
+				if(type(reason) ~= "string" or reason == "") then
+					reason = result.status or "SELF_STRATEGY_REJECTED"
+				end
+				_mbWarnStrategyMutationBlocked("SELF", subject, reason)
+			end
+		end
+
+		-- Refresh authoritative state before any specialized ACK-side UI commit.
+		_mbRefreshSelfStrategyState()
+
+		if(type(onComplete) == "function") then
+			onComplete(ok, result)
+		end
+	end)
+
+	if(token ~= false and token ~= nil) then
+		return MB_STRATEGY_ROUTE_BRIDGE, token
+	end
+
+	_mbWarnStrategyMutationBlocked("SELF", subject, _mbStrategyLastError("SELF_STRATEGY_SEND_FAILED"))
+	_mbRefreshSelfStrategyState()
+	return MB_STRATEGY_ROUTE_BLOCKED, nil
+end
+
+MultiBot.OnOffSelfBotStrategy = function(pButton, pOn, pOff)
+	local wasEnabled = pButton.state == true
+	local action = wasEnabled and pOff or pOn
+	local mutationScope = _mbParseStrategyMutation(action)
+	if(not mutationScope) then
+		return false, "blocked"
+	end
+
+	local route, token = _mbRouteSelfStrategyMutation(action)
+	if(route == MB_STRATEGY_ROUTE_BRIDGE) then
+		-- A queued request is not an applied mutation. The authoritative
+		-- SELF_STRATEGY_STATE refresh owns the final toggle and sibling state.
+		return false, "pending", token
+	end
+
+	-- SelfBot never falls through to the legacy bot whisper route and blocked
+	-- requests must never be mistaken for a successful/active toggle.
+	return false, "blocked"
+end
+
+MultiBot.IsSelfBotStrategyTarget = function(pTarget)
+	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
+	local playerName = UnitName("player")
+
+	return type(targetName) == "string"
+		and targetName ~= ""
+		and type(playerName) == "string"
+		and playerName ~= ""
+		and targetName == playerName
+end
+MultiBot.RequestUnitStrategyState = function(pTarget)
+	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
+
+	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RequestSelfStrategyState) == "function") then
+			local request = MultiBot.Comm.RequestSelfStrategyState()
+			return request ~= false and request ~= nil
+		end
+		return false
+	end
+
+	if(type(targetName) == "string"
+		and targetName ~= ""
+		and MultiBot.bridge
+		and MultiBot.bridge.connected == true
+		and MultiBot.Comm
+		and type(MultiBot.Comm.RequestState) == "function") then
+		MultiBot.Comm.RequestState(targetName)
+		return true
+	end
+
+	return false
+end
+
+MultiBot.ActionToUnitStrategy = function(pAction, oTarget, onComplete)
+	local targetName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
+
+	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
+		if(not _mbParseStrategyMutation(pAction)) then
+			_mbWarnStrategyMutationBlocked("SELF", targetName, "BAD_OPERATION")
+			_mbRefreshSelfStrategyState()
+			return false, "blocked"
+		end
+
+		local route, token = _mbRouteSelfStrategyMutation(pAction, onComplete)
+		if(route == MB_STRATEGY_ROUTE_BRIDGE) then
+			-- false means "not synchronously applied"; pending is explicit so
+			-- callers cannot accidentally commit optimistic SelfBot UI.
+			return false, "pending", token
+		end
+
+		return false, "blocked"
+	end
+
+	-- Ordinary bot semantics remain unchanged.
+	return MultiBot.ActionToTarget(pAction, targetName)
+end
 MultiBot.ActionToTarget = function(pAction, oTarget)
 	local tName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
 
@@ -708,6 +861,42 @@ MultiBot.SelectToTarget = function(pParent, pIndex, pTexture, pAction, oTarget)
 		tButton.setTexture(pTexture)
 		tFrame:Hide()
 		if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(tFrame) end
+		return true
+	end
+
+	return false
+end
+
+MultiBot.SelectToUnitStrategy = function(pParent, pIndex, pTexture, pAction, oTarget, onAccepted)
+	local targetName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
+
+	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
+		local _, transport, token = MultiBot.ActionToUnitStrategy(pAction, targetName, function(ok)
+			if(ok ~= true) then return end
+
+			local tFrame = pParent.frames[pIndex]
+			local tButton = pParent.buttons[pIndex]
+			if(not tFrame or not tButton) then return end
+
+			tButton.setTexture(pTexture)
+			tFrame:Hide()
+			if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(tFrame) end
+			if(type(onAccepted) == "function") then onAccepted() end
+		end)
+
+		if(transport == "pending") then
+			return false, "pending", token
+		end
+		return false, transport or "blocked"
+	end
+
+	if(MultiBot.ActionToUnitStrategy(pAction, targetName)) then
+		local tFrame = pParent.frames[pIndex]
+		local tButton = pParent.buttons[pIndex]
+		tButton.setTexture(pTexture)
+		tFrame:Hide()
+		if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(tFrame) end
+		if(type(onAccepted) == "function") then onAccepted() end
 		return true
 	end
 
@@ -1075,6 +1264,15 @@ MultiBot.OnOffActionToTarget = function(pButton, pOn, pOff, pTarget)
 	end
 end
 
+MultiBot.OnOffUnitStrategy = function(pButton, pOn, pOff, pTarget)
+	local targetName = MultiBot.IF(pTarget == nil, UnitName("target"), pTarget)
+
+	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
+		return MultiBot.OnOffSelfBotStrategy(pButton, pOn, pOff)
+	end
+
+	return MultiBot.OnOffActionToTarget(pButton, pOn, pOff, targetName)
+end
 MultiBot.OnOffSwitch = function(pButton)
 	if(pButton.state) then
 		pButton.setDisable()

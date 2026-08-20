@@ -9,7 +9,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("DpsAssist", 0, 0, "spell_holy_heroism", MultiBot.L("tips.rogue.dps.dpsAssist")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +dps assist,?", "co -dps assist,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +dps assist,?", "co -dps assist,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 		end
@@ -17,7 +17,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("DpsAoe", 0, 26, "spell_holy_surgeoflight", MultiBot.L("tips.rogue.dps.dpsAoe")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +dps aoe,?", "co -dps aoe,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +dps aoe,?", "co -dps aoe,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAssist").setDisable()
 		end
@@ -25,21 +25,21 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("Dps", 0, 52, "spell_holy_divinepurpose", MultiBot.L("tips.rogue.dps.dps")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +dps,?", "co -dps,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +dps,?", "co -dps,?", pButton.getName())
 	end
 
 	-- STEALTH (maintenir le camouflage HORS COMBAT)
 	tFrame.addButton("Stealth", 0, 78, "ability_stealth",  MultiBot.L("tips.rogue.dps.stealth")).setDisable()
 	.doLeft = function(pButton)
 		-- "stealth" est une stratégie non-combat : on la pousse côté pNormal
-		MultiBot.OnOffActionToTarget(pButton, "nc +stealth,?", "nc -stealth,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "nc +stealth,?", "nc -stealth,?", pButton.getName())
 	end
 
 	-- STEALTHED (comportement EN CAMOUFLAGE en combat)
 	tFrame.addButton("Stealthed", 0, 104, "ability_sap", MultiBot.L("tips.rogue.dps.stealthed")).setDisable()
 	.doLeft = function(pButton)
 		-- Pour entrer en mode "stealthed", on coupe dps et on force stealthed ; l'inverse pour repasser en dps.
-		if(MultiBot.OnOffActionToTarget(pButton, "co +stealthed,?", "co -stealthed,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +stealthed,?", "co -stealthed,?", pButton.getName())) then
 			pButton.getButton("Dps")      .setDisable()
 			pButton.getButton("DpsAoe")   .setDisable()
 			pButton.getButton("DpsAssist")   .setDisable()
@@ -49,7 +49,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 	-- BOOST (active les CD offensifs : Adrenaline Rush, Blade Flurry, etc.)
 	tFrame.addButton("Boost", 0, 130, "ability_mage_potentspirit", MultiBot.L("tips.rogue.dps.boost")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +boost,?", "co -boost,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +boost,?", "co -boost,?", pButton.getName())
 	end
 
 	if MultiBot.AddCommonCombatStrategyButtons then
@@ -60,7 +60,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("TankAssist", -30, 0, "ability_warrior_innerrage", MultiBot.L("tips.rogue.tankAssist")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +tank assist,?", "co -tank assist,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +tank assist,?", "co -tank assist,?", pButton.getName())) then
 			pButton.getButton("DpsAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 		end

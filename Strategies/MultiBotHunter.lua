@@ -9,41 +9,44 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 
 	nonCombatAspectFrame.addButton("NonCombatNature", 0, 0, "spell_nature_protectionformnature", MultiBot.L("tips.hunter.naspect.rnature"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToTarget(pButton.get(), "NonCombatAspect", pButton.texture, "nc +rnature,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAspect", pButton.texture, "nc +rnature,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAspect").doRight = function(btn)
-			MultiBot.OnOffActionToTarget(btn, "nc +rnature,?", "nc -rnature,?", btn.getName())
+			MultiBot.OnOffUnitStrategy(btn, "nc +rnature,?", "nc -rnature,?", btn.getName())
 		end
+		end)
 	end
 
 	nonCombatAspectFrame.addButton("NonCombatSpeed", 0, 26, "ability_mount_whitetiger", MultiBot.L("tips.hunter.naspect.bspeed"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToTarget(pButton.get(), "NonCombatAspect", pButton.texture, "nc +bspeed,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAspect", pButton.texture, "nc +bspeed,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAspect").doRight = function(btn)
-			MultiBot.OnOffActionToTarget(btn, "nc +bspeed,?", "nc -bspeed,?", btn.getName())
+			MultiBot.OnOffUnitStrategy(btn, "nc +bspeed,?", "nc -bspeed,?", btn.getName())
 		end
+		end)
 	end
 
 	nonCombatAspectFrame.addButton("NonCombatDps", 0, 52, "ability_hunter_pet_dragonhawk", MultiBot.L("tips.hunter.naspect.bdps"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToTarget(pButton.get(), "NonCombatAspect", pButton.texture, "nc +bdps,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAspect", pButton.texture, "nc +bdps,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAspect").doRight = function(btn)
-			MultiBot.OnOffActionToTarget(btn, "nc +bdps,?", "nc -bdps,?", btn.getName())
+			MultiBot.OnOffUnitStrategy(btn, "nc +bdps,?", "nc -bdps,?", btn.getName())
 		end
+		end)
 	end
 
 	-- STRATEGIES:NON-COMBAT-BUFF --
 
 	if(MultiBot.hasStrategy(pNormal, "rnature")) then
 		nonCombatAspectButton.setTexture("spell_nature_protectionformnature").setEnable().doRight = function(pButton)
-			MultiBot.OnOffActionToTarget(pButton, "nc +rnature,?", "nc -rnature,?", pButton.getName())
+			MultiBot.OnOffUnitStrategy(pButton, "nc +rnature,?", "nc -rnature,?", pButton.getName())
 		end
 	elseif(MultiBot.hasStrategy(pNormal, "bspeed")) then
 		nonCombatAspectButton.setTexture("ability_mount_whitetiger").setEnable().doRight = function(pButton)
-			MultiBot.OnOffActionToTarget(pButton, "nc +bspeed,?", "nc -bspeed,?", pButton.getName())
+			MultiBot.OnOffUnitStrategy(pButton, "nc +bspeed,?", "nc -bspeed,?", pButton.getName())
 		end
 	elseif(MultiBot.hasStrategy(pNormal, "bdps")) then
 		nonCombatAspectButton.setTexture("ability_hunter_pet_dragonhawk").setEnable().doRight = function(pButton)
-			MultiBot.OnOffActionToTarget(pButton, "nc +bdps,?", "nc -bdps,?", pButton.getName())
+			MultiBot.OnOffUnitStrategy(pButton, "nc +bdps,?", "nc -bdps,?", pButton.getName())
 		end
 	end
 
@@ -59,41 +62,44 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 
 	combatAspectFrame.addButton("CombatNature", 0, 0, "spell_nature_protectionformnature", MultiBot.L("tips.hunter.caspect.rnature"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToTarget(pButton.get(), "CombatAspect", pButton.texture, "co +rnature,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAspect", pButton.texture, "co +rnature,?", pButton.getName(), function()
 		pButton.getButton("CombatAspect").doRight = function(btn)
-			MultiBot.OnOffActionToTarget(btn, "co +rnature,?", "co -rnature,?", btn.getName())
+			MultiBot.OnOffUnitStrategy(btn, "co +rnature,?", "co -rnature,?", btn.getName())
 		end
+		end)
 	end
 
 	combatAspectFrame.addButton("CombatSpeed", 0, 26, "ability_mount_whitetiger", MultiBot.L("tips.hunter.caspect.bspeed"))
     .doLeft = function(pButton)
-        MultiBot.SelectToTarget(pButton.get(), "CombatAspect", pButton.texture, "co +bspeed,?", pButton.getName())
+        MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAspect", pButton.texture, "co +bspeed,?", pButton.getName(), function()
 		pButton.getButton("CombatAspect").doRight = function(btn)
-			MultiBot.OnOffActionToTarget(btn, "co +bspeed,?", "co -bspeed,?", btn.getName())
+			MultiBot.OnOffUnitStrategy(btn, "co +bspeed,?", "co -bspeed,?", btn.getName())
 		end
+		end)
 	end
 
 	combatAspectFrame.addButton("CombatDps", 0, 52, "ability_hunter_pet_dragonhawk", MultiBot.L("tips.hunter.caspect.bdps"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToTarget(pButton.get(), "CombatAspect", pButton.texture, "co +bdps,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAspect", pButton.texture, "co +bdps,?", pButton.getName(), function()
 		pButton.getButton("CombatAspect").doRight = function(btn)
-			MultiBot.OnOffActionToTarget(btn, "co +bdps,?", "co -bdps,?", btn.getName())
+			MultiBot.OnOffUnitStrategy(btn, "co +bdps,?", "co -bdps,?", btn.getName())
 		end
+		end)
 	end
 
 	-- STRATEGIES:COMABT-ASPECT --
 
 	if(MultiBot.hasStrategy(pCombat, "rnature")) then
 		combatAspectButton.setTexture("spell_nature_protectionformnature").setEnable().doRight = function(pButton)
-			MultiBot.OnOffActionToTarget(pButton, "co +rnature,?", "co -rnature,?", pButton.getName())
+			MultiBot.OnOffUnitStrategy(pButton, "co +rnature,?", "co -rnature,?", pButton.getName())
 		end
 	elseif(MultiBot.hasStrategy(pCombat, "bspeed")) then
 		combatAspectButton.setTexture("ability_mount_whitetiger").setEnable().doRight = function(pButton)
-			MultiBot.OnOffActionToTarget(pButton, "co +bspeed,?", "co -bspeed,?", pButton.getName())
+			MultiBot.OnOffUnitStrategy(pButton, "co +bspeed,?", "co -bspeed,?", pButton.getName())
 		end
 	elseif(MultiBot.hasStrategy(pCombat, "bdps")) then
 		combatAspectButton.setTexture("ability_hunter_pet_dragonhawk").setEnable().doRight = function(pButton)
-			MultiBot.OnOffActionToTarget(pButton, "co +bdps,?", "co -bdps,?", pButton.getName())
+			MultiBot.OnOffUnitStrategy(pButton, "co +bdps,?", "co -bdps,?", pButton.getName())
 		end
 	end
 
@@ -119,7 +125,7 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 			pButton.setDisable()
 		end
 
-		if(MultiBot.OnOffActionToTarget(pButton, pCommand, pCommand, pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, pCommand, pCommand, pButton.getName())) then
 			pButton.getButton(pOtherOne).setDisable()
 			pButton.getButton(pOtherTwo).setDisable()
 		end
@@ -127,7 +133,7 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 
 	playbookFrame.addButton("Aoe", 0, 0, "spell_holy_surgeoflight", MultiBot.L("tips.hunter.playbook.aoe")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
 	end
 
 	playbookFrame.addButton("BeastMastery", 0, 26, "ability_hunter_pet_dragonhawk", MultiBot.L("tips.hunter.playbook.bm")).setDisable()
@@ -164,7 +170,7 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 
 	dpsFrame.addButton("DpsAssist", 0, 0, "spell_holy_heroism", MultiBot.L("tips.hunter.dps.dpsAssist")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +dps assist,?", "co -dps assist,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +dps assist,?", "co -dps assist,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 		end
@@ -172,7 +178,7 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 
 	dpsFrame.addButton("DpsAoe", 0, 26, "spell_holy_surgeoflight", MultiBot.L("tips.hunter.dps.dpsAoe")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +dps aoe,?", "co -dps aoe,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +dps aoe,?", "co -dps aoe,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAssist").setDisable()
 		end
@@ -180,7 +186,7 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 
 	dpsFrame.addButton("TrapWeave", 0, 52, "ability_ensnare", MultiBot.L("tips.hunter.trapweave")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +trap weave,?", "co -trap weave,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +trap weave,?", "co -trap weave,?", pButton.getName())
 	end
 
 	if MultiBot.AddCommonCombatStrategyButtons then
@@ -191,7 +197,7 @@ MultiBot.addHunter = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("TankAssist", -120, 0, "ability_warrior_innerrage", MultiBot.L("tips.hunter.tankAssist")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +tank assist,?", "co -tank assist,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +tank assist,?", "co -tank assist,?", pButton.getName())) then
 			pButton.getButton("DpsAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 		end

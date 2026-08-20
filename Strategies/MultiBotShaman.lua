@@ -159,11 +159,29 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 	end
 
 	local function requestShamanCombatState(target, bridgeSync, sequenceKey, sequence)
-		local previousUpdateAt = getShamanBridgeStateTimestamp(target)
+		local selfStrategyTarget = MultiBot.IsSelfBotStrategyTarget
+			and MultiBot.IsSelfBotStrategyTarget(target)
 
 		local function isCurrent()
 			return isShamanPlaybookSequenceCurrent(sequenceKey, sequence)
 		end
+
+		if(selfStrategyTarget) then
+			local function requestSelfState()
+				if(not isCurrent()) then return end
+				if(MultiBot.Comm and type(MultiBot.Comm.RequestSelfStrategyState) == "function") then
+					MultiBot.Comm.RequestSelfStrategyState()
+				end
+			end
+
+			if(bridgeSync) then
+				scheduleShamanTask(shamanStateRefreshDelay, requestSelfState)
+				scheduleShamanTask(shamanStateRefreshDelay + 0.65, requestSelfState)
+			end
+			return
+		end
+
+		local previousUpdateAt = getShamanBridgeStateTimestamp(target)
 
 		local function requestBridgeState()
 			if(not isCurrent()) then return end
@@ -194,22 +212,56 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 -- MB_P1A_SHAMAN_PLAYBOOK_BLOCKED_STATE_V1_START
 	local function dispatchShamanPlaybookCommands(target, commands, bridgeSync, sequenceKey, sequence, onAccepted)
+		local selfStrategyTarget = MultiBot.IsSelfBotStrategyTarget
+			and MultiBot.IsSelfBotStrategyTarget(target)
+
+		local function finishAcceptedSequence()
+			if(type(onAccepted) == "function" and isShamanPlaybookSequenceCurrent(sequenceKey, sequence)) then
+				onAccepted()
+			end
+			requestShamanCombatState(target, bridgeSync, sequenceKey, sequence)
+		end
+
 		local function sendCommand(index)
 			if(not isShamanPlaybookSequenceCurrent(sequenceKey, sequence)) then return end
 
 			local command = commands[index]
 			if(not command) then return end
-			if(not MultiBot.ActionToTarget(command, target)) then return end
+
+			local completion = nil
+			if(selfStrategyTarget) then
+				completion = function(ok)
+					if(not isShamanPlaybookSequenceCurrent(sequenceKey, sequence)) then return end
+					if(ok ~= true) then return end
+
+					if(index < #commands) then
+						scheduleShamanTask(shamanCommandInterval, function()
+							sendCommand(index + 1)
+						end)
+					else
+						finishAcceptedSequence()
+					end
+				end
+			end
+
+			local sent, transport = MultiBot.ActionToUnitStrategy(command, target, completion)
+
+			if(selfStrategyTarget) then
+				-- "pending" means queued only. The completion callback alone
+				-- advances the SelfBot sequence after an ACK OK.
+				if(transport ~= "pending") then return end
+				return
+			end
+
+			-- Preserve the existing ordinary-bot behavior.
+			if(not sent) then return end
 
 			if(index < #commands) then
 				scheduleShamanTask(shamanCommandInterval, function()
 					sendCommand(index + 1)
 				end)
 			else
-				if(type(onAccepted) == "function" and isShamanPlaybookSequenceCurrent(sequenceKey, sequence)) then
-					onAccepted()
-				end
-				requestShamanCombatState(target, bridgeSync, sequenceKey, sequence)
+				finishAcceptedSequence()
 			end
 		end
 
@@ -221,10 +273,13 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 		local target = pButton.getName()
 		if(not defaults or type(target) ~= "string" or target == "") then return end
 
+		local selfStrategyTarget = MultiBot.IsSelfBotStrategyTarget
+			and MultiBot.IsSelfBotStrategyTarget(target)
 		local bridgeSync = MultiBot.bridge
 			and MultiBot.bridge.connected == true
 			and MultiBot.Comm
-			and MultiBot.Comm.RequestState
+			and ((selfStrategyTarget and type(MultiBot.Comm.RequestSelfStrategyState) == "function")
+				or (not selfStrategyTarget and type(MultiBot.Comm.RequestState) == "function"))
 
 		local commands = { "co -resto,-ele,-enh,+" .. specKey }
 		for _, elementKey in ipairs(shamanElementOrder) do
@@ -249,7 +304,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 		"Aoe", 0, 0, "spell_nature_lightningoverload",
 		MultiBot.L("tips.shaman.playbook.aoe")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +aoe,?", "co -aoe,?", pButton.getName())
 	end
 
 	playbookFrame.addButton(
@@ -292,7 +347,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 	dpsControlFrame.addButton("DpsAssist", 0, 0, "spell_holy_heroism", MultiBot.L("tips.shaman.dps.dpsAssist")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +dps assist,?", "co -dps assist,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +dps assist,?", "co -dps assist,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 		end
@@ -300,7 +355,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 	dpsControlFrame.addButton("DpsAoe", 0, 26, "spell_holy_surgeoflight", MultiBot.L("tips.shaman.dps.dpsAoe")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +dps aoe,?", "co -dps aoe,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +dps aoe,?", "co -dps aoe,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAssist").setDisable()
 		end
@@ -310,7 +365,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 	dpsControlFrame.addButton("HealerDps", 0, 52, "INV_Alchemy_Elixir_02", MultiBot.L("tips.shaman.dps.healerdps")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +healer dps,?", "co -healer dps,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +healer dps,?", "co -healer dps,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 			pButton.getButton("DpsAssist").setDisable()
@@ -325,7 +380,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("TankAssist", -60, 0, "ability_warrior_innerrage", MultiBot.L("tips.shaman.tankAssist")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +tank assist,?", "co -tank assist,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +tank assist,?", "co -tank assist,?", pButton.getName())) then
 			pButton.getButton("DpsAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 		end
@@ -335,7 +390,7 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("Cure", -90, 0, "Ability_Creature_Poison_02", MultiBot.L("tips.shaman.playbook.cure")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +cure,?", "co -cure,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +cure,?", "co -cure,?", pButton.getName())
 	end
 
 	-- STRATEGIES --

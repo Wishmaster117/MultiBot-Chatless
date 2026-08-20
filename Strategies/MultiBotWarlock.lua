@@ -163,7 +163,12 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 			end
 		end
 
-		local sent, transport = MultiBot.ActionToTarget(action, target)
+		local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+			if ok == true then
+				fStones:Hide()
+			end
+		end)
+		if transport == "pending" then return end
 		if not sent then return end
 		if transport ~= "bridge" then
 			fStones.activeStone = desired
@@ -258,7 +263,12 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 			end
 		end
 
-		local sent, transport = MultiBot.ActionToTarget(action, target)
+		local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+			if ok == true then
+				fSoul:Hide()
+			end
+		end)
+		if transport == "pending" then return end
 		if not sent then return end
 		if transport ~= "bridge" then
 			fSoul.activeSS = desired
@@ -357,7 +367,12 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
         end
       end
 
-      local sent, transport = MultiBot.ActionToTarget(action, target)
+      local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+        if ok == true then
+          fPets:Hide()
+        end
+      end)
+      if transport == "pending" then return end
       if not sent then return end
       if transport ~= "bridge" then
         fPets.activePet = desired
@@ -403,7 +418,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("DpsAssist", 0, 0, "spell_holy_heroism", MultiBot.L("tips.warlock.dps.dpsAssist")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +dps assist,?", "co -dps assist,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +dps assist,?", "co -dps assist,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 		end
@@ -412,7 +427,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("DpsAoe", 0, 26, "spell_holy_surgeoflight", MultiBot.L("tips.warlock.dps.dpsAoe")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +dps aoe,?", "co -dps aoe,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +dps aoe,?", "co -dps aoe,?", pButton.getName())) then
 			pButton.getButton("TankAssist").setDisable()
 			pButton.getButton("DpsAssist").setDisable()
 		end
@@ -427,7 +442,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
     btnMeta.setDisable()
 
     btnMeta.doLeft = function(pButton)
-      MultiBot.OnOffActionToTarget(pButton, "co +meta melee,?", "co -meta melee,?", pButton.getName())
+      MultiBot.OnOffUnitStrategy(pButton, "co +meta melee,?", "co -meta melee,?", pButton.getName())
     end
 
 	if MultiBot.AddCommonCombatStrategyButtons then
@@ -438,7 +453,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("TankAssist", -30, 0, "ability_warrior_innerrage", MultiBot.L("tips.warlock.tankAssist")).setDisable()
 	.doLeft = function(pButton)
-		if(MultiBot.OnOffActionToTarget(pButton, "co +tank assist,?", "co -tank assist,?", pButton.getName())) then
+		if(MultiBot.OnOffUnitStrategy(pButton, "co +tank assist,?", "co -tank assist,?", pButton.getName())) then
 			pButton.getButton("DpsAssist").setDisable()
 			pButton.getButton("DpsAoe").setDisable()
 		end
@@ -448,7 +463,7 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 
 	pFrame.addButton("Tank", -60, 0, "ability_warrior_shieldmastery", MultiBot.L("tips.warlock.tank")).setDisable()
 	.doLeft = function(pButton)
-		MultiBot.OnOffActionToTarget(pButton, "co +tank,?", "co -tank,?", pButton.getName())
+		MultiBot.OnOffUnitStrategy(pButton, "co +tank,?", "co -tank,?", pButton.getName())
 	end
 
    -- CURSES --
@@ -537,7 +552,12 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
          end
        end
 
-       local sent, transport = MultiBot.ActionToTarget(action, target)
+       local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+         if ok == true then
+           fCurses:Hide()
+         end
+       end)
+       if transport == "pending" then return end
        if not sent then return end
        if transport ~= "bridge" then
          fCurses.activeCurse = desired

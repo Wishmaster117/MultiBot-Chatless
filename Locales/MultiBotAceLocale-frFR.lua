@@ -4,6 +4,12 @@ if type(register) ~= "function" then
 end
 
 local frFRValues = {
+  -- MB_SELFACTION_I18N_V1_BEGIN
+  ["selfaction.bridge_unavailable"] = "Le bridge est indisponible : l'action SelfBot n'a pas été envoyée.",
+  ["selfaction.failed"] = "Échec de l'action SelfBot : %s",
+  ["selfaction.send_failed"] = "L'action SelfBot n'a pas pu être envoyée : %s",
+  ["selfaction.reason.RATE_LIMIT"] = "Trop de demandes SelfBot. Réessayez dans quelques secondes.",
+  -- MB_SELFACTION_I18N_V1_END
   ["lootmaster.title"] = "MultiBot Responsable du butin",
   ["lootmaster.refresh"] = "Rafraîchir",
   ["lootmaster.assign_to"] = "Attribuer à :",
@@ -1185,6 +1191,19 @@ local frFRValues = {
   ["strategy.reason.PARTIAL"] = "La commande de stratégie n'a été appliquée que partiellement.",
   ["strategy.reason.FAILED"] = "La commande de stratégie a échoué.",
   ["strategy.reason.ACK_TOO_LONG"] = "L'accusé de réception de stratégie est trop volumineux.",
+  ["strategy.reason.SELF_STRATEGY_BRIDGE_UNAVAILABLE"] = "Le bridge SelfBot pour les stratégies est indisponible.",
+  ["strategy.reason.SELF_STRATEGY_NOT_CONNECTED"] = "Le bridge n'est pas connecté.",
+  ["strategy.reason.SELF_BOT_CAPABILITY_UNAVAILABLE"] = "La prise en charge SelfBot est indisponible sur le bridge.",
+  ["strategy.reason.SELF_STRATEGY_CAPABILITY_UNAVAILABLE"] = "La prise en charge des stratégies SelfBot est indisponible sur le bridge.",
+  ["strategy.reason.SELF_STRATEGY_NOT_ACTIVE"] = "SelfBot n'est pas actif.",
+  ["strategy.reason.SELF_STRATEGY_CLIENT_UNAVAILABLE"] = "L'addon ne peut pas envoyer de commandes de stratégie SelfBot.",
+  ["strategy.reason.SELF_STRATEGY_UNAVAILABLE"] = "Le contrôle des stratégies SelfBot est indisponible.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_RESULT"] = "Le bridge a renvoyé un résultat de stratégie SelfBot invalide.",
+  ["strategy.reason.SELF_STRATEGY_SEND_FAILED"] = "La commande de stratégie SelfBot n'a pas pu être envoyée.",
+  ["strategy.reason.SELF_STRATEGY_REJECTED"] = "La commande de stratégie SelfBot a été refusée.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_STATE_SCOPE"] = "Portée d'état de stratégie SelfBot non valide.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_CHANGES"] = "Modifications de stratégie SelfBot non valides.",
+  ["strategy.reason.SELF_STRATEGY_TOO_MANY_REQUESTS"] = "Trop de requêtes de stratégie SelfBot. Réessayez dans un instant.",
   ["strategy.reason.UNKNOWN"] = "La commande de stratégie a échoué pour une raison inconnue.",
   ["info.outfits.feedback_equip"] = "Tenue « %s » équipée.",
   ["info.outfits.feedback_replace"] = "Tenue « %s » remplacée.",

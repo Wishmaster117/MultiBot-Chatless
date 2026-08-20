@@ -4,6 +4,12 @@ if type(register) ~= "function" then
 end
 
 local enGBValues = {
+  -- MB_SELFACTION_I18N_V1_BEGIN
+  ["selfaction.bridge_unavailable"] = "The bridge is unavailable: the SelfBot action was not sent.",
+  ["selfaction.failed"] = "SelfBot action failed: %s",
+  ["selfaction.send_failed"] = "The SelfBot action could not be sent: %s",
+  ["selfaction.reason.RATE_LIMIT"] = "Too many SelfBot requests. Try again in a few seconds.",
+  -- MB_SELFACTION_I18N_V1_END
   ["lootmaster.title"] = "MultiBot Loot Master",
   ["lootmaster.refresh"] = "Refresh",
   ["lootmaster.assign_to"] = "Assign to:",
@@ -1188,6 +1194,19 @@ local enGBValues = {
   ["strategy.reason.PARTIAL"] = "The strategy command was only partially applied.",
   ["strategy.reason.FAILED"] = "The strategy command failed.",
   ["strategy.reason.ACK_TOO_LONG"] = "The strategy acknowledgement was too large.",
+  ["strategy.reason.SELF_STRATEGY_BRIDGE_UNAVAILABLE"] = "Bridge support for SelfBot strategies is unavailable.",
+  ["strategy.reason.SELF_STRATEGY_NOT_CONNECTED"] = "The bridge is not connected.",
+  ["strategy.reason.SELF_BOT_CAPABILITY_UNAVAILABLE"] = "SelfBot support is unavailable on the bridge.",
+  ["strategy.reason.SELF_STRATEGY_CAPABILITY_UNAVAILABLE"] = "SelfBot strategy support is unavailable on the bridge.",
+  ["strategy.reason.SELF_STRATEGY_NOT_ACTIVE"] = "SelfBot is not active.",
+  ["strategy.reason.SELF_STRATEGY_CLIENT_UNAVAILABLE"] = "The addon cannot send SelfBot strategy commands.",
+  ["strategy.reason.SELF_STRATEGY_UNAVAILABLE"] = "SelfBot strategy control is unavailable.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_RESULT"] = "The bridge returned an invalid SelfBot strategy result.",
+  ["strategy.reason.SELF_STRATEGY_SEND_FAILED"] = "The SelfBot strategy command could not be sent.",
+  ["strategy.reason.SELF_STRATEGY_REJECTED"] = "The SelfBot strategy command was rejected.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_STATE_SCOPE"] = "Invalid SelfBot strategy state scope.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_CHANGES"] = "Invalid SelfBot strategy changes.",
+  ["strategy.reason.SELF_STRATEGY_TOO_MANY_REQUESTS"] = "Too many SelfBot strategy requests. Try again in a moment.",
   ["strategy.reason.UNKNOWN"] = "The strategy command failed for an unknown reason.",
   ["info.outfits.feedback_equip"] = "Outfit \"%s\" equipped.",
   ["info.outfits.feedback_replace"] = "Outfit \"%s\" replaced.",
