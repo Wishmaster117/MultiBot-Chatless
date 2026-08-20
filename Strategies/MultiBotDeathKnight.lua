@@ -9,26 +9,29 @@ MultiBot.addDeathKnight = function(pFrame, pCombat, pNormal)
 
 	tFrame.addButton("Unholy", 0, 0, "spell_deathknight_unholypresence", MultiBot.L("tips.deathknight.presence.unholy"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Presence", pButton.texture, "co +unholy,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Presence", pButton.texture, "co +unholy,?", pButton.getName(), function()
 		pButton.getButton("Presence").doRight = function()
 			MultiBot.OnOffUnitStrategy(pButton, "co +unholy,?", "co -unholy,?", pButton.getName())
 		end
+		end)
 	end
 
 	tFrame.addButton("Frost", 0, 26, "spell_deathknight_frostpresence", MultiBot.L("tips.deathknight.presence.frost"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Presence", pButton.texture, "co +frost,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Presence", pButton.texture, "co +frost,?", pButton.getName(), function()
 		pButton.getButton("Presence").doRight = function()
 			MultiBot.OnOffUnitStrategy(pButton, "co +frost,?", "co -frost,?", pButton.getName())
 		end
+		end)
 	end
 
 	tFrame.addButton("Blood", 0, 52, "spell_deathknight_bloodpresence", MultiBot.L("tips.deathknight.presence.blood"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Presence", pButton.texture, "co +blood,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Presence", pButton.texture, "co +blood,?", pButton.getName(), function()
 		pButton.getButton("Presence").doRight = function()
 			MultiBot.OnOffUnitStrategy(pButton, "co +blood,?", "co -blood,?", pButton.getName())
 		end
+		end)
 	end
 
 	-- SRATEGIES:PRESENCE ---

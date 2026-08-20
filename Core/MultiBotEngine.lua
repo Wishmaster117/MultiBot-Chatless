@@ -867,7 +867,7 @@ MultiBot.SelectToTarget = function(pParent, pIndex, pTexture, pAction, oTarget)
 	return false
 end
 
-MultiBot.SelectToUnitStrategy = function(pParent, pIndex, pTexture, pAction, oTarget)
+MultiBot.SelectToUnitStrategy = function(pParent, pIndex, pTexture, pAction, oTarget, onAccepted)
 	local targetName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
 
 	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
@@ -881,6 +881,7 @@ MultiBot.SelectToUnitStrategy = function(pParent, pIndex, pTexture, pAction, oTa
 			tButton.setTexture(pTexture)
 			tFrame:Hide()
 			if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(tFrame) end
+			if(type(onAccepted) == "function") then onAccepted() end
 		end)
 
 		if(transport == "pending") then
@@ -895,6 +896,7 @@ MultiBot.SelectToUnitStrategy = function(pParent, pIndex, pTexture, pAction, oTa
 		tButton.setTexture(pTexture)
 		tFrame:Hide()
 		if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(tFrame) end
+		if(type(onAccepted) == "function") then onAccepted() end
 		return true
 	end
 

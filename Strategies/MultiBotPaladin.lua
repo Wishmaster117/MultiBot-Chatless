@@ -19,34 +19,38 @@ MultiBot.addPaladin = function(pFrame, pCombat, pNormal)
 
 	sealFrame.addButton("SealHealth", 0, 0, "spell_holy_healingaura", MultiBot.L("tips.paladin.seal.bhealth"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Seal", pButton.texture, "nc +bsanc,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Seal", pButton.texture, "nc +bsanc,?", pButton.getName(), function()
 		pButton.getButton("Seal").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +bsanc,?", "nc -bsanc,?", btn.getName())
 		end
+		end)
 	end
 
 	sealFrame.addButton("SealMana", 0, 26, "spell_holy_sealofwisdom", MultiBot.L("tips.paladin.seal.bmana"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Seal", pButton.texture, "nc +bwisdom,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Seal", pButton.texture, "nc +bwisdom,?", pButton.getName(), function()
 		pButton.getButton("Seal").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +bwisdom,?", "nc -bwisdom,?", btn.getName())
 		end
+		end)
 	end
 
 	sealFrame.addButton("SealStats", 0, 52, "spell_magic_magearmor", MultiBot.L("tips.paladin.seal.bstats"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Seal", pButton.texture, "nc +bkings,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Seal", pButton.texture, "nc +bkings,?", pButton.getName(), function()
 		pButton.getButton("Seal").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +bkings,?", "nc -bkings,?", btn.getName())
 		end
+		end)
 	end
 
 	sealFrame.addButton("SealDps", 0, 78, "inv_hammer_01", MultiBot.L("tips.paladin.seal.bdps"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Seal", pButton.texture, "nc +bmight,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Seal", pButton.texture, "nc +bmight,?", pButton.getName(), function()
 		pButton.getButton("Seal").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +bmight,?", "nc -bmight,?", btn.getName())
 		end
+		end)
 	end
 
 	-- STRATEGIES:SEAL --
@@ -81,58 +85,65 @@ MultiBot.addPaladin = function(pFrame, pCombat, pNormal)
 
 	nonCombatAuraFrame.addButton("NonCombatSpeed", 0, 0, "spell_holy_crusaderaura", MultiBot.L("tips.paladin.naura.bspeed"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +bspeed,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +bspeed,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +bspeed,?", "nc -bspeed,?", btn.getName())
 		end
+		end)
 	end
 
 	nonCombatAuraFrame.addButton("NonCombatFire", 0, 26, "spell_fire_sealoffire", MultiBot.L("tips.paladin.naura.rfire"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +rfire,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +rfire,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +rfire,?", "nc -rfire,?", btn.getName())
 		end
+		end)
 	end
 
 	nonCombatAuraFrame.addButton("NonCombatFrost", 0, 52, "spell_frost_wizardmark", MultiBot.L("tips.paladin.naura.rfrost"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +rfrost,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +rfrost,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +rfrost,?", "nc -rfrost,?", btn.getName())
 		end
+		end)
 	end
 
 	nonCombatAuraFrame.addButton("NonCombatShadow", 0, 78, "spell_shadow_sealofkings", MultiBot.L("tips.paladin.naura.rshadow"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +rshadow,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +rshadow,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +rshadow,?", "nc -rshadow,?", btn.getName())
 		end
+		end)
 	end
 
 	nonCombatAuraFrame.addButton("NonCombatDamage", 0, 104, "spell_holy_auraoflight", MultiBot.L("tips.paladin.naura.baoe"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +baoe,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +baoe,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +baoe,?", "nc -baoe,?", btn.getName())
 		end
+		end)
 	end
 
 	nonCombatAuraFrame.addButton("NonCombatArmor", 0, 130, "spell_holy_devotionaura", MultiBot.L("tips.paladin.naura.barmor"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +barmor,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +barmor,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +barmor,?", "nc -barmor,?", btn.getName())
 		end
+		end)
 	end
 
 	nonCombatAuraFrame.addButton("NonCombatCast", 0, 156, "spell_holy_mindsooth", MultiBot.L("tips.paladin.naura.bcast"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +bcast,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "NonCombatAura", pButton.texture, "nc +bcast,?", pButton.getName(), function()
 		pButton.getButton("NonCombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "nc +bcast,?", "nc -bcast,?", btn.getName())
 		end
+		end)
 	end
 
 	-- STRATEGIES:NON-COMBAT-AURA --
@@ -179,58 +190,65 @@ MultiBot.addPaladin = function(pFrame, pCombat, pNormal)
 
 	combatAuraFrame.addButton("CombatSpeed", 0, 0, "spell_holy_crusaderaura", MultiBot.L("tips.paladin.caura.bspeed"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +bspeed,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +bspeed,?", pButton.getName(), function()
 		pButton.getButton("CombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "co +bspeed,?", "co -bspeed,?", btn.getName())
 		end
+		end)
 	end
 
 	combatAuraFrame.addButton("CombatFire", 0, 26, "spell_fire_sealoffire", MultiBot.L("tips.paladin.caura.rfire"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +rfire,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +rfire,?", pButton.getName(), function()
 		pButton.getButton("CombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "co +rfire,?", "co -rfire,?", btn.getName())
 		end
+		end)
 	end
 
 	combatAuraFrame.addButton("CombatFrost", 0, 52, "spell_frost_wizardmark", MultiBot.L("tips.paladin.caura.rfrost"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +rfrost,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +rfrost,?", pButton.getName(), function()
 		pButton.getButton("CombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "co +rfrost,?", "co -rfrost,?", btn.getName())
 		end
+		end)
 	end
 
 	combatAuraFrame.addButton("CombatShadow", 0, 78, "spell_shadow_sealofkings", MultiBot.L("tips.paladin.caura.rshadow"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +rshadow,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +rshadow,?", pButton.getName(), function()
 		pButton.getButton("CombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "co +rshadow,?", "co -rshadow,?", btn.getName())
 		end
+		end)
 	end
 
 	combatAuraFrame.addButton("CombatDamage", 0, 104, "spell_holy_auraoflight", MultiBot.L("tips.paladin.caura.baoe"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +baoe,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +baoe,?", pButton.getName(), function()
 		pButton.getButton("CombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "co +baoe,?", "co -baoe,?", btn.getName())
 		end
+		end)
 	end
 
 	combatAuraFrame.addButton("CombatArmor", 0, 130, "spell_holy_devotionaura", MultiBot.L("tips.paladin.caura.barmor"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +barmor,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +barmor,?", pButton.getName(), function()
 		pButton.getButton("CombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "co +barmor,?", "co -barmor,?", btn.getName())
 		end
+		end)
 	end
 
 	combatAuraFrame.addButton("CombatCast", 0, 156, "spell_holy_mindsooth", MultiBot.L("tips.paladin.caura.bcast"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +bcast,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "CombatAura", pButton.texture, "co +bcast,?", pButton.getName(), function()
 		pButton.getButton("CombatAura").doRight = function(btn)
 			MultiBot.OnOffUnitStrategy(btn, "co +bcast,?", "co -bcast,?", btn.getName())
 		end
+		end)
 	end
 
 	-- STRATEGIES:COMBAT-AURA --

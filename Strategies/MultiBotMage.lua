@@ -9,18 +9,20 @@ MultiBot.addMage = function(pFrame, pCombat, pNormal)
 
     buffFrame.addButton("NonCombatMana", 0, 0, "inv_elemental_primal_mana", MultiBot.L("tips.mage.buff.bmana"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Buff", pButton.texture, "nc +bmana,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Buff", pButton.texture, "nc +bmana,?", pButton.getName(), function()
         pButton.getButton("Buff").doRight = function(btn)
             MultiBot.OnOffUnitStrategy(btn, "nc +bmana,?", "nc -bmana,?", btn.getName())
 		end
+        end)
 	end
 
     buffFrame.addButton("NonCombatDps", 0, 26, "inv_elemental_primal_nether", MultiBot.L("tips.mage.buff.bdps"))
 	.doLeft = function(pButton)
-		MultiBot.SelectToUnitStrategy(pButton.get(), "Buff", pButton.texture, "nc +bdps,?", pButton.getName())
+		MultiBot.SelectToUnitStrategy(pButton.get(), "Buff", pButton.texture, "nc +bdps,?", pButton.getName(), function()
         pButton.getButton("Buff").doRight = function(btn)
             MultiBot.OnOffUnitStrategy(btn, "nc +bdps,?", "nc -bdps,?", btn.getName())
 		end
+        end)
 	end
 
 	-- STRATEGIES:BUFF --

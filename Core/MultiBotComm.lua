@@ -261,6 +261,7 @@ local function ensureBridgeState()
   state.stateLatestByBot = state.stateLatestByBot or {}
   state.stateLatestOrderByBot = state.stateLatestOrderByBot or {}
   state.stateGlobalLatestToken = state.stateGlobalLatestToken or nil
+  state.selfStrategyStateToken = state.selfStrategyStateToken or nil
   state.stateFramingCapable = state.stateFramingCapable or false
   state.connectionGeneration = tonumber(state.connectionGeneration) or 0
   state.capabilityFallbackDeadline = tonumber(state.capabilityFallbackDeadline) or 0
@@ -430,6 +431,10 @@ local function clearStateRequest(state, token)
 
   clearStateTransactionsForToken(state, token)
   state.stateRequests[token] = nil
+
+  if state.selfStrategyStateToken == token then
+    state.selfStrategyStateToken = nil
+  end
 
   if state.bootstrapStateToken == token then
     state.bootstrapStateToken = nil
@@ -706,6 +711,8 @@ function Comm.RequestSelfStrategyState()
     state.lastError = "SELF_STRATEGY_STATE_SEND_FAILED"
     return false
   end
+
+  state.selfStrategyStateToken = token
 
   local request = state.stateRequests[token]
   if type(request) == "table" then
@@ -1188,6 +1195,34 @@ local function finishSelfStrategyCommand(token, result)
   end
 
   return true
+end
+
+local function invalidateInactiveSelfBotWork(state)
+  state = type(state) == "table" and state or ensureBridgeState()
+
+  local strategyStateToken = state.selfStrategyStateToken
+  if type(strategyStateToken) == "string" and strategyStateToken ~= "" then
+    clearStateRequest(state, strategyStateToken)
+  end
+  state.selfStrategyStateToken = nil
+
+  local pendingSelfStrategyTokens = {}
+  for token in pairs(state.selfStrategyCommands or {}) do
+    pendingSelfStrategyTokens[#pendingSelfStrategyTokens + 1] = token
+  end
+  for _, token in ipairs(pendingSelfStrategyTokens) do
+    finishSelfStrategyCommand(token, {
+      status = "error",
+      reason = "SELF_STRATEGY_NOT_ACTIVE",
+    })
+  end
+  state.selfStrategyCommands = {}
+
+  -- SELF_ACTION consumers currently use callbacks for result/error reporting
+  -- only; there is no local optimistic button state to repair. Dropping these
+  -- requests prevents late ACKs from completing work that belonged to the
+  -- previous active SelfBot lifecycle without adding disable-time UI spam.
+  state.selfActionCommands = {}
 end
 
 function Comm.RunSelfStrategyCommand(stateScope, changes, callback)
@@ -1898,6 +1933,7 @@ function Comm.HandleSelfBotAddonMessage(opcode, payload, state)
     state.selfBotMountNormalizeEpoch = (tonumber(state.selfBotMountNormalizeEpoch) or 0) + 1
     state.selfBotMountNormalizePending = false
     state.selfBotMountNormalized = false
+    invalidateInactiveSelfBotWork(state)
   elseif state.selfStrategyCapable == true then
     normalizeSelfBotMountStrategy(state)
   end
@@ -3401,6 +3437,7 @@ state.selfActionCapable = false
 
   state.stateRequests = {}
   state.stateActive = {}
+  state.selfStrategyStateToken = nil
   state.stateLatestByBot = {}
   state.stateLatestOrderByBot = {}
   state.stateGlobalLatestToken = nil
