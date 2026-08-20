@@ -7770,7 +7770,7 @@ state.selfActionCapable = false
             failed = 0,
             reason = reason,
           })
-        elseif (requestType == "STATE" or requestType == "STATES") and state.stateRequests[token] then
+        elseif (requestType == "STATE" or requestType == "STATES" or requestType == "SELF_STRATEGY_STATE") and state.stateRequests[token] then
           failBootstrapStateRequest(state, token)
           clearStateRequest(state, token)
         end
