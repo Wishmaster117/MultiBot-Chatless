@@ -163,7 +163,12 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 			end
 		end
 
-		local sent, transport = MultiBot.ActionToUnitStrategy(action, target)
+		local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+			if ok == true then
+				fStones:Hide()
+			end
+		end)
+		if transport == "pending" then return end
 		if not sent then return end
 		if transport ~= "bridge" then
 			fStones.activeStone = desired
@@ -258,7 +263,12 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 			end
 		end
 
-		local sent, transport = MultiBot.ActionToUnitStrategy(action, target)
+		local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+			if ok == true then
+				fSoul:Hide()
+			end
+		end)
+		if transport == "pending" then return end
 		if not sent then return end
 		if transport ~= "bridge" then
 			fSoul.activeSS = desired
@@ -357,7 +367,12 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
         end
       end
 
-      local sent, transport = MultiBot.ActionToUnitStrategy(action, target)
+      local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+        if ok == true then
+          fPets:Hide()
+        end
+      end)
+      if transport == "pending" then return end
       if not sent then return end
       if transport ~= "bridge" then
         fPets.activePet = desired
@@ -537,7 +552,12 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
          end
        end
 
-       local sent, transport = MultiBot.ActionToUnitStrategy(action, target)
+       local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+         if ok == true then
+           fCurses:Hide()
+         end
+       end)
+       if transport == "pending" then return end
        if not sent then return end
        if transport ~= "bridge" then
          fCurses.activeCurse = desired

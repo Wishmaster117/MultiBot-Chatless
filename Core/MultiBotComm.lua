@@ -51,6 +51,7 @@ local STRATEGY_MUTATION_TIMEOUT_SECONDS = 5.0
 local SELF_STRATEGY_MUTATION_TIMEOUT_SECONDS = 10.0
 local SELF_ACTION_TIMEOUT_SECONDS = 10.0
 local STRATEGY_MUTATION_MAX_ACTIVE = 32
+local SELF_STRATEGY_MUTATION_MAX_ACTIVE = 1
 local STRATEGY_MUTATION_MAX_CHANGES_LENGTH = 160
 local STRATEGY_MUTATION_MAX_OPERATIONS = 32
 local STRATEGY_MUTATION_MAX_STRATEGY_LENGTH = 96
@@ -1220,7 +1221,7 @@ function Comm.RunSelfStrategyCommand(stateScope, changes, callback)
     state.lastError = "SELF_STRATEGY_INVALID_CHANGES"
     return false
   end
-  if countTableEntries(state.selfStrategyCommands) >= STRATEGY_MUTATION_MAX_ACTIVE then
+  if countTableEntries(state.selfStrategyCommands) >= SELF_STRATEGY_MUTATION_MAX_ACTIVE then
     state.lastError = "SELF_STRATEGY_TOO_MANY_REQUESTS"
     return false
   end

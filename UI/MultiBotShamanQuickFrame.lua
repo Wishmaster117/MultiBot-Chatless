@@ -718,12 +718,39 @@ function ShamanQuick:SelectTotem(row, elementKey, button, definition)
     local currentButton = row.selectedButtons[elementKey]
     local currentIcon = row.selectedIcons[elementKey]
     local isSameSelection = currentButton == button or currentIcon == button.__mbIcon
+    local selfStrategyTarget = MultiBot.IsSelfBotStrategyTarget
+        and MultiBot.IsSelfBotStrategyTarget(row.owner)
+
+    local function runMutation(action, onAccepted)
+        local completion = nil
+        if selfStrategyTarget then
+            completion = function(ok)
+                if ok == true and type(onAccepted) == "function" then
+                    onAccepted()
+                end
+            end
+        end
+
+        local sent, transport = MultiBot.ActionToUnitStrategy(action, row.owner, completion)
+
+        if selfStrategyTarget then
+            return transport == "pending"
+        end
+
+        if not sent then
+            return false
+        end
+
+        if type(onAccepted) == "function" then
+            onAccepted()
+        end
+        return true
+    end
 
     if isSameSelection then
-        if not MultiBot.ActionToUnitStrategy("co -" .. definition.spell .. ",?", row.owner) then
-            return
-        end
-        self:ClearTotemSelection(row, elementKey)
+        runMutation("co -" .. definition.spell .. ",?", function()
+            self:ClearTotemSelection(row, elementKey)
+        end)
         return
     end
 
@@ -732,17 +759,15 @@ function ShamanQuick:SelectTotem(row, elementKey, button, definition)
         command = "co -" .. currentButton.__mbSpell .. ",+" .. definition.spell .. ",?"
     end
 
-    if not MultiBot.ActionToUnitStrategy(command, row.owner) then
-        return
-    end
+    runMutation(command, function()
+        row.selectedIcons[elementKey] = button.__mbIcon
+        self:SetSelectedTotemButton(row, elementKey, button)
+        self:SetElementIcon(row, elementKey, button.__mbIcon)
 
-    row.selectedIcons[elementKey] = button.__mbIcon
-    self:SetSelectedTotemButton(row, elementKey, button)
-    self:SetElementIcon(row, elementKey, button.__mbIcon)
-
-    if MultiBot.SetShamanTotemChoice then
-        MultiBot.SetShamanTotemChoice(row.owner, elementKey, button.__mbIcon)
-    end
+        if MultiBot.SetShamanTotemChoice then
+            MultiBot.SetShamanTotemChoice(row.owner, elementKey, button.__mbIcon)
+        end
+    end)
 end
 -- MB_P1A_SHAMAN_QUICK_BLOCKED_STATE_V1_END
 function ShamanQuick:CreateTotemButton(row, elementDefinition, groupFrame, spellDefinition, index)

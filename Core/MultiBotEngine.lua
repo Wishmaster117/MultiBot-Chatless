@@ -645,43 +645,48 @@ local function _mbRefreshSelfStrategyState()
 	end
 end
 
-local function _mbRouteSelfStrategyMutation(action)
+local function _mbRouteSelfStrategyMutation(action, onComplete)
 	local mutationScope, changes = _mbParseStrategyMutation(action)
-	if(not mutationScope) then return MB_STRATEGY_ROUTE_NOT_STRATEGY end
+	if(not mutationScope) then return MB_STRATEGY_ROUTE_NOT_STRATEGY, nil end
 
 	local subject = UnitName("player") or "self"
 	if(not _mbCanUseBridgeSelfStrategyMutation()) then
 		_mbWarnStrategyMutationBlocked("SELF", subject, _mbSelfStrategyUnavailableReason())
 		_mbRefreshSelfStrategyState()
-		return MB_STRATEGY_ROUTE_BLOCKED
+		return MB_STRATEGY_ROUTE_BLOCKED, nil
 	end
 
 	local stateScope = mutationScope == "nc" and "N" or "C"
 	local token = MultiBot.Comm.RunSelfStrategyCommand(stateScope, changes, function(result)
+		local ok = false
 		if(type(result) ~= "table") then
 			_mbWarnStrategyMutationBlocked("SELF", subject, "SELF_STRATEGY_INVALID_RESULT")
-			_mbRefreshSelfStrategyState()
-			return
-		end
-
-		if(result.status ~= "ok") then
-			local reason = result.reason
-			if(type(reason) ~= "string" or reason == "") then
-				reason = result.status or "SELF_STRATEGY_REJECTED"
+		else
+			ok = result.status == "ok"
+			if(not ok) then
+				local reason = result.reason
+				if(type(reason) ~= "string" or reason == "") then
+					reason = result.status or "SELF_STRATEGY_REJECTED"
+				end
+				_mbWarnStrategyMutationBlocked("SELF", subject, reason)
 			end
-			_mbWarnStrategyMutationBlocked("SELF", subject, reason)
 		end
 
+		-- Refresh authoritative state before any specialized ACK-side UI commit.
 		_mbRefreshSelfStrategyState()
+
+		if(type(onComplete) == "function") then
+			onComplete(ok, result)
+		end
 	end)
 
 	if(token ~= false and token ~= nil) then
-		return MB_STRATEGY_ROUTE_BRIDGE
+		return MB_STRATEGY_ROUTE_BRIDGE, token
 	end
 
 	_mbWarnStrategyMutationBlocked("SELF", subject, _mbStrategyLastError("SELF_STRATEGY_SEND_FAILED"))
 	_mbRefreshSelfStrategyState()
-	return MB_STRATEGY_ROUTE_BLOCKED
+	return MB_STRATEGY_ROUTE_BLOCKED, nil
 end
 
 MultiBot.OnOffSelfBotStrategy = function(pButton, pOn, pOff)
@@ -689,17 +694,19 @@ MultiBot.OnOffSelfBotStrategy = function(pButton, pOn, pOff)
 	local action = wasEnabled and pOff or pOn
 	local mutationScope = _mbParseStrategyMutation(action)
 	if(not mutationScope) then
-		return wasEnabled
+		return false, "blocked"
 	end
 
-	local route = _mbRouteSelfStrategyMutation(action)
+	local route, token = _mbRouteSelfStrategyMutation(action)
 	if(route == MB_STRATEGY_ROUTE_BRIDGE) then
-		-- The authoritative STATE response rebuilds the final visual state.
-		return not wasEnabled
+		-- A queued request is not an applied mutation. The authoritative
+		-- SELF_STRATEGY_STATE refresh owns the final toggle and sibling state.
+		return false, "pending", token
 	end
 
-	-- SelfBot never falls through to the legacy bot whisper route.
-	return wasEnabled
+	-- SelfBot never falls through to the legacy bot whisper route and blocked
+	-- requests must never be mistaken for a successful/active toggle.
+	return false, "blocked"
 end
 
 MultiBot.IsSelfBotStrategyTarget = function(pTarget)
@@ -739,7 +746,7 @@ MultiBot.RequestUnitStrategyState = function(pTarget)
 	return false
 end
 
-MultiBot.ActionToUnitStrategy = function(pAction, oTarget)
+MultiBot.ActionToUnitStrategy = function(pAction, oTarget, onComplete)
 	local targetName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
 
 	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
@@ -749,14 +756,17 @@ MultiBot.ActionToUnitStrategy = function(pAction, oTarget)
 			return false, "blocked"
 		end
 
-		local route = _mbRouteSelfStrategyMutation(pAction)
+		local route, token = _mbRouteSelfStrategyMutation(pAction, onComplete)
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then
-			return true, "bridge"
+			-- false means "not synchronously applied"; pending is explicit so
+			-- callers cannot accidentally commit optimistic SelfBot UI.
+			return false, "pending", token
 		end
 
 		return false, "blocked"
 	end
 
+	-- Ordinary bot semantics remain unchanged.
 	return MultiBot.ActionToTarget(pAction, targetName)
 end
 MultiBot.ActionToTarget = function(pAction, oTarget)
@@ -858,7 +868,28 @@ MultiBot.SelectToTarget = function(pParent, pIndex, pTexture, pAction, oTarget)
 end
 
 MultiBot.SelectToUnitStrategy = function(pParent, pIndex, pTexture, pAction, oTarget)
-	if(MultiBot.ActionToUnitStrategy(pAction, oTarget)) then
+	local targetName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
+
+	if(MultiBot.IsSelfBotStrategyTarget(targetName)) then
+		local _, transport, token = MultiBot.ActionToUnitStrategy(pAction, targetName, function(ok)
+			if(ok ~= true) then return end
+
+			local tFrame = pParent.frames[pIndex]
+			local tButton = pParent.buttons[pIndex]
+			if(not tFrame or not tButton) then return end
+
+			tButton.setTexture(pTexture)
+			tFrame:Hide()
+			if(MultiBot.RequestClickBlockerUpdate) then MultiBot.RequestClickBlockerUpdate(tFrame) end
+		end)
+
+		if(transport == "pending") then
+			return false, "pending", token
+		end
+		return false, transport or "blocked"
+	end
+
+	if(MultiBot.ActionToUnitStrategy(pAction, targetName)) then
 		local tFrame = pParent.frames[pIndex]
 		local tButton = pParent.buttons[pIndex]
 		tButton.setTexture(pTexture)

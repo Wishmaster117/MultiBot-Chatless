@@ -212,22 +212,56 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 
 -- MB_P1A_SHAMAN_PLAYBOOK_BLOCKED_STATE_V1_START
 	local function dispatchShamanPlaybookCommands(target, commands, bridgeSync, sequenceKey, sequence, onAccepted)
+		local selfStrategyTarget = MultiBot.IsSelfBotStrategyTarget
+			and MultiBot.IsSelfBotStrategyTarget(target)
+
+		local function finishAcceptedSequence()
+			if(type(onAccepted) == "function" and isShamanPlaybookSequenceCurrent(sequenceKey, sequence)) then
+				onAccepted()
+			end
+			requestShamanCombatState(target, bridgeSync, sequenceKey, sequence)
+		end
+
 		local function sendCommand(index)
 			if(not isShamanPlaybookSequenceCurrent(sequenceKey, sequence)) then return end
 
 			local command = commands[index]
 			if(not command) then return end
-			if(not MultiBot.ActionToUnitStrategy(command, target)) then return end
+
+			local completion = nil
+			if(selfStrategyTarget) then
+				completion = function(ok)
+					if(not isShamanPlaybookSequenceCurrent(sequenceKey, sequence)) then return end
+					if(ok ~= true) then return end
+
+					if(index < #commands) then
+						scheduleShamanTask(shamanCommandInterval, function()
+							sendCommand(index + 1)
+						end)
+					else
+						finishAcceptedSequence()
+					end
+				end
+			end
+
+			local sent, transport = MultiBot.ActionToUnitStrategy(command, target, completion)
+
+			if(selfStrategyTarget) then
+				-- "pending" means queued only. The completion callback alone
+				-- advances the SelfBot sequence after an ACK OK.
+				if(transport ~= "pending") then return end
+				return
+			end
+
+			-- Preserve the existing ordinary-bot behavior.
+			if(not sent) then return end
 
 			if(index < #commands) then
 				scheduleShamanTask(shamanCommandInterval, function()
 					sendCommand(index + 1)
 				end)
 			else
-				if(type(onAccepted) == "function" and isShamanPlaybookSequenceCurrent(sequenceKey, sequence)) then
-					onAccepted()
-				end
-				requestShamanCombatState(target, bridgeSync, sequenceKey, sequence)
+				finishAcceptedSequence()
 			end
 		end
 
