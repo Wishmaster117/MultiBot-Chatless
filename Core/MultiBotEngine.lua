@@ -720,8 +720,8 @@ MultiBot.RequestUnitStrategyState = function(pTarget)
 			and MultiBot.bridge.connected == true
 			and MultiBot.Comm
 			and type(MultiBot.Comm.RequestSelfStrategyState) == "function") then
-			MultiBot.Comm.RequestSelfStrategyState()
-			return true
+			local request = MultiBot.Comm.RequestSelfStrategyState()
+			return request ~= false and request ~= nil
 		end
 		return false
 	end

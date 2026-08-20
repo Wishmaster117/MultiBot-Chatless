@@ -4,6 +4,12 @@ if type(register) ~= "function" then
 end
 
 local koKRValues = {
+  -- MB_SELFACTION_I18N_V1_BEGIN
+  ["selfaction.bridge_unavailable"] = "브리지를 사용할 수 없어 SelfBot 동작을 보내지 못했습니다.",
+  ["selfaction.failed"] = "SelfBot 동작 실패: %s",
+  ["selfaction.send_failed"] = "SelfBot 동작을 보내지 못했습니다: %s",
+  ["selfaction.reason.RATE_LIMIT"] = "SelfBot 요청이 너무 많습니다. 몇 초 후 다시 시도하세요.",
+  -- MB_SELFACTION_I18N_V1_END
   ["lootmaster.title"] = "MultiBot 전리품 담당자",
   ["lootmaster.refresh"] = "새로 고침",
   ["lootmaster.assign_to"] = "할당 대상:",
@@ -1177,6 +1183,16 @@ local koKRValues = {
   ["strategy.reason.PARTIAL"] = "전략 명령이 일부만 적용되었습니다.",
   ["strategy.reason.FAILED"] = "전략 명령이 실패했습니다.",
   ["strategy.reason.ACK_TOO_LONG"] = "전략 응답이 너무 큽니다.",
+  ["strategy.reason.SELF_STRATEGY_BRIDGE_UNAVAILABLE"] = "브리지의 SelfBot 전략 지원을 사용할 수 없습니다.",
+  ["strategy.reason.SELF_STRATEGY_NOT_CONNECTED"] = "브리지가 연결되어 있지 않습니다.",
+  ["strategy.reason.SELF_BOT_CAPABILITY_UNAVAILABLE"] = "브리지에서 SelfBot 지원을 사용할 수 없습니다.",
+  ["strategy.reason.SELF_STRATEGY_CAPABILITY_UNAVAILABLE"] = "브리지에서 SelfBot 전략 지원을 사용할 수 없습니다.",
+  ["strategy.reason.SELF_STRATEGY_NOT_ACTIVE"] = "SelfBot이 활성화되어 있지 않습니다.",
+  ["strategy.reason.SELF_STRATEGY_CLIENT_UNAVAILABLE"] = "애드온이 SelfBot 전략 명령을 보낼 수 없습니다.",
+  ["strategy.reason.SELF_STRATEGY_UNAVAILABLE"] = "SelfBot 전략 제어를 사용할 수 없습니다.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_RESULT"] = "브리지가 잘못된 SelfBot 전략 결과를 반환했습니다.",
+  ["strategy.reason.SELF_STRATEGY_SEND_FAILED"] = "SelfBot 전략 명령을 보낼 수 없습니다.",
+  ["strategy.reason.SELF_STRATEGY_REJECTED"] = "SelfBot 전략 명령이 거부되었습니다.",
   ["strategy.reason.UNKNOWN"] = "알 수 없는 이유로 전략 명령이 실패했습니다.",
   ["info.outfits.feedback_equip"] = "장비 세트 \"%s\": 장착 완료.",
   ["info.outfits.feedback_replace"] = "장비 세트 \"%s\": 교체 완료.",

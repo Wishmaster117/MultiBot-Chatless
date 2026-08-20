@@ -4,6 +4,12 @@ if type(register) ~= "function" then
 end
 
 local esESValues = {
+  -- MB_SELFACTION_I18N_V1_BEGIN
+  ["selfaction.bridge_unavailable"] = "El bridge no está disponible: la acción de SelfBot no se ha enviado.",
+  ["selfaction.failed"] = "La acción de SelfBot ha fallado: %s",
+  ["selfaction.send_failed"] = "No se ha podido enviar la acción de SelfBot: %s",
+  ["selfaction.reason.RATE_LIMIT"] = "Demasiadas solicitudes de SelfBot. Vuelve a intentarlo en unos segundos.",
+  -- MB_SELFACTION_I18N_V1_END
   ["lootmaster.title"] = "MultiBot Maestro despojador",
   ["lootmaster.refresh"] = "Actualizar",
   ["lootmaster.assign_to"] = "Asignar a:",
@@ -1186,6 +1192,16 @@ local esESValues = {
   ["strategy.reason.PARTIAL"] = "La orden de estrategia solo se aplicó parcialmente.",
   ["strategy.reason.FAILED"] = "La orden de estrategia falló.",
   ["strategy.reason.ACK_TOO_LONG"] = "La confirmación de estrategia es demasiado grande.",
+  ["strategy.reason.SELF_STRATEGY_BRIDGE_UNAVAILABLE"] = "La compatibilidad del puente con las estrategias de SelfBot no está disponible.",
+  ["strategy.reason.SELF_STRATEGY_NOT_CONNECTED"] = "El puente no está conectado.",
+  ["strategy.reason.SELF_BOT_CAPABILITY_UNAVAILABLE"] = "La compatibilidad con SelfBot no está disponible en el puente.",
+  ["strategy.reason.SELF_STRATEGY_CAPABILITY_UNAVAILABLE"] = "La compatibilidad con estrategias de SelfBot no está disponible en el puente.",
+  ["strategy.reason.SELF_STRATEGY_NOT_ACTIVE"] = "SelfBot no está activo.",
+  ["strategy.reason.SELF_STRATEGY_CLIENT_UNAVAILABLE"] = "El addon no puede enviar comandos de estrategia de SelfBot.",
+  ["strategy.reason.SELF_STRATEGY_UNAVAILABLE"] = "El control de estrategias de SelfBot no está disponible.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_RESULT"] = "El puente devolvió un resultado de estrategia de SelfBot no válido.",
+  ["strategy.reason.SELF_STRATEGY_SEND_FAILED"] = "No se pudo enviar el comando de estrategia de SelfBot.",
+  ["strategy.reason.SELF_STRATEGY_REJECTED"] = "El comando de estrategia de SelfBot fue rechazado.",
   ["strategy.reason.UNKNOWN"] = "La orden de estrategia falló por un motivo desconocido.",
   ["info.outfits.feedback_equip"] = "Conjunto «%s» equipado.",
   ["info.outfits.feedback_replace"] = "Conjunto «%s» reemplazado.",

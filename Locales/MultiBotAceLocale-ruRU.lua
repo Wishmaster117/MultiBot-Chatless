@@ -4,6 +4,12 @@ if type(register) ~= "function" then
 end
 
 local ruRUValues = {
+  -- MB_SELFACTION_I18N_V1_BEGIN
+  ["selfaction.bridge_unavailable"] = "Мост недоступен: действие SelfBot не было отправлено.",
+  ["selfaction.failed"] = "Ошибка действия SelfBot: %s",
+  ["selfaction.send_failed"] = "Не удалось отправить действие SelfBot: %s",
+  ["selfaction.reason.RATE_LIMIT"] = "Слишком много запросов SelfBot. Повторите попытку через несколько секунд.",
+  -- MB_SELFACTION_I18N_V1_END
   ["lootmaster.title"] = "MultiBot ответственный за добычу",
   ["lootmaster.refresh"] = "Обновить",
   ["lootmaster.assign_to"] = "Назначить:",
@@ -1186,6 +1192,16 @@ local ruRUValues = {
   ["strategy.reason.PARTIAL"] = "Команда стратегии применена только частично.",
   ["strategy.reason.FAILED"] = "Команда стратегии завершилась ошибкой.",
   ["strategy.reason.ACK_TOO_LONG"] = "Подтверждение стратегии слишком велико.",
+  ["strategy.reason.SELF_STRATEGY_BRIDGE_UNAVAILABLE"] = "Поддержка стратегий SelfBot через мост недоступна.",
+  ["strategy.reason.SELF_STRATEGY_NOT_CONNECTED"] = "Мост не подключен.",
+  ["strategy.reason.SELF_BOT_CAPABILITY_UNAVAILABLE"] = "Поддержка SelfBot на мосту недоступна.",
+  ["strategy.reason.SELF_STRATEGY_CAPABILITY_UNAVAILABLE"] = "Поддержка стратегий SelfBot на мосту недоступна.",
+  ["strategy.reason.SELF_STRATEGY_NOT_ACTIVE"] = "SelfBot не активен.",
+  ["strategy.reason.SELF_STRATEGY_CLIENT_UNAVAILABLE"] = "Аддон не может отправлять команды стратегий SelfBot.",
+  ["strategy.reason.SELF_STRATEGY_UNAVAILABLE"] = "Управление стратегиями SelfBot недоступно.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_RESULT"] = "Мост вернул некорректный результат стратегии SelfBot.",
+  ["strategy.reason.SELF_STRATEGY_SEND_FAILED"] = "Не удалось отправить команду стратегии SelfBot.",
+  ["strategy.reason.SELF_STRATEGY_REJECTED"] = "Команда стратегии SelfBot была отклонена.",
   ["strategy.reason.UNKNOWN"] = "Команда стратегии завершилась ошибкой по неизвестной причине.",
   ["info.outfits.feedback_equip"] = "Комплект «%s» экипирован.",
   ["info.outfits.feedback_replace"] = "Комплект «%s» заменён.",

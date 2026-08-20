@@ -5406,6 +5406,31 @@ function Comm.HandleSelfActionAddonMessage(opcode, payload, state)
 
   return true
 end
+
+function Comm.HandleSelfActionProtocolError(requestType, token, reason, state)
+  if requestType ~= "SELF_ACTION" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(token)
+  local pending = state.selfActionCommands[token]
+  if type(pending) ~= "table" then
+    return true
+  end
+
+  state.selfActionCommands[token] = nil
+  local failureReason = reason or "PROTOCOL_ERROR"
+  state.lastError = "SELF_ACTION_" .. failureReason
+  if type(pending.callback) == "function" then
+    pending.callback({
+      status = "error",
+      action = pending.action,
+      reason = failureReason,
+    })
+  end
+  return true
+end
 -- MB_SELFBOT_ACTION_V1_END
 -- MB_SELFBOT_STRATEGY_V1_RX_HELPER_BEGIN
 function Comm.HandleSelfStrategyAddonMessage(opcode, payload, state)
@@ -5467,9 +5492,25 @@ function Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state)
   return true
 end
 -- MB_SELFBOT_STRATEGY_V1_RX_HELPER_END
+function Comm.IsExpectedBridgeSender(sender)
+  local expectedSender = getPlayerName()
+  local senderName = trim(sender or "")
+  senderName = string.gsub(senderName, "%-.*$", "")
+  if not expectedSender or string.lower(senderName) ~= string.lower(expectedSender) then
+    debugPrint("ADDON:RX:DROP", "SENDER", sender or "")
+    return false
+  end
+
+  return true
+end
+
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   if prefix ~= Comm.prefix then
     return false
+  end
+
+  if not Comm.IsExpectedBridgeSender(sender) then
+    return true
   end
 
   local state = ensureBridgeState()
@@ -7709,6 +7750,8 @@ state.selfActionCapable = false
       requestType = requestType and string.upper(trim(requestType)) or nil
       if requestType and isValidStateToken(token) and reason then
         if Comm.HandleSelfBotProtocolError(requestType, token, reason, state) then
+          return true
+        elseif Comm.HandleSelfActionProtocolError(requestType, token, reason, state) then
           return true
         elseif Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state) then
           return true

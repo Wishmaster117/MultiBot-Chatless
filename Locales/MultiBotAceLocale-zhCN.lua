@@ -4,6 +4,12 @@ if type(register) ~= "function" then
 end
 
 local zhCNValues = {
+  -- MB_SELFACTION_I18N_V1_BEGIN
+  ["selfaction.bridge_unavailable"] = "Bridge 不可用：SelfBot 操作未发送。",
+  ["selfaction.failed"] = "SelfBot 操作失败：%s",
+  ["selfaction.send_failed"] = "无法发送 SelfBot 操作：%s",
+  ["selfaction.reason.RATE_LIMIT"] = "SelfBot 请求过于频繁。请几秒后重试。",
+  -- MB_SELFACTION_I18N_V1_END
   ["lootmaster.title"] = "MultiBot 战利品分配者",
   ["lootmaster.refresh"] = "刷新",
   ["lootmaster.assign_to"] = "分配给：",
@@ -1186,6 +1192,16 @@ local zhCNValues = {
   ["strategy.reason.PARTIAL"] = "策略命令只应用了一部分。",
   ["strategy.reason.FAILED"] = "策略命令失败。",
   ["strategy.reason.ACK_TOO_LONG"] = "策略确认消息过大。",
+  ["strategy.reason.SELF_STRATEGY_BRIDGE_UNAVAILABLE"] = "桥接端的 SelfBot 策略支持不可用。",
+  ["strategy.reason.SELF_STRATEGY_NOT_CONNECTED"] = "桥接端未连接。",
+  ["strategy.reason.SELF_BOT_CAPABILITY_UNAVAILABLE"] = "桥接端不支持 SelfBot。",
+  ["strategy.reason.SELF_STRATEGY_CAPABILITY_UNAVAILABLE"] = "桥接端不支持 SelfBot 策略。",
+  ["strategy.reason.SELF_STRATEGY_NOT_ACTIVE"] = "SelfBot 未启用。",
+  ["strategy.reason.SELF_STRATEGY_CLIENT_UNAVAILABLE"] = "插件无法发送 SelfBot 策略命令。",
+  ["strategy.reason.SELF_STRATEGY_UNAVAILABLE"] = "SelfBot 策略控制不可用。",
+  ["strategy.reason.SELF_STRATEGY_INVALID_RESULT"] = "桥接端返回了无效的 SelfBot 策略结果。",
+  ["strategy.reason.SELF_STRATEGY_SEND_FAILED"] = "无法发送 SelfBot 策略命令。",
+  ["strategy.reason.SELF_STRATEGY_REJECTED"] = "SelfBot 策略命令被拒绝。",
   ["strategy.reason.UNKNOWN"] = "策略命令因未知原因失败。",
   ["info.outfits.feedback_equip"] = "配装“%s”已装备。",
   ["info.outfits.feedback_replace"] = "配装“%s”已替换。",

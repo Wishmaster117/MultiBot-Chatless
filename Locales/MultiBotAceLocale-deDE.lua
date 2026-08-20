@@ -4,6 +4,12 @@ if type(register) ~= "function" then
 end
 
 local deDEValues = {
+  -- MB_SELFACTION_I18N_V1_BEGIN
+  ["selfaction.bridge_unavailable"] = "Die Bridge ist nicht verfügbar: Die SelfBot-Aktion wurde nicht gesendet.",
+  ["selfaction.failed"] = "SelfBot-Aktion fehlgeschlagen: %s",
+  ["selfaction.send_failed"] = "Die SelfBot-Aktion konnte nicht gesendet werden: %s",
+  ["selfaction.reason.RATE_LIMIT"] = "Zu viele SelfBot-Anfragen. Bitte in einigen Sekunden erneut versuchen.",
+  -- MB_SELFACTION_I18N_V1_END
   ["lootmaster.title"] = "MultiBot Plündermeister",
   ["lootmaster.refresh"] = "Aktualisieren",
   ["lootmaster.assign_to"] = "Zuweisen an:",
@@ -1185,6 +1191,16 @@ local deDEValues = {
   ["strategy.reason.PARTIAL"] = "Der Strategiebefehl wurde nur teilweise angewendet.",
   ["strategy.reason.FAILED"] = "Der Strategiebefehl ist fehlgeschlagen.",
   ["strategy.reason.ACK_TOO_LONG"] = "Die Strategiebestätigung ist zu groß.",
+  ["strategy.reason.SELF_STRATEGY_BRIDGE_UNAVAILABLE"] = "Die Bridge-Unterstützung für SelfBot-Strategien ist nicht verfügbar.",
+  ["strategy.reason.SELF_STRATEGY_NOT_CONNECTED"] = "Die Bridge ist nicht verbunden.",
+  ["strategy.reason.SELF_BOT_CAPABILITY_UNAVAILABLE"] = "SelfBot-Unterstützung ist auf der Bridge nicht verfügbar.",
+  ["strategy.reason.SELF_STRATEGY_CAPABILITY_UNAVAILABLE"] = "SelfBot-Strategieunterstützung ist auf der Bridge nicht verfügbar.",
+  ["strategy.reason.SELF_STRATEGY_NOT_ACTIVE"] = "SelfBot ist nicht aktiv.",
+  ["strategy.reason.SELF_STRATEGY_CLIENT_UNAVAILABLE"] = "Das Addon kann keine SelfBot-Strategiebefehle senden.",
+  ["strategy.reason.SELF_STRATEGY_UNAVAILABLE"] = "Die SelfBot-Strategiesteuerung ist nicht verfügbar.",
+  ["strategy.reason.SELF_STRATEGY_INVALID_RESULT"] = "Die Bridge hat ein ungültiges SelfBot-Strategieergebnis zurückgegeben.",
+  ["strategy.reason.SELF_STRATEGY_SEND_FAILED"] = "Der SelfBot-Strategiebefehl konnte nicht gesendet werden.",
+  ["strategy.reason.SELF_STRATEGY_REJECTED"] = "Der SelfBot-Strategiebefehl wurde abgelehnt.",
   ["strategy.reason.UNKNOWN"] = "Der Strategiebefehl ist aus unbekanntem Grund fehlgeschlagen.",
   ["info.outfits.feedback_equip"] = "Outfit „%s“ ausgerüstet.",
   ["info.outfits.feedback_replace"] = "Outfit „%s“ ersetzt.",

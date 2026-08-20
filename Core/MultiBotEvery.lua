@@ -1,22 +1,31 @@
 local showEveryMessage
 
+local function selfActionReasonText(reason)
+  local reasonCode = tostring(reason or "UNKNOWN")
+  if reasonCode == "RATE_LIMIT" then
+    return MultiBot.L("selfaction.reason.RATE_LIMIT")
+  end
+  return reasonCode
+end
+
 local function runEverySelfAction(action, argument)
   local comm = MultiBot and MultiBot.Comm or nil
   if not (comm and type(comm.RunSelfAction) == "function") then
     if showEveryMessage then
-      showEveryMessage("Bridge unavailable: SelfBot action was not sent.")
+      showEveryMessage(MultiBot.L("selfaction.bridge_unavailable"))
     end
     return false
   end
 
   local token = comm.RunSelfAction(action, argument or "", function(result)
     if type(result) == "table" and result.status ~= "ok" and showEveryMessage then
-      showEveryMessage("SelfBot action failed: " .. tostring(result.reason or "UNKNOWN"))
+      local reasonText = selfActionReasonText(result.reason)
+      showEveryMessage(string.format(MultiBot.L("selfaction.failed"), reasonText))
     end
   end)
   if not token and showEveryMessage then
     local reason = MultiBot and MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE"
-    showEveryMessage("SelfBot action was not sent: " .. tostring(reason))
+    showEveryMessage(string.format(MultiBot.L("selfaction.send_failed"), selfActionReasonText(reason)))
   end
   return token and true or false
 end
