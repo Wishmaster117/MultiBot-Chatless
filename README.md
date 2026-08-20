@@ -152,6 +152,9 @@ INVENTORY_BULK_SELL_V1
 INVENTORY_OPEN_V1
 GROUP_ROLL_V1
 ENCHANT_TRADE_V1
+SELF_BOT_V1
+SELF_STRATEGY_V1
+SELF_ACTION_V1
 ```
 
 `STATE_FRAMING_V1` uses tokenized `STATE` / `STATES` transactions with framed responses, bounded payloads, cleanup on terminal errors/timeouts, and stale-response protection. Per-bot requests use a 5-second timeout; global state requests use a 15-second timeout.
@@ -159,6 +162,8 @@ ENCHANT_TRADE_V1
 `STRATEGY_MUTATION_V1` provides structured `co/nc` mutations through `RUN~STRATEGY` and completion through `STRATEGY_ACK`. The bridge reports matched, succeeded and failed bot counts, while the addon applies explicit timeout and rejection diagnostics.
 
 `INVENTORY_V1` provides the established native inventory read/refresh path. `INVENTORY_EXACT_V1` complements it with exact physical topology for Backpack, Bag 1..4 and Keyring, including empty slots and per-container filtering in the inventory UI. `ITEM_MOVE_V1` adds server-authoritative whole-stack drag/drop between allowed physical slots. The addon keeps only synthetic drag state: it does not call `PickupContainerItem`, `PickupInventoryItem`, `GetCursorInfo` or `ClearCursor`, and it does not mutate the displayed inventory optimistically; an exact snapshot refresh follows the server result. Stack splitting remains outside this capability. `ITEM_EQUIP_V1` equips an exact item from Backpack or Bag 1..4 through a structured bridge request and waits for the authoritative result before refreshing. `ITEM_UNEQUIP_V1` routes Inspect right-click through the exact equipment slot plus item ID, converts client Inspect slots 1..19 to Core slots 0..18, waits for the structured result and then refreshes. The historical `ue` whisper fallback is used only when `MultiBot.allowLegacyChatFallback == true`; normal bridge-first configuration keeps that fallback disabled. `ITEM_USE_V1` uses the exact physical source, waits for the structured `INVENTORY_ITEM_USE` result and delegates execution to the native use-item path. `ITEM_DESTROY` is a specialized exact-item destruction path with server-side source revalidation and an authoritative result. `ITEM_SELL_SINGLE_V1` validates the exact source and nearby vendor before native single-item sale and returns `INVENTORY_ITEM_SELL`. `VENDOR_BUYBACK_V1` exposes a structured Buyback list/result flow and uses the native Buyback handler before authoritative inventory/list refreshes. `INVENTORY_BULK_SELL_V1` and `INVENTORY_OPEN_V1` gate the current bulk-sell and `OPEN_ITEMS` bridge paths. `GROUP_ROLL_V1` gates the group Roll workflow; normal rolls and item-linked rolls are tokenized and completed through a structured `GROUP_ROLL_ACK`. `ENCHANT_TRADE_V1` gates the Enchanting Trade Service: the addon lists only known Enchanting spells exposed by the bot, uses the native WoW Trade window and the non-traded item slot, then requests one validated numeric spell ID through the bridge.
+
+`SELF_BOT_V1` controls the player's own SelfBot mode with explicit ENABLE/DISABLE requests and authoritative state/result replies. `SELF_STRATEGY_V1` reads and mutates only the active SelfBot's whitelisted combat/non-combat strategies through framed state plus `SELF_STRATEGY_ACK`; it is not a generic strategy executor. `SELF_ACTION_V1` exposes only the audited SelfBot actions `AUTOGEAR`, `MAINTENANCE` and `WAIT_ATTACK_TIME`, with server-side SelfBot/security/rate-limit checks. These SelfBot paths are a separate completed workstream inherited by the Jellypowered v2 branch; normal-bot Maintenance/Autogear paths that still use legacy chat are not implicitly migrated by these capabilities.
 
 The migration is intentionally incremental. The Warlock stone, soulstone, pet and curse selectors are now migrated to structured `RUN~STRATEGY` mutations. When those selectors use the bridge, the addon waits for authoritative server `STATE` data before committing the selected UI state instead of applying an optimistic local state. Other specialized legacy UI paths still issue Playerbots chat commands directly and must be migrated before the addon can be described as fully chatless.
 
@@ -608,6 +613,9 @@ Implemented bridge-first / chatless areas:
 - Bulk inventory sell through `INVENTORY_BULK_SELL_V1` when supported; `SELL_VENDOR` is bridge-first in normal current operation, while legacy compatibility fallback remains available and SELL_GREY follow-up is deferred.
 - `OPEN_ITEMS` through `INVENTORY_OPEN_V1`, with structured result handling and no silent chat fallback in the normal bridge-first path.
 - Group Roll through `GROUP_ROLL_V1`: normal 0–100 roll and Shift+click item roll, tokenized pending state, duplicate-send protection, timeout/cleanup handling and structured `GROUP_ROLL_ACK`.
+- SelfBot enable/disable through `SELF_BOT_V1`, with explicit desired state, authoritative server verification and legacy `.playerbot bot self` fallback only when compatibility fallback is explicitly enabled.
+- SelfBot strategy state/mutation through `SELF_STRATEGY_V1`, restricted to the player's active SelfBot and server-side class/state allowlists.
+- SelfBot EveryBar actions through `SELF_ACTION_V1` for `AUTOGEAR`, `MAINTENANCE` and `WAIT_ATTACK_TIME`; this does not migrate equivalent normal-bot legacy chat paths.
 - Spellbook refresh, with profession/crafting spells separated from the combat spellbook path.
 - Character Info frame through the bridge with Blizzard-style tabs for class, profession, secondary, weapon and armor skills, reputations and currencies/emblems.
 - Bot bank and guild bank snapshots through the bridge, plus bank deposit/withdraw, guild bank deposit/withdraw and vendor buy item actions.
@@ -643,6 +651,9 @@ Validated development milestones on the current line:
 - PR #58 — single-bot inventory Sell Vendor migrated to the bridge.
 - PR #60 — bridge-first `OPEN_ITEMS`.
 - PR #61 — chatless Group Roll UI, merged as `106074c3c93f80812f73af27e746860c7c8a4dcf`.
+- PR #67 — Jellypowered chatless/inventory integration merged into `main`, merge commit `70e72ba6cb9a7170497b201e0dbe469bb29e6be9`.
+- PR #72 — `Complete SelfBot chatless integration`, merged into `main`; current audited Addon baseline is merge commit `833d541063f207354c4131cf6a614c7df176348d`.
+- The current `jellypowered-chatless-integration-v2` branch was created from that `main` baseline on 2026-08-20 and initially matched `main`/`origin/main`/its remote tracking branch at 0/0 ahead-behind.
 - Final static STATE/strategy audit on 2026-08-07: 57 checks, 0 failures; final manual runtime matrix remains pending.
 - Warlock selector batch is migrated to bridge strategy mutations; final project-level real TEMP_ENCHANT revalidation and the four remaining LuaLint warnings are explicitly deferred.
 - Group Roll runtime validation on 2026-08-14: normal roll, item roll, eligibility, no chat spam, duplicate protection, invalid/empty item rejection and pending cleanup all validated.
@@ -652,7 +663,9 @@ Known migration remaining:
 
 - Remaining direct `SendChatMessage` occurrences outside migrated paths still need to be classified as manual command, diagnostic fallback, information message, UI mechanism to migrate, compatibility fallback, or dead code.
 - Item enchanting is now **implemented and runtime validated** through the closed `ENCHANT_TRADE_V1` Trade Service; it does not expose a generic cast or arbitrary Playerbots command executor.
-- The next normal roadmap item is **item-specific loot-rule add/remove**, followed by the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
+- `ITEM_MOVE_V1` already covers whole-stack movement between allowed Backpack / Bag 1..4 / Keyring physical slots, including inter-container moves. A future `BAG_MOVE` item must therefore mean moving/re-equipping the **bag objects themselves** in equipped bag slots, not moving ordinary inventory items.
+- Generic exact-item Trade is **not** yet represented by an `ITEM_TRADE_V1` capability. The existing Inventory -> Trade UI still opens the native WoW Trade workflow/historical give path; `ENCHANT_TRADE_V1` remains a separate specialized service and must not be generalized accidentally.
+- The active Jellypowered v2 continuation should audit `ITEM_TRADE` first; equipped-bag reassignment remains lower priority. After the remaining Jellypowered batch, the normal roadmap resumes with item-specific loot-rule add/remove, the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
 - The project should be described as **bridge-first / mostly chatless**, not fully chatless, until these remaining paths are classified/migrated and the final runtime matrix is closed.
 
 Kept intentionally:
@@ -666,9 +679,15 @@ Kept intentionally:
 
 # Remaining Work
 
-The current line includes bridge-first inventory refresh, exact bag-aware inventory topology, native whole-stack item drag/drop, outfits, Sell Vendor, `OPEN_ITEMS`, Group Roll and the runtime-validated Enchanting Trade Service in addition to the previously migrated UI areas. The roadmap is intentionally continuing feature-family by feature-family rather than jumping directly to final cleanup.
+The current `jellypowered-chatless-integration-v2` line starts from the merged Jellypowered inventory baseline plus the separately completed SelfBot work. It continues the remaining Jellypowered items feature-family by feature-family rather than reapplying already merged code or jumping directly to final cleanup.
 
-Next normal roadmap work:
+Immediate Jellypowered v2 work:
+
+1. Audit/implement generic exact-item `ITEM_TRADE` without regressing the specialized `ENCHANT_TRADE_V1` service or exposing a generic command executor.
+2. Audit moving/re-equipping the **equipped bag objects themselves** only if the need remains; ordinary item moves between Backpack / Bag 1..4 / Keyring are already covered by `ITEM_MOVE_V1`.
+3. Audit `QUEST_ABANDON`, `QUEST_SHARE`, `TALENT_APPLY` and `CRAFT_RECIPE_TARGET` separately before any endpoint proposal.
+
+Normal roadmap work queued after the remaining Jellypowered batch:
 
 1. Audit and implement item-specific loot-rule add/remove using verified Playerbots interfaces only.
 2. Decide the Quest/Skill versus Disenchant path from verified Playerbots capabilities.

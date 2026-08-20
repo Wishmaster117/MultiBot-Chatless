@@ -1,27 +1,32 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
-Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée avec l'état de stabilisation pré-merge du 17 août 2026.
-Dernière mise à jour : 17/08/2026 — le support multi-préfixes configurable, `INVENTORY_EXACT_V1`, l'UI inventaire bag-aware, `ITEM_MOVE_V1`, `ITEM_EQUIP_V1`, `ITEM_UNEQUIP_V1`, `ITEM_USE_V1`, `ITEM_DESTROY`, `ITEM_SELL_SINGLE_V1` et `VENDOR_BUYBACK_V1` sont validés sur la branche Jellypowered. La stabilisation pré-merge a clos les correctifs CAPS, postconditions ITEM_MOVE/ITEM_USE, autorisation INVENTORY_EXACT, fallback Equip, recyclage de la frame inventaire, sécurité cold-cache, localisation ITEM_USE/Inspect, garde nil Buyback et warning LuaLint `BUYBACK_ROWS`. Les lectures bulk Jellypowered restent différées et les vérifications globales LuaLint/CI restent à exécuter avant merge. Le prochain chantier de la roadmap normale reste l'ajout/retrait d'items précis dans les règles de loot.
-Cette roadmap est la source de vérité active du projet. Les anciens trackers et le fichier `TODO.md` ont été consolidés ici.
+Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 20 août 2026 après les merges Jellypowered et SelfBot et la création des nouvelles branches `jellypowered-chatless-integration-v2`.
+Dernière mise à jour : 20/08/2026 — l'ancien lot Jellypowered est déjà mergé dans `main` dans les deux dépôts ; les nouvelles branches v2 partent des `main` incluant également le chantier SelfBot séparé. `ITEM_MOVE_V1` couvre déjà les déplacements de piles entières entre Backpack / sacs 1..4 / Keyring, y compris inter-conteneurs. Le résiduel `BAG_MOVE` désigne uniquement le déplacement/rééquipement des **sacs eux-mêmes** dans les emplacements de sacs équipés. Aucun `ITEM_TRADE_V1` générique n'est présent : ce point devient le premier sous-chantier Jellypowered recommandé.
+Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
 
-Audit de synchronisation : `audit-multibot-trade-inventory-whisper-spam-v1b-2026-08-15-004941`, complété par les patches runtime validés de suppression du dump Trade.
+Synchronisation documentaire fondée sur :
+
+- `audit-multibot-jellypowered-docs-baseline-v2-2026-08-20-172627.zip` ;
+- `audit-multibot-jellypowered-git-state-supplement-v1-2026-08-20-173756.zip` ;
+- `audit-multibot-jellypowered-bag-move-item-trade-v1-2026-08-20-174218.zip`.
 
 - Addon : `L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot`
-  - branche `main` ;
-  - HEAD et `origin/main` avant le correctif Trade local : `2c827f0acf305030d9d97ed797f9c798a25daab3` ;
-  - merge PR #63 : **Add chatless Enchanting Trade Service UI** ;
-  - correctif local validé en jeu : suppression du dump inventaire automatique lors des ouvertures Trade Inventory, Enchanting et client WoW natif.
+  - branche `jellypowered-chatless-integration-v2`, créée depuis `main` le 20/08/2026 ;
+  - HEAD = `main` = `origin/main` = `origin/jellypowered-chatless-integration-v2` au baseline audité : `833d541063f207354c4131cf6a614c7df176348d` ;
+  - ahead/behind versus `main` : `0/0` avant cette synchronisation documentaire ;
+  - PR Jellypowered #67 déjà mergée, merge commit `70e72ba6cb9a7170497b201e0dbe469bb29e6be9` ;
+  - PR SelfBot #72 **Complete SelfBot chatless integration** déjà mergée ; le chantier SelfBot reste séparé du développement Jellypowered ;
+  - seul `TODO.md` est modifié localement et non stagé ; il est explicitement hors scope de cette synchronisation.
 - Bridge : `L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge`
-  - branche `main` ;
-  - HEAD et `origin/main` : `112428373dbd5741b55028e3efca299480a769bb` ;
-  - merge PR #27 : **Add ENCHANT_TRADE_V1 native enchanting trade service** ;
-  - aucun changement requis pour le correctif de spam Trade.
+  - branche `jellypowered-chatless-integration-v2`, créée depuis `main` le 20/08/2026 ;
+  - HEAD = `main` = `origin/main` = `origin/jellypowered-chatless-integration-v2` au baseline audité : `d42b23dd288b6ff0871c57bedd98856b705594da` ;
+  - ahead/behind versus `main` : `0/0` avant cette synchronisation documentaire ;
+  - PR Jellypowered #28 déjà mergée, merge commit `5e5ff7594ec8afedf40926605a60848dbc14991e` ;
+  - PR SelfBot #30 **Complete SelfBot chatless bridge support** déjà mergée ; le worktree Bridge est propre au baseline audité.
 - Playerbots : `L:\AC_PB\azerothcore-wotlk\modules\mod-playerbots`
-  - branche `master`, commit `a7b885d27134466dbc1c91d39b8241ea725a1bbb` ;
-  - **lecture seule stricte** ; invariant avant/après audit : `OK`.
-- AzerothCore : branche `Playerbot`, commit `092e9ba6ff8dc6d861dddd1f31baa9d404381a85`, worktree propre pendant l'audit.
+  - **lecture seule stricte** ; fingerprints source identiques avant/après les audits ciblés du 20/08/2026.
 - Communication actuelle : bridge-first pour les principaux rafraîchissements UI et pour plusieurs actions d'écriture explicitement bornées ; des occurrences `SendChatMessage` subsistent et doivent être classées/migrées famille par famille.
 - Fallback automatique legacy désactivé par défaut : `MultiBot.allowLegacyChatFallback = false`. Certains chemins de compatibilité historiques restent toutefois explicitement documentés jusqu'à leur migration ou leur suppression validée.
 
@@ -135,18 +140,23 @@ La branche `Extended` est divergente et ne doit pas être mergée en bloc. Chaqu
    - le fallback legacy `ue` n'est possible que lorsque `MultiBot.allowLegacyChatFallback == true`; avec la configuration bridge-first normale (`false`), aucun whisper automatique n'est émis ;
    - tests en jeu validés : slot simple, main hand, 2H/offhand, inventaire plein, double clic rapide, aucune perte/duplication, rafraîchissement cohérent et zéro chat parasite.
 
-5. **Utilisation native d'un item précis — PROCHAIN CHANTIER JELLYPOWERED / À AUDITER-ADAPTER**
-   - endpoint spécialisé `ITEM_USE` ;
-   - item exact, usage explicitement supporté, cooldown/cast/mouvement/état revalidés ;
-   - ne pas considérer l'action réussie avant validation du résultat réel.
+5. **Utilisation native d'un item précis — TERMINÉ / VALIDÉ EN JEU**
+   - `ITEM_USE_V1` utilise une source physique exacte et un résultat structuré `INVENTORY_ITEM_USE` ;
+   - le Bridge revalide le bot, l'identité de la source et l'état runtime avant d'emprunter le chemin natif `HandleUseItemOpcode` ;
+   - aucune mutation optimiste Addon ; le snapshot est rafraîchi après le résultat autoritatif ;
+   - la postcondition des objets démarrant une quête a été corrigée ; le cas négatif « quête déjà acceptée » reste un test runtime différé, pas un chantier `ITEM_USE_V1` à réimplémenter.
 
-6. **Déplacement/rééquipement de sacs — À ADAPTER, priorité faible**
-   - `BAG_MOVE` Extended déplace un sac entre emplacements de sacs équipés ;
-   - ne pas le présenter comme un déplacement arbitraire de tout item.
+6. **Déplacement/rééquipement des sacs équipés eux-mêmes — À ADAPTER, priorité faible**
+   - `ITEM_MOVE_V1` couvre déjà les piles d'items dans Backpack / sacs 1..4 / Keyring, y compris les déplacements inter-conteneurs ;
+   - le résiduel `BAG_MOVE` concerne uniquement l'objet sac placé dans un emplacement de sac équipé ;
+   - les emplacements d'équipement des sacs ne font pas partie de la whitelist actuelle `ITEM_MOVE_V1` et ne doivent pas être ajoutés sans audit dédié ;
+   - ne jamais présenter ce point comme un déplacement générique des objets d'inventaire.
 
-7. **Échange d'un item précis — À ADAPTER**
-   - étudier `ITEM_TRADE` avec quantité et emplacement exact ;
-   - revalider partenaire, distance, Trade actif, propriété et contrôle du bot.
+7. **Échange générique d'un item précis — À ADAPTER / PREMIER SOUS-CHANTIER JELLYPOWERED RECOMMANDÉ**
+   - aucun `ITEM_TRADE_V1` / `RUN~ITEM_TRADE` structuré n'est présent au baseline audité ;
+   - l'UI Inventory -> Trade existante ouvre le Trade WoW natif et conserve le workflow historique de don/échange ; la suppression du dump `=== Inventory ===` ne transforme pas ce chemin en endpoint chatless générique ;
+   - `ENCHANT_TRADE_V1` est un service spécialisé déjà validé et ne doit pas être généralisé ou régressé ;
+   - étudier un item exact avec quantité et emplacement exact, puis revalider partenaire, distance, Trade actif, propriété et contrôle du bot.
 
 8. **Abandon et partage de quête — À ADAPTER**
    - endpoints `QUEST_ABANDON` et `QUEST_SHARE` ;
@@ -518,7 +528,7 @@ Critère de sortie : version stabilisée, documentée et reproductible du projet
 <!-- MULTIBOT_JELLYPOWERED_PROGRESS_SYNC_2026-08-17 -->
 <!-- NORMAL_ROADMAP_NEXT=LOOT_RULE_EXACT_ITEM_ADD_REMOVE -->
 
-## État consolidé Jellypowered / inventaire — 17/08/2026
+## État consolidé Jellypowered / inventaire — 20/08/2026
 
 > **Référence de progression actuelle.** Ce bloc supplante les anciens libellés « prochain chantier Jellypowered » conservés plus haut à titre historique. Il ne modifie pas l'ordre de la roadmap normale après clôture du lot Jellypowered.
 
@@ -537,7 +547,15 @@ Critère de sortie : version stabilisée, documentée et reproductible du projet
 
 Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte** et n'introduisent aucun exécuteur générique de commande Playerbots.
 
-### Stabilisation pré-merge — 17/08/2026
+### Merges validés et nouvelle baseline v2 — 20/08/2026
+
+- Addon : le lot Jellypowered est déjà intégré à `main` via la PR #67, merge commit `70e72ba6cb9a7170497b201e0dbe469bb29e6be9`.
+- Bridge : le lot Jellypowered est déjà intégré à `main` via la PR #28, merge commit `5e5ff7594ec8afedf40926605a60848dbc14991e`.
+- Le chantier SelfBot, traité séparément, est lui aussi déjà intégré à `main` via Addon PR #72 et Bridge PR #30 ; les capacités héritées sont `SELF_BOT_V1`, `SELF_STRATEGY_V1` et `SELF_ACTION_V1`.
+- Les nouvelles branches `jellypowered-chatless-integration-v2` ont été créées directement depuis ces `main` le 20/08/2026 et étaient à `0/0` ahead/behind au baseline audité.
+- Les résiduels SelfBot Bridge déjà identifiés (`dps aoe` -> stratégie native `aoe`, robustesse du rollback différé Warlock) restent un chantier séparé et ne doivent pas être corrigés pendant Jellypowered.
+
+### Stabilisation validée avant merge — historique du 17/08/2026
 
 - CAPS : fragmentation/budget wire bornés et corrigés.
 - `ITEM_MOVE_V1` : postcondition de déplacement de pile entière corrigée.
@@ -548,7 +566,7 @@ Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte*
 - `ITEM_USE_V1` : namespace locale et raisons d'échec localisées ; tooltip Inspect localisé dans les 8 locales auditées.
 - `VENDOR_BUYBACK_V1` : garde nil de création de frame ajoutée sans changement de protocole.
 - LuaLint : variable inutilisée `BUYBACK_ROWS` supprimée.
-- Les contrôles globaux LuaLint/CI restent une porte de sortie pré-merge et doivent encore être exécutés après cette synchronisation documentaire.
+- Ces contrôles constituaient la porte de sortie du lot avant son merge ; les futurs patches Jellypowered v2 devront à nouveau passer les contrôles applicables avant tout nouveau merge.
 
 ### Audité et différé / non intégré
 
@@ -557,16 +575,16 @@ Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte*
 
 ### Jellypowered restant à étudier
 
-L'ordre exact sera redécidé après synchronisation/commit de la branche ; **aucun de ces points n'est marqué comme prochain chantier actif par ce document**.
+Ordre recommandé après la synchronisation documentaire :
 
-- `BAG_MOVE` — déplacement/rééquipement de sacs ; priorité faible.
-- `ITEM_TRADE` — item exact, quantité, partenaire, distance, Trade actif, propriété et contrôle du bot ; ne pas régresser `ENCHANT_TRADE_V1`.
-- `QUEST_ABANDON` — endpoint spécialisé uniquement.
-- `QUEST_SHARE` — endpoint spécialisé uniquement.
-- `TALENT_APPLY` — audit strict des API Playerbots locales, points, niveau, reset/coût, combat et dual spec avant toute proposition.
-- `CRAFT_RECIPE_TARGET` — profession/recette/matériaux/outils/cible/Trade à revalider.
-- Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
-- Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
+1. `ITEM_TRADE` — premier sous-chantier : item exact, quantité, partenaire, distance, Trade actif, propriété et contrôle du bot ; ne pas régresser `ENCHANT_TRADE_V1`.
+2. `BAG_MOVE` — uniquement déplacement/rééquipement des **sacs équipés eux-mêmes** ; priorité faible. Les déplacements d'items entre conteneurs sont déjà terminés via `ITEM_MOVE_V1`.
+3. `QUEST_ABANDON` — endpoint spécialisé uniquement.
+4. `QUEST_SHARE` — endpoint spécialisé uniquement.
+5. `TALENT_APPLY` — audit strict des API Playerbots locales, points, niveau, reset/coût, combat et dual spec avant toute proposition.
+6. `CRAFT_RECIPE_TARGET` — profession/recette/matériaux/outils/cible/Trade à revalider.
+7. Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
+8. Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
 
 ### Chantiers suspendus — inchangés
 
@@ -581,4 +599,4 @@ L'ordre exact sera redécidé après synchronisation/commit de la branche ; **au
 
 Le **prochain chantier normal** reste : **ajout/retrait d'items précis dans les règles de loot**.
 
-La décision du prochain sous-chantier Jellypowered restant sera prise après la synchronisation manuelle de la branche, à partir de cet état consolidé.
+La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Après application et vérification de cette synchronisation documentaire, un commit documentaire séparé sera créé dans chaque dépôt avant de reprendre `ITEM_TRADE`. Aucune PR n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.
