@@ -503,6 +503,34 @@ local function runBridgeInventoryItemSell(button, botName)
 end
 -- MB_ITEM_SELL_SINGLE_V1_HELPER_END
 
+local function runBridgeInventoryItemTrade(button, botName)
+    if not button or not button.item or not botName or botName == "" then
+        return false
+    end
+
+    local item = button.item
+    if item.exactLocation ~= true then
+        return false
+    end
+
+    local srcBag = tonumber(item.bag)
+    local srcSlot = tonumber(item.slot)
+    local itemId = tonumber(item.id or 0) or 0
+    local count = tonumber(item._serverCount or item.count or 1) or 1
+    if srcBag == nil or srcSlot == nil or itemId <= 0 or count < 1 then
+        return false
+    end
+
+    if not MultiBot.Comm or not MultiBot.Comm.RunInventoryItemTrade then
+        return false
+    end
+
+    local token = MultiBot.Comm.RunInventoryItemTrade(
+        botName, srcBag, srcSlot, itemId, count
+    )
+    return token and true or false
+end
+
 local function runBridgeInventoryItemUse(button, botName)
     if not button or not button.item or not botName or botName == "" then
         return false
@@ -587,6 +615,19 @@ MultiBot.OnBridgeInventoryItemDestroyResult = function(botName, _, reason)
 
     requestInventoryRefresh(0.15, botName)
 end
+MultiBot.OnBridgeInventoryItemTradeResult = function(_, status, reason)
+    if reason == "DISCONNECTED" then
+        return
+    end
+
+    if status ~= "OK" then
+        addInventorySystemMessage(
+            inventoryItemL("inventory.item_trade.failed", "The item could not be added to the trade.")
+                .. " [" .. tostring(reason or "FAILED") .. "]"
+        )
+    end
+end
+
 local function handleInventoryItemClick(button)
     local action, botName = getInventoryItemActionState()
     local item = button and button.item or nil
@@ -661,7 +702,30 @@ local function handleInventoryItemClick(button)
     end
 
     if action == "give" then
-        sendInventoryItemCommand(action, button, botName)
+        local bridgeCapable = MultiBot.Comm
+            and MultiBot.Comm.IsInventoryItemTradeCapable
+            and MultiBot.Comm.IsInventoryItemTradeCapable()
+
+        if bridgeCapable then
+            if runBridgeInventoryItemTrade(button, botName) then
+                return
+            end
+
+            addInventorySystemMessage(inventoryItemL(
+                "inventory.item_trade.send_failed",
+                "The item-trade request could not be sent."
+            ))
+            return
+        end
+
+        if MultiBot.allowLegacyChatFallback == true then
+            sendInventoryItemCommand(action, button, botName)
+        else
+            addInventorySystemMessage(inventoryItemL(
+                "inventory.item_trade.unavailable",
+                "Item trading via the bridge is unavailable."
+            ))
+        end
         return
     end
 

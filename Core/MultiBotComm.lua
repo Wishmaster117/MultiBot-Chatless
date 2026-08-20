@@ -18,6 +18,7 @@ local OUTFIT_CAPABILITY = "OUTFIT_V1"
 local INVENTORY_CAPABILITY = "INVENTORY_V1"
 local INVENTORY_EXACT_CAPABILITY = "INVENTORY_EXACT_V1"
 local INVENTORY_ITEM_MOVE_CAPABILITY = "ITEM_MOVE_V1"
+local INVENTORY_ITEM_TRADE_CAPABILITY = "ITEM_TRADE_V1"
 local INVENTORY_ITEM_EQUIP_CAPABILITY = "ITEM_EQUIP_V1"
 local INVENTORY_ITEM_UNEQUIP_CAPABILITY = "ITEM_UNEQUIP_V1"
 local INVENTORY_ITEM_DESTROY_CAPABILITY = "ITEM_DESTROY_V1"
@@ -27,10 +28,37 @@ local INVENTORY_BULK_SELL_CAPABILITY = "INVENTORY_BULK_SELL_V1"
 local INVENTORY_OPEN_CAPABILITY = "INVENTORY_OPEN_V1"
 local GROUP_ROLL_CAPABILITY = "GROUP_ROLL_V1"
 local ENCHANT_TRADE_CAPABILITY = "ENCHANT_TRADE_V1"
+-- MB_LUA51_UPVALUE_REFACTOR_V1_BEGIN
+-- Keep capability-to-state mapping outside Comm.HandleAddonMessage so each
+-- capability does not consume a separate Lua 5.1 upvalue in that dispatcher.
+local CAPABILITY_STATE_FIELDS = {
+  [STATE_FRAMING_CAPABILITY] = "stateFramingCapable",
+  [STRATEGY_MUTATION_CAPABILITY] = "strategyMutationCapable",
+  ["SELF_STRATEGY_V1"] = "selfStrategyCapable",
+  [SELF_ACTION_CAPABILITY] = "selfActionCapable",
+  [OUTFIT_CAPABILITY] = "outfitCapable",
+  [INVENTORY_CAPABILITY] = "inventoryCapable",
+  [INVENTORY_EXACT_CAPABILITY] = "inventoryExactCapable",
+  [INVENTORY_ITEM_MOVE_CAPABILITY] = "inventoryItemMoveCapable",
+  [INVENTORY_ITEM_TRADE_CAPABILITY] = "inventoryItemTradeCapable",
+  [INVENTORY_ITEM_EQUIP_CAPABILITY] = "inventoryItemEquipCapable",
+  [INVENTORY_ITEM_UNEQUIP_CAPABILITY] = "inventoryItemUnequipCapable",
+  [INVENTORY_ITEM_DESTROY_CAPABILITY] = "inventoryItemDestroyCapable",
+  [INVENTORY_ITEM_USE_CAPABILITY] = "inventoryItemUseCapable",
+  [INVENTORY_ITEM_SELL_CAPABILITY] = "inventoryItemSellCapable",
+  ["VENDOR_BUYBACK_V1"] = "inventoryBuybackCapable",
+  [INVENTORY_BULK_SELL_CAPABILITY] = "inventoryBulkSellCapable",
+  [INVENTORY_OPEN_CAPABILITY] = "inventoryOpenCapable",
+  [GROUP_ROLL_CAPABILITY] = "groupRollCapable",
+  [ENCHANT_TRADE_CAPABILITY] = "enchantTradeCapable",
+  ["SELF_BOT_V1"] = "selfBotCapable",
+}
+-- MB_LUA51_UPVALUE_REFACTOR_V1_END
 local SELF_BOT_TIMEOUT_SECONDS = 5.0
 local GROUP_ROLL_TIMEOUT_SECONDS = 5.0
 local ENCHANT_TRADE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_MOVE_TIMEOUT_SECONDS = 5.0
+local INVENTORY_ITEM_TRADE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_EQUIP_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_UNEQUIP_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_DESTROY_TIMEOUT_SECONDS = 5.0
@@ -38,6 +66,7 @@ local INVENTORY_ITEM_USE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_SELL_TIMEOUT_SECONDS = 5.0
 local INVENTORY_BUYBACK_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_MOVE_MAX_COUNT = 1000
+local INVENTORY_ITEM_TRADE_MAX_COUNT = 1000
 local INVENTORY_ITEM_EQUIP_MAX_COUNT = 1000
 local INVENTORY_ITEM_DESTROY_MAX_COUNT = 1000
 local INVENTORY_ITEM_USE_MAX_COUNT = 1000
@@ -281,6 +310,7 @@ local function ensureBridgeState()
   state.inventoryCapable = state.inventoryCapable or false
   state.inventoryExactCapable = state.inventoryExactCapable or false
   state.inventoryItemMoveCapable = state.inventoryItemMoveCapable or false
+  state.inventoryItemTradeCapable = state.inventoryItemTradeCapable or false
   state.inventoryItemEquipCapable = state.inventoryItemEquipCapable or false
   state.inventoryItemUnequipCapable = state.inventoryItemUnequipCapable or false
   state.inventoryItemDestroyCapable = state.inventoryItemDestroyCapable or false
@@ -334,6 +364,8 @@ local function ensureBridgeState()
   state.inventoryExactSnapshots = state.inventoryExactSnapshots or {}
   state.inventoryItemMoveSeq = state.inventoryItemMoveSeq or 0
   state.inventoryItemMoves = state.inventoryItemMoves or {}
+  state.inventoryItemTradeSeq = state.inventoryItemTradeSeq or 0
+  state.inventoryItemTrades = state.inventoryItemTrades or {}
   state.inventoryItemEquipSeq = state.inventoryItemEquipSeq or 0
   state.inventoryItemEquips = state.inventoryItemEquips or {}
   state.inventoryItemUnequipSeq = state.inventoryItemUnequipSeq or 0
@@ -866,6 +898,7 @@ state.selfActionCapable = false
     state.inventoryCapable = false
     state.inventoryExactCapable = false
     state.inventoryItemMoveCapable = false
+    state.inventoryItemTradeCapable = false
     state.inventoryItemEquipCapable = false
     state.inventoryItemUnequipCapable = false
     state.inventoryItemDestroyCapable = false
@@ -2270,6 +2303,82 @@ function Comm.RunInventoryItemMove(name, srcBag, srcSlot, srcItemId, srcCount, d
   return token
 end
 
+function Comm.IsInventoryItemTradeCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.inventoryExactCapable == true and state.inventoryItemTradeCapable == true
+end
+
+function Comm.RunInventoryItemTrade(name, srcBag, srcSlot, srcItemId, srcCount)
+  local state = ensureBridgeState()
+  name = trim(name)
+
+  srcBag = parseBoundedInteger(tostring(srcBag or ""), 0, 255)
+  srcSlot = parseBoundedInteger(tostring(srcSlot or ""), 0, 255)
+  srcItemId = parseBoundedInteger(tostring(srcItemId or ""), 1, 4294967295)
+  srcCount = parseBoundedInteger(tostring(srcCount or ""), 1, INVENTORY_ITEM_TRADE_MAX_COUNT)
+
+  if name == "" or not state.connected or state.inventoryExactCapable ~= true or state.inventoryItemTradeCapable ~= true then
+    return false
+  end
+  if srcBag == nil or srcSlot == nil or not srcItemId or not srcCount then
+    return false
+  end
+
+  local botNameKey = string.lower(name)
+  for _, pending in pairs(state.inventoryItemTrades or {}) do
+    if pending.botNameKey == botNameKey
+        and pending.srcBag == srcBag
+        and pending.srcSlot == srcSlot
+        and pending.srcItemId == srcItemId
+        and pending.srcCount == srcCount then
+      return false
+    end
+  end
+
+  state.inventoryItemTradeSeq = (tonumber(state.inventoryItemTradeSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-trade-" .. tostring(state.inventoryItemTradeSeq)
+  local command = {
+    token = token,
+    botName = name,
+    botNameKey = botNameKey,
+    srcBag = srcBag,
+    srcSlot = srcSlot,
+    srcItemId = srcItemId,
+    srcCount = srcCount,
+    startedAt = safeNow(),
+  }
+  state.inventoryItemTrades[token] = command
+
+  local payload = table.concat({
+    "ITEM_TRADE", name, token,
+    tostring(srcBag), tostring(srcSlot), tostring(srcItemId), tostring(srcCount),
+  }, "~")
+
+  if not Comm.Send("RUN", payload) then
+    state.inventoryItemTrades[token] = nil
+    return false
+  end
+
+  safeDelay(INVENTORY_ITEM_TRADE_TIMEOUT_SECONDS, function()
+    local bridgeState = ensureBridgeState()
+    local pending = bridgeState.inventoryItemTrades and bridgeState.inventoryItemTrades[token] or nil
+    if not pending then
+      return
+    end
+
+    bridgeState.inventoryItemTrades[token] = nil
+    bridgeState.lastError = "ITEM_TRADE_TIMEOUT"
+    if MultiBot.OnBridgeInventoryItemTradeResult then
+      MultiBot.OnBridgeInventoryItemTradeResult(
+        pending.botName, "ERR", "TIMEOUT",
+        pending.srcBag, pending.srcSlot, pending.srcItemId, pending.srcCount, 255, pending
+      )
+    end
+  end)
+
+  return token
+end
+
 function Comm.IsInventoryItemEquipCapable()
   local state = ensureBridgeState()
   return state.connected == true and state.inventoryExactCapable == true and state.inventoryItemEquipCapable == true
@@ -3261,6 +3370,15 @@ function Comm.MarkDisconnected(reason)
     end
   end
   state.inventoryItemMoves = {}
+  for _, command in pairs(state.inventoryItemTrades or {}) do
+    if MultiBot.OnBridgeInventoryItemTradeResult then
+      MultiBot.OnBridgeInventoryItemTradeResult(
+        command.botName or "", "ERR", "DISCONNECTED",
+        command.srcBag or 0, command.srcSlot or 0, command.srcItemId or 0, command.srcCount or 0, 255, command
+      )
+    end
+  end
+  state.inventoryItemTrades = {}
   state.inventoryItemEquips = {}
   for _, command in pairs(state.inventoryItemUnequips or {}) do
     if MultiBot.OnBridgeInventoryItemUnequipResult then
@@ -3371,6 +3489,7 @@ state.selfActionCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
   state.inventoryItemMoveCapable = false
+  state.inventoryItemTradeCapable = false
   state.inventoryItemEquipCapable = false
   state.inventoryItemUnequipCapable = false
   state.inventoryItemDestroyCapable = false
@@ -5542,6 +5661,142 @@ function Comm.IsExpectedBridgeSender(sender)
   return true
 end
 
+local function resetCapabilityFlags(state)
+  for _, stateField in pairs(CAPABILITY_STATE_FIELDS) do
+    state[stateField] = false
+  end
+end
+
+local function finishCapabilityResolution(state, debugOpcode, payload)
+  state.capabilityFallbackDeadline = 0
+  state.capabilityFallbackGeneration = 0
+  state.capabilitiesResolved = true
+  debugPrint("ADDON:RX", debugOpcode, payload or "")
+  flushPendingStateRefreshes()
+  if state.selfBotCapable == true and type(Comm.RequestSelfBotState) == "function" then
+    Comm.RequestSelfBotState()
+  end
+  if MultiBot.RefreshEnchantingEveryButtons then
+    MultiBot.RefreshEnchantingEveryButtons()
+  end
+end
+
+local function handleCapabilityMessage(opcode, payload, state)
+  if opcode == "CAPS_BEGIN" then
+    resetCapabilityFlags(state)
+    state.capabilityBatchActive = true
+    state.capabilitiesResolved = false
+    debugPrint("ADDON:RX", "CAPS_BEGIN")
+    return true
+  end
+
+  if opcode == "CAPS" then
+    if not state.capabilityBatchActive then
+      resetCapabilityFlags(state)
+    end
+
+    for capability in string.gmatch(payload or "", "([^,]+)") do
+      capability = trim(capability)
+      local stateField = CAPABILITY_STATE_FIELDS[capability]
+      if stateField then
+        state[stateField] = true
+      end
+    end
+
+    if state.capabilityBatchActive then
+      debugPrint("ADDON:RX", "CAPS_PART", payload or "")
+      return true
+    end
+
+    finishCapabilityResolution(state, "CAPS", payload)
+    return true
+  end
+
+  if opcode == "CAPS_END" then
+    if not state.capabilityBatchActive then
+      return true
+    end
+
+    state.capabilityBatchActive = false
+    finishCapabilityResolution(state, "CAPS_END")
+    return true
+  end
+
+  return false
+end
+
+local function handleInventoryItemTradeResponse(payload, state)
+  local fields = splitFields(payload)
+  if #fields ~= 9 then
+    state.lastError = "ITEM_TRADE_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local botName = urlDecodeFieldStrict(fields[1], 64, false)
+  local token = trim(fields[2])
+  local status = string.upper(trim(fields[3]))
+  local reason = urlDecodeFieldStrict(fields[4], 64, false)
+  local srcBag = parseBoundedInteger(fields[5], 0, 255)
+  local srcSlot = parseBoundedInteger(fields[6], 0, 255)
+  local srcItemId = parseBoundedInteger(fields[7], 1, 4294967295)
+  local srcCount = parseBoundedInteger(fields[8], 1, INVENTORY_ITEM_TRADE_MAX_COUNT)
+  local tradeSlot = parseBoundedInteger(fields[9], 0, 255)
+
+  state.connected = true
+  local command = state.inventoryItemTrades and state.inventoryItemTrades[token] or nil
+  if not botName or not isValidStateToken(token) or (status ~= "OK" and status ~= "ERR") or not reason or
+    srcBag == nil or srcSlot == nil or srcItemId == nil or srcCount == nil or tradeSlot == nil then
+    state.lastError = "ITEM_TRADE_BAD_RESPONSE"
+    if command then
+      state.inventoryItemTrades[token] = nil
+      if MultiBot.OnBridgeInventoryItemTradeResult then
+        MultiBot.OnBridgeInventoryItemTradeResult(
+          command.botName, "ERR", "BAD_RESPONSE",
+          command.srcBag, command.srcSlot, command.srcItemId, command.srcCount, 255, command
+        )
+      end
+    end
+    return true
+  end
+
+  if not command then
+    return true
+  end
+
+  local responseMatches = string.lower(botName) == command.botNameKey and
+    srcBag == command.srcBag and srcSlot == command.srcSlot and
+    srcItemId == command.srcItemId and srcCount == command.srcCount and
+    ((status == "OK" and tradeSlot >= 0 and tradeSlot <= 5) or status == "ERR")
+
+  state.inventoryItemTrades[token] = nil
+  if not responseMatches then
+    status = "ERR"
+    reason = "RESPONSE_MISMATCH"
+    tradeSlot = 255
+    state.lastError = "ITEM_TRADE_RESPONSE_MISMATCH"
+  elseif status == "OK" then
+    state.lastError = nil
+  else
+    state.lastError = "ITEM_TRADE_" .. reason
+  end
+
+  if MultiBot.OnBridgeInventoryItemTradeResult then
+    MultiBot.OnBridgeInventoryItemTradeResult(
+      command.botName, status, reason,
+      command.srcBag, command.srcSlot, command.srcItemId, command.srcCount, tradeSlot, command
+    )
+  end
+
+  debugPrint("ADDON:RX", "INVENTORY_ITEM_TRADE", botName, token, status, reason, srcBag, srcSlot, srcItemId, srcCount, tradeSlot)
+  return true
+end
+
+-- New structured response handlers should be registered here instead of adding
+-- another large branch directly inside Comm.HandleAddonMessage.
+local STRUCTURED_OPCODE_HANDLERS = {
+  INVENTORY_ITEM_TRADE = handleInventoryItemTradeResponse,
+}
+
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   if prefix ~= Comm.prefix then
     return false
@@ -5604,136 +5859,10 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
-  if opcode == "CAPS_BEGIN" then
-    state.stateFramingCapable = false
-    state.strategyMutationCapable = false
-state.selfStrategyCapable = false
-state.selfActionCapable = false
-    state.outfitCapable = false
-    state.inventoryCapable = false
-    state.inventoryExactCapable = false
-    state.inventoryItemMoveCapable = false
-    state.inventoryItemEquipCapable = false
-    state.inventoryItemUnequipCapable = false
-    state.inventoryItemDestroyCapable = false
-    state.inventoryItemUseCapable = false
-    state.inventoryItemSellCapable = false
-    state.inventoryBuybackCapable = false
-    state.inventoryBulkSellCapable = false
-    state.inventoryOpenCapable = false
-    state.groupRollCapable = false
-    state.enchantTradeCapable = false
-    state.selfBotCapable = false
-    state.capabilityBatchActive = true
-    state.capabilitiesResolved = false
-    debugPrint("ADDON:RX", "CAPS_BEGIN")
+  if handleCapabilityMessage(opcode, payload, state) then
     return true
   end
 
-  if opcode == "CAPS" then
-    if not state.capabilityBatchActive then
-      state.stateFramingCapable = false
-      state.strategyMutationCapable = false
-state.selfStrategyCapable = false
-state.selfActionCapable = false
-      state.outfitCapable = false
-      state.inventoryCapable = false
-      state.inventoryExactCapable = false
-      state.inventoryItemMoveCapable = false
-      state.inventoryItemEquipCapable = false
-      state.inventoryItemUnequipCapable = false
-      state.inventoryItemDestroyCapable = false
-      state.inventoryItemUseCapable = false
-      state.inventoryItemSellCapable = false
-      state.inventoryBuybackCapable = false
-      state.inventoryBulkSellCapable = false
-      state.inventoryOpenCapable = false
-      state.groupRollCapable = false
-      state.enchantTradeCapable = false
-      state.selfBotCapable = false
-    end
-
-    for capability in string.gmatch(payload or "", "([^,]+)") do
-      capability = trim(capability)
-      if capability == STATE_FRAMING_CAPABILITY then
-        state.stateFramingCapable = true
-      elseif capability == STRATEGY_MUTATION_CAPABILITY then
-        state.strategyMutationCapable = true
-      elseif capability == "SELF_STRATEGY_V1" then
-        state.selfStrategyCapable = true
-      elseif capability == SELF_ACTION_CAPABILITY then
-        state.selfActionCapable = true
-      elseif capability == OUTFIT_CAPABILITY then
-        state.outfitCapable = true
-      elseif capability == INVENTORY_CAPABILITY then
-        state.inventoryCapable = true
-      elseif capability == INVENTORY_EXACT_CAPABILITY then
-        state.inventoryExactCapable = true
-      elseif capability == INVENTORY_ITEM_MOVE_CAPABILITY then
-        state.inventoryItemMoveCapable = true
-      elseif capability == INVENTORY_ITEM_EQUIP_CAPABILITY then
-        state.inventoryItemEquipCapable = true
-      elseif capability == INVENTORY_ITEM_UNEQUIP_CAPABILITY then
-        state.inventoryItemUnequipCapable = true
-      elseif capability == INVENTORY_ITEM_DESTROY_CAPABILITY then
-        state.inventoryItemDestroyCapable = true
-      elseif capability == INVENTORY_ITEM_USE_CAPABILITY then
-        state.inventoryItemUseCapable = true
-      elseif capability == INVENTORY_ITEM_SELL_CAPABILITY then
-        state.inventoryItemSellCapable = true
-      elseif capability == "VENDOR_BUYBACK_V1" then
-        state.inventoryBuybackCapable = true
-      elseif capability == INVENTORY_BULK_SELL_CAPABILITY then
-        state.inventoryBulkSellCapable = true
-      elseif capability == INVENTORY_OPEN_CAPABILITY then
-        state.inventoryOpenCapable = true
-      elseif capability == GROUP_ROLL_CAPABILITY then
-        state.groupRollCapable = true
-      elseif capability == ENCHANT_TRADE_CAPABILITY then
-        state.enchantTradeCapable = true
-      elseif capability == "SELF_BOT_V1" then
-        state.selfBotCapable = true
-      end
-    end
-
-    if state.capabilityBatchActive then
-      debugPrint("ADDON:RX", "CAPS_PART", payload or "")
-      return true
-    end
-
-    state.capabilityFallbackDeadline = 0
-    state.capabilityFallbackGeneration = 0
-    state.capabilitiesResolved = true
-    debugPrint("ADDON:RX", "CAPS", payload or "")
-    flushPendingStateRefreshes()
-    if state.selfBotCapable == true and type(Comm.RequestSelfBotState) == "function" then
-      Comm.RequestSelfBotState()
-    end
-    if MultiBot.RefreshEnchantingEveryButtons then
-      MultiBot.RefreshEnchantingEveryButtons()
-    end
-    return true
-  end
-
-  if opcode == "CAPS_END" then
-    if not state.capabilityBatchActive then
-      return true
-    end
-
-    state.capabilityBatchActive = false
-    state.capabilityFallbackDeadline = 0
-    state.capabilityFallbackGeneration = 0
-    state.capabilitiesResolved = true
-    debugPrint("ADDON:RX", "CAPS_END")
-    flushPendingStateRefreshes()
-    if state.selfBotCapable == true and type(Comm.RequestSelfBotState) == "function" then
-      Comm.RequestSelfBotState()
-    end
-    if MultiBot.RefreshEnchantingEveryButtons then
-      MultiBot.RefreshEnchantingEveryButtons()
-    end
-    return true
-  end
   if opcode == "WEAPON_ENCHANT" then
     state.connected = true
 
@@ -6547,6 +6676,11 @@ state.selfActionCapable = false
 
     debugPrint("ADDON:RX", "INVENTORY_ITEM_MOVE", botName, token, status, reason, srcBag, srcSlot, dstBag, dstSlot)
     return true
+  end
+
+  local structuredHandler = STRUCTURED_OPCODE_HANDLERS[opcode]
+  if structuredHandler then
+    return structuredHandler(payload, state)
   end
 
   if opcode == "INVENTORY_ITEM_EQUIP" then
@@ -7861,6 +7995,7 @@ state.selfActionCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
   state.inventoryItemMoveCapable = false
+  state.inventoryItemTradeCapable = false
   state.inventoryItemEquipCapable = false
   state.inventoryItemUnequipCapable = false
   state.inventoryItemDestroyCapable = false
