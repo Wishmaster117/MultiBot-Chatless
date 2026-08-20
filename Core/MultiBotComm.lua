@@ -28,6 +28,7 @@ local INVENTORY_BULK_SELL_CAPABILITY = "INVENTORY_BULK_SELL_V1"
 local INVENTORY_OPEN_CAPABILITY = "INVENTORY_OPEN_V1"
 local GROUP_ROLL_CAPABILITY = "GROUP_ROLL_V1"
 local ENCHANT_TRADE_CAPABILITY = "ENCHANT_TRADE_V1"
+local QUEST_ABANDON_CAPABILITY = "QUEST_ABANDON_V1"
 -- MB_LUA51_UPVALUE_REFACTOR_V1_BEGIN
 -- Keep capability-to-state mapping outside Comm.HandleAddonMessage so each
 -- capability does not consume a separate Lua 5.1 upvalue in that dispatcher.
@@ -51,12 +52,14 @@ local CAPABILITY_STATE_FIELDS = {
   [INVENTORY_OPEN_CAPABILITY] = "inventoryOpenCapable",
   [GROUP_ROLL_CAPABILITY] = "groupRollCapable",
   [ENCHANT_TRADE_CAPABILITY] = "enchantTradeCapable",
+  [QUEST_ABANDON_CAPABILITY] = "questAbandonCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
 -- MB_LUA51_UPVALUE_REFACTOR_V1_END
 local SELF_BOT_TIMEOUT_SECONDS = 5.0
 local GROUP_ROLL_TIMEOUT_SECONDS = 5.0
 local ENCHANT_TRADE_TIMEOUT_SECONDS = 5.0
+local QUEST_ABANDON_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_MOVE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_TRADE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_EQUIP_TIMEOUT_SECONDS = 5.0
@@ -321,6 +324,7 @@ local function ensureBridgeState()
   state.inventoryOpenCapable = state.inventoryOpenCapable or false
   state.groupRollCapable = state.groupRollCapable or false
   state.enchantTradeCapable = state.enchantTradeCapable or false
+  state.questAbandonCapable = state.questAbandonCapable or false
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -335,6 +339,8 @@ local function ensureBridgeState()
   state.enchantTradeLists = state.enchantTradeLists or {}
   state.groupRollSeq = state.groupRollSeq or 0
   state.groupRollCommands = state.groupRollCommands or {}
+  state.questAbandonSeq = state.questAbandonSeq or 0
+  state.questAbandonCommands = state.questAbandonCommands or {}
   state.strategyMutationSeq = state.strategyMutationSeq or 0
   state.strategyMutationCommands = state.strategyMutationCommands or {}
   state.selfStrategySeq = state.selfStrategySeq or 0
@@ -3194,6 +3200,122 @@ function Comm.RunProfessionRecipeCraft(name, skillId, spellId, itemId)
   return token
 end
 
+-- MB_QUEST_ABANDON_V1_BEGIN
+local function finishQuestAbandonCommand(token, result)
+  local state = ensureBridgeState()
+  local pending = state.questAbandonCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.questAbandonCommands[token] = nil
+  result = type(result) == "table" and result or {}
+  result.token = token
+  result.questId = result.questId or pending.questId
+
+  if type(pending.callback) == "function" then
+    pending.callback(result)
+  end
+
+  if MultiBot.OnBridgeQuestAbandonResult then
+    MultiBot.OnBridgeQuestAbandonResult(result)
+  end
+
+  return true
+end
+
+function Comm.IsQuestAbandonCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.questAbandonCapable == true
+end
+
+function Comm.RunQuestAbandon(questId, callback)
+  local state = ensureBridgeState()
+  questId = tonumber(questId or 0) or 0
+
+  if not state.connected or state.questAbandonCapable ~= true then
+    return false
+  end
+  if questId <= 0 or questId > 4294967295 or math.floor(questId) ~= questId then
+    return false
+  end
+  if countTableEntries(state.questAbandonCommands) >= 8 then
+    state.lastError = "QUEST_ABANDON_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  state.questAbandonSeq = (tonumber(state.questAbandonSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-quest-abandon-" .. tostring(state.questAbandonSeq)
+  state.questAbandonCommands[token] = {
+    questId = questId,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("RUN", "QUEST_ABANDON~" .. token .. "~" .. tostring(questId)) then
+    state.questAbandonCommands[token] = nil
+    return false
+  end
+
+  safeDelay(QUEST_ABANDON_TIMEOUT_SECONDS, function()
+    local bridgeState = ensureBridgeState()
+    if not bridgeState.questAbandonCommands[token] then
+      return
+    end
+
+    bridgeState.lastError = "QUEST_ABANDON_TIMEOUT"
+    finishQuestAbandonCommand(token, {
+      status = "error",
+      reason = "TIMEOUT",
+      matched = 0,
+      abandoned = 0,
+      questId = questId,
+    })
+  end)
+
+  return token
+end
+
+local function handleQuestAbandonResponse(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 6 then
+    state.lastError = "QUEST_ABANDON_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local questId = parseBoundedInteger(fields[2], 1, 4294967295)
+  local status = string.upper(trim(fields[3]))
+  local reason = urlDecodeFieldStrict(fields[4], 64, false)
+  local matched = parseBoundedInteger(fields[5], 0, 128)
+  local abandoned = parseBoundedInteger(fields[6], 0, 128)
+  local pending = state.questAbandonCommands[token]
+
+  if not isValidStateToken(token)
+      or questId == nil
+      or (status ~= "OK" and status ~= "ERR")
+      or reason == nil
+      or matched == nil
+      or abandoned == nil
+      or abandoned > matched
+      or type(pending) ~= "table"
+      or pending.questId ~= questId then
+    state.lastError = "QUEST_ABANDON_BAD_RESPONSE"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("QUEST_ABANDON_" .. reason)
+  finishQuestAbandonCommand(token, {
+    status = status == "OK" and "ok" or "error",
+    reason = reason,
+    matched = matched,
+    abandoned = abandoned,
+    questId = questId,
+  })
+  return true
+end
+-- MB_QUEST_ABANDON_V1_END
 local function finishGroupRollCommand(token, result)
   local state = ensureBridgeState()
   local pending = state.groupRollCommands[token]
@@ -3437,6 +3559,22 @@ function Comm.MarkDisconnected(reason)
   state.bankActive = nil
   state.guildBankActive = nil
   state.inventoryItemActions = {}
+
+  local pendingQuestAbandonTokens = {}
+  for token in pairs(state.questAbandonCommands or {}) do
+    pendingQuestAbandonTokens[#pendingQuestAbandonTokens + 1] = token
+  end
+  for _, token in ipairs(pendingQuestAbandonTokens) do
+    local pending = state.questAbandonCommands[token]
+    finishQuestAbandonCommand(token, {
+      status = "error",
+      reason = "DISCONNECTED",
+      matched = 0,
+      abandoned = 0,
+      questId = pending and pending.questId or 0,
+    })
+  end
+  state.questAbandonCommands = {}
 
   local pendingRollTokens = {}
   for token in pairs(state.groupRollCommands or {}) do
@@ -5795,6 +5933,7 @@ end
 -- another large branch directly inside Comm.HandleAddonMessage.
 local STRUCTURED_OPCODE_HANDLERS = {
   INVENTORY_ITEM_TRADE = handleInventoryItemTradeResponse,
+  QUEST_ABANDON_RESULT = handleQuestAbandonResponse,
 }
 
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
@@ -8006,6 +8145,7 @@ state.selfActionCapable = false
   state.inventoryOpenCapable = false
   state.groupRollCapable = false
   state.enchantTradeCapable = false
+  state.questAbandonCapable = false
   state.selfBotCapable = false
   state.strategyMutationCommands = {}
   state.details = {}

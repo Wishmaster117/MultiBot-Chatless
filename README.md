@@ -107,6 +107,8 @@ RUN~CRAFT_RECIPE
 RUN~ITEM_ACTION
 RUN~ITEM_EQUIP
 RUN~ITEM_UNEQUIP
+RUN~ITEM_TRADE
+RUN~QUEST_ABANDON
 RUN~OUTFIT
 RUN~RTI
 RUN~COMBAT
@@ -145,6 +147,7 @@ INVENTORY_EXACT_V1
 ITEM_MOVE_V1
 ITEM_EQUIP_V1
 ITEM_UNEQUIP_V1
+ITEM_TRADE_V1
 ITEM_USE_V1
 ITEM_SELL_SINGLE_V1
 VENDOR_BUYBACK_V1
@@ -152,6 +155,7 @@ INVENTORY_BULK_SELL_V1
 INVENTORY_OPEN_V1
 GROUP_ROLL_V1
 ENCHANT_TRADE_V1
+QUEST_ABANDON_V1
 SELF_BOT_V1
 SELF_STRATEGY_V1
 SELF_ACTION_V1
@@ -161,7 +165,7 @@ SELF_ACTION_V1
 
 `STRATEGY_MUTATION_V1` provides structured `co/nc` mutations through `RUN~STRATEGY` and completion through `STRATEGY_ACK`. The bridge reports matched, succeeded and failed bot counts, while the addon applies explicit timeout and rejection diagnostics.
 
-`INVENTORY_V1` provides the established native inventory read/refresh path. `INVENTORY_EXACT_V1` complements it with exact physical topology for Backpack, Bag 1..4 and Keyring, including empty slots and per-container filtering in the inventory UI. `ITEM_MOVE_V1` adds server-authoritative whole-stack drag/drop between allowed physical slots. The addon keeps only synthetic drag state: it does not call `PickupContainerItem`, `PickupInventoryItem`, `GetCursorInfo` or `ClearCursor`, and it does not mutate the displayed inventory optimistically; an exact snapshot refresh follows the server result. Stack splitting remains outside this capability. `ITEM_EQUIP_V1` equips an exact item from Backpack or Bag 1..4 through a structured bridge request and waits for the authoritative result before refreshing. `ITEM_UNEQUIP_V1` routes Inspect right-click through the exact equipment slot plus item ID, converts client Inspect slots 1..19 to Core slots 0..18, waits for the structured result and then refreshes. The historical `ue` whisper fallback is used only when `MultiBot.allowLegacyChatFallback == true`; normal bridge-first configuration keeps that fallback disabled. `ITEM_USE_V1` uses the exact physical source, waits for the structured `INVENTORY_ITEM_USE` result and delegates execution to the native use-item path. `ITEM_DESTROY` is a specialized exact-item destruction path with server-side source revalidation and an authoritative result. `ITEM_SELL_SINGLE_V1` validates the exact source and nearby vendor before native single-item sale and returns `INVENTORY_ITEM_SELL`. `VENDOR_BUYBACK_V1` exposes a structured Buyback list/result flow and uses the native Buyback handler before authoritative inventory/list refreshes. `INVENTORY_BULK_SELL_V1` and `INVENTORY_OPEN_V1` gate the current bulk-sell and `OPEN_ITEMS` bridge paths. `GROUP_ROLL_V1` gates the group Roll workflow; normal rolls and item-linked rolls are tokenized and completed through a structured `GROUP_ROLL_ACK`. `ENCHANT_TRADE_V1` gates the Enchanting Trade Service: the addon lists only known Enchanting spells exposed by the bot, uses the native WoW Trade window and the non-traded item slot, then requests one validated numeric spell ID through the bridge.
+`INVENTORY_V1` provides the established native inventory read/refresh path. `INVENTORY_EXACT_V1` complements it with exact physical topology for Backpack, Bag 1..4 and Keyring, including empty slots and per-container filtering in the inventory UI. `ITEM_MOVE_V1` adds server-authoritative whole-stack drag/drop between allowed physical slots. The addon keeps only synthetic drag state: it does not call `PickupContainerItem`, `PickupInventoryItem`, `GetCursorInfo` or `ClearCursor`, and it does not mutate the displayed inventory optimistically; an exact snapshot refresh follows the server result. Stack splitting remains outside this capability. `ITEM_EQUIP_V1` equips an exact item from Backpack or Bag 1..4 through a structured bridge request and waits for the authoritative result before refreshing. `ITEM_UNEQUIP_V1` routes Inspect right-click through the exact equipment slot plus item ID, converts client Inspect slots 1..19 to Core slots 0..18, waits for the structured result and then refreshes. `ITEM_TRADE_V1` routes Inventory -> Trade through an exact source identity, preserves the native WoW Trade UI, waits for the structured `INVENTORY_ITEM_TRADE` result and keeps the historical give path behind the explicit compatibility fallback flag. The historical `ue` whisper fallback is used only when `MultiBot.allowLegacyChatFallback == true`; normal bridge-first configuration keeps that fallback disabled. `ITEM_USE_V1` uses the exact physical source, waits for the structured `INVENTORY_ITEM_USE` result and delegates execution to the native use-item path. `ITEM_DESTROY` is a specialized exact-item destruction path with server-side source revalidation and an authoritative result. `ITEM_SELL_SINGLE_V1` validates the exact source and nearby vendor before native single-item sale and returns `INVENTORY_ITEM_SELL`. `VENDOR_BUYBACK_V1` exposes a structured Buyback list/result flow and uses the native Buyback handler before authoritative inventory/list refreshes. `INVENTORY_BULK_SELL_V1` and `INVENTORY_OPEN_V1` gate the current bulk-sell and `OPEN_ITEMS` bridge paths. `GROUP_ROLL_V1` gates the group Roll workflow; normal rolls and item-linked rolls are tokenized and completed through a structured `GROUP_ROLL_ACK`. `ENCHANT_TRADE_V1` gates the Enchanting Trade Service: the addon lists only known Enchanting spells exposed by the bot, uses the native WoW Trade window and the non-traded item slot, then requests one validated numeric spell ID through the bridge. `QUEST_ABANDON_V1` routes bot quest abandon through a tokenized structured request/result; the player still abandons locally with the native WoW quest API, while the legacy `drop` group-chat fallback is available only when `MultiBot.allowLegacyChatFallback == true`. Quest sharing remains intentionally native through `QuestLogPushQuest()` and does not require a `QUEST_SHARE_V1` bridge capability.
 
 `SELF_BOT_V1` controls the player's own SelfBot mode with explicit ENABLE/DISABLE requests and authoritative state/result replies. `SELF_STRATEGY_V1` reads and mutates only the active SelfBot's whitelisted combat/non-combat strategies through framed state plus `SELF_STRATEGY_ACK`; it is not a generic strategy executor. `SELF_ACTION_V1` exposes only the audited SelfBot actions `AUTOGEAR`, `MAINTENANCE` and `WAIT_ATTACK_TIME`, with server-side SelfBot/security/rate-limit checks. These SelfBot paths are a separate completed workstream inherited by the Jellypowered v2 branch; normal-bot Maintenance/Autogear paths that still use legacy chat are not implicitly migrated by these capabilities.
 
@@ -606,6 +610,7 @@ Implemented bridge-first / chatless areas:
 - Whole-stack inventory drag/drop through `ITEM_MOVE_V1`, with synthetic addon drag state, no native player cursor APIs, no optimistic inventory mutation and an exact snapshot refresh after the structured server result. Stack splitting remains out of scope.
 - Exact inventory equip through `ITEM_EQUIP_V1`, with source identity revalidation, authoritative result handling and no optimistic UI mutation.
 - Exact Inspect unequip through `ITEM_UNEQUIP_V1`, with exact equipment slot/item identity and legacy `ue` fallback disabled unless explicitly enabled.
+- Generic exact-item Trade through `ITEM_TRADE_V1`, with exact source identity, native WoW Trade UI preservation, native AzerothCore trade handling, structured `INVENTORY_ITEM_TRADE` completion and legacy give fallback only when compatibility fallback is explicitly enabled. Runtime validation passed in both trade directions.
 - Exact item use through `ITEM_USE_V1`, with native use-item execution, source revalidation, structured result handling and localized failure reasons.
 - Exact item destruction through the specialized `ITEM_DESTROY` path with server-side source revalidation.
 - Exact single-item vendor sale through `ITEM_SELL_SINGLE_V1`, with nearby-vendor validation, protected-item guards, replay/rate limiting and structured result handling.
@@ -625,6 +630,8 @@ Implemented bridge-first / chatless areas:
 - Outfits refresh and actions through the bridge.
 - Outfit equip/replace without detailed `Equipping [item] ...` chat spam.
 - Quest list refresh through the bridge.
+- Quest abandon through `QUEST_ABANDON_V1`: right-click keeps the player's native `SetAbandonQuest()` / `AbandonQuest()` path, sends a structured bot-abandon request through the bridge and emits no legacy `drop` chat in normal bridge-first configuration. Runtime validation with one controlled bot passed with zero chat spam and zero Lua errors; the mixed multi-bot scenario is explicitly deferred until suitable bots are available.
+- Quest sharing remains intentionally native/chatless through `QuestLogPushQuest()`; no `QUEST_SHARE_V1` endpoint is required for the current behavior.
 - Game object search results and copy frame through the bridge.
 - RTI controls through the bridge.
 - Pull Control frame through the bridge.
@@ -664,8 +671,9 @@ Known migration remaining:
 - Remaining direct `SendChatMessage` occurrences outside migrated paths still need to be classified as manual command, diagnostic fallback, information message, UI mechanism to migrate, compatibility fallback, or dead code.
 - Item enchanting is now **implemented and runtime validated** through the closed `ENCHANT_TRADE_V1` Trade Service; it does not expose a generic cast or arbitrary Playerbots command executor.
 - `ITEM_MOVE_V1` already covers whole-stack movement between allowed Backpack / Bag 1..4 / Keyring physical slots, including inter-container moves. A future `BAG_MOVE` item must therefore mean moving/re-equipping the **bag objects themselves** in equipped bag slots, not moving ordinary inventory items.
-- Generic exact-item Trade is **not** yet represented by an `ITEM_TRADE_V1` capability. The existing Inventory -> Trade UI still opens the native WoW Trade workflow/historical give path; `ENCHANT_TRADE_V1` remains a separate specialized service and must not be generalized accidentally.
-- The active Jellypowered v2 continuation should audit `ITEM_TRADE` first; equipped-bag reassignment remains lower priority. After the remaining Jellypowered batch, the normal roadmap resumes with item-specific loot-rule add/remove, the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
+- Generic exact-item Trade is now implemented and runtime validated through `ITEM_TRADE_V1`; it remains distinct from the specialized `ENCHANT_TRADE_V1` service and does not expose a generic command executor.
+- Quest abandon is now implemented through `QUEST_ABANDON_V1` and runtime validated with one bot. Quest sharing remains native through `QuestLogPushQuest()`. The mixed multi-bot Quest Abandon runtime scenario is deferred until suitable bots are available.
+- The active Jellypowered v2 continuation should audit `TALENT_APPLY` next; equipped-bag reassignment remains a low-priority residual. After the remaining Jellypowered batch, the normal roadmap resumes with item-specific loot-rule add/remove, the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
 - The project should be described as **bridge-first / mostly chatless**, not fully chatless, until these remaining paths are classified/migrated and the final runtime matrix is closed.
 
 Kept intentionally:
@@ -683,9 +691,11 @@ The current `jellypowered-chatless-integration-v2` line starts from the merged J
 
 Immediate Jellypowered v2 work:
 
-1. Audit/implement generic exact-item `ITEM_TRADE` without regressing the specialized `ENCHANT_TRADE_V1` service or exposing a generic command executor.
-2. Audit moving/re-equipping the **equipped bag objects themselves** only if the need remains; ordinary item moves between Backpack / Bag 1..4 / Keyring are already covered by `ITEM_MOVE_V1`.
-3. Audit `QUEST_ABANDON`, `QUEST_SHARE`, `TALENT_APPLY` and `CRAFT_RECIPE_TARGET` separately before any endpoint proposal.
+1. Audit `TALENT_APPLY` against the exact local Playerbots/AzerothCore APIs before any endpoint proposal; revalidate points, level, reset/cost, combat state and dual-spec behavior.
+2. Audit `CRAFT_RECIPE_TARGET` separately: profession, known recipe, materials, tools, exact target and Trade/runtime state must be revalidated.
+3. Compare bank / guild-bank / vendor and inventory-selection residuals only when an actual current defect or demonstrable improvement exists.
+
+Low-priority residual: moving/re-equipping the **equipped bag objects themselves** (`BAG_MOVE`) only if the need remains; ordinary item moves between Backpack / Bag 1..4 / Keyring are already covered by `ITEM_MOVE_V1`.
 
 Normal roadmap work queued after the remaining Jellypowered batch:
 

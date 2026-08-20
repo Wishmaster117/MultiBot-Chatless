@@ -75,11 +75,22 @@ local function handleQuestClick(questID, button)
             SelectQuestLogEntry(questIndex)
 
             if button == "RightButton" then
-                if GetNumRaidMembers() > 0 then
-                    SendChatMessage("drop " .. questLink, "RAID")
-                elseif GetNumPartyMembers() > 0 then
-                    SendChatMessage("drop " .. questLink, "PARTY")
+                local bridgeHandled = false
+                if MultiBot.Comm
+                    and MultiBot.Comm.IsQuestAbandonCapable
+                    and MultiBot.Comm.IsQuestAbandonCapable()
+                    and MultiBot.Comm.RunQuestAbandon then
+                    bridgeHandled = MultiBot.Comm.RunQuestAbandon(questID) and true or false
                 end
+
+                if not bridgeHandled and MultiBot.allowLegacyChatFallback == true then
+                    if GetNumRaidMembers() > 0 then
+                        SendChatMessage("drop " .. questLink, "RAID")
+                    elseif GetNumPartyMembers() > 0 then
+                        SendChatMessage("drop " .. questLink, "PARTY")
+                    end
+                end
+
                 SetAbandonQuest()
                 AbandonQuest()
             else

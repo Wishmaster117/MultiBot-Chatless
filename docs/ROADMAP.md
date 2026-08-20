@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
 Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 20 août 2026 après les merges Jellypowered et SelfBot et la création des nouvelles branches `jellypowered-chatless-integration-v2`.
-Dernière mise à jour : 20/08/2026 — l'ancien lot Jellypowered est déjà mergé dans `main` dans les deux dépôts ; les nouvelles branches v2 partent des `main` incluant également le chantier SelfBot séparé. `ITEM_MOVE_V1` couvre déjà les déplacements de piles entières entre Backpack / sacs 1..4 / Keyring, y compris inter-conteneurs. Le résiduel `BAG_MOVE` désigne uniquement le déplacement/rééquipement des **sacs eux-mêmes** dans les emplacements de sacs équipés. Aucun `ITEM_TRADE_V1` générique n'est présent : ce point devient le premier sous-chantier Jellypowered recommandé.
+Dernière mise à jour : 20/08/2026 — l'ancien lot Jellypowered est déjà mergé dans `main` dans les deux dépôts ; les nouvelles branches v2 partent des `main` incluant également le chantier SelfBot séparé. `ITEM_MOVE_V1` couvre déjà les déplacements de piles entières entre Backpack / sacs 1..4 / Keyring, y compris inter-conteneurs. Le résiduel `BAG_MOVE` désigne uniquement le déplacement/rééquipement des **sacs eux-mêmes** dans les emplacements de sacs équipés. `ITEM_TRADE_V1` est maintenant implémenté et validé en jeu dans les deux sens. `QUEST_ABANDON_V1` est implémenté, compilé et validé avec un bot sans spam chat ni erreur Lua ; le scénario mixte multi-bots reste différé faute de bots disponibles. `QUEST_SHARE` reste volontairement natif/chatless via `QuestLogPushQuest()`. Le prochain sous-chantier Jellypowered actif devient `TALENT_APPLY`.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -152,15 +152,22 @@ La branche `Extended` est divergente et ne doit pas être mergée en bloc. Chaqu
    - les emplacements d'équipement des sacs ne font pas partie de la whitelist actuelle `ITEM_MOVE_V1` et ne doivent pas être ajoutés sans audit dédié ;
    - ne jamais présenter ce point comme un déplacement générique des objets d'inventaire.
 
-7. **Échange générique d'un item précis — À ADAPTER / PREMIER SOUS-CHANTIER JELLYPOWERED RECOMMANDÉ**
-   - aucun `ITEM_TRADE_V1` / `RUN~ITEM_TRADE` structuré n'est présent au baseline audité ;
-   - l'UI Inventory -> Trade existante ouvre le Trade WoW natif et conserve le workflow historique de don/échange ; la suppression du dump `=== Inventory ===` ne transforme pas ce chemin en endpoint chatless générique ;
-   - `ENCHANT_TRADE_V1` est un service spécialisé déjà validé et ne doit pas être généralisé ou régressé ;
-   - étudier un item exact avec quantité et emplacement exact, puis revalider partenaire, distance, Trade actif, propriété et contrôle du bot.
+7. **Échange générique d'un item précis — TERMINÉ / VALIDÉ EN JEU — `ITEM_TRADE_V1`**
+   - l'UI Inventory -> Trade utilise désormais un endpoint structuré bridge-first avec identité de source exacte et résultat `INVENTORY_ITEM_TRADE` ;
+   - le workflow natif WoW Trade est préservé et le Bridge emprunte le handler AzerothCore natif pour placer l'item exact dans le Trade ;
+   - le fallback historique de don/échange reste derrière `MultiBot.allowLegacyChatFallback == true` et n'est pas utilisé en configuration bridge-first normale ;
+   - `ENCHANT_TRADE_V1` reste un service spécialisé distinct et n'a pas été généralisé ;
+   - validation runtime du 20/08/2026 : Trade natif validé dans les deux sens, aucune régression de l'UI Trade et aucun exécuteur générique de commande Playerbots.
 
-8. **Abandon et partage de quête — À ADAPTER**
-   - endpoints `QUEST_ABANDON` et `QUEST_SHARE` ;
-   - valider présence de la quête, partageabilité, groupe, cible et état du bot.
+8. **Abandon et partage de quête — TERMINÉ POUR LE BESOIN ACTUEL**
+   - `QUEST_ABANDON_V1` utilise `RUN~QUEST_ABANDON~token~questId` et un résultat structuré `QUEST_ABANDON_RESULT` ;
+   - le Bridge limite l'exécution aux bots visibles du requester appartenant au même groupe, revalide la sécurité Playerbots, la session/l'état monde et recherche la quête dans les slots bornés `0..MAX_QUEST_LOG_SIZE-1` ;
+   - l'abandon bot passe par `WorldPackets::Quest::QuestLogRemoveQuest`, `Read()` puis `WorldSession::HandleQuestLogRemoveQuest`, avec vérification de postcondition ;
+   - protections : **4 requêtes / 2 s / requester**, TTL anti-rejeu **10 s**, **32** tokens récents maximum et **512** états requester maximum ;
+   - côté Addon, le joueur conserve l'abandon WoW natif `SetAbandonQuest()` / `AbandonQuest()` ; le fallback historique `drop <quest>` n'est disponible que si `MultiBot.allowLegacyChatFallback == true` ;
+   - test runtime 1 bot du 20/08/2026 : joueur et bot abandonnent correctement, zéro chat/whisper parasite, zéro erreur Lua ;
+   - **test différé roadmap** — `DEFERRED_RUNTIME_TEST_NO_BOTS_AVAILABLE` : scénario avec plusieurs bots dont au moins un sans la quête, faute de bots disponibles au moment de la validation ;
+   - `QUEST_SHARE` est déjà natif/chatless via `QuestLogPushQuest()` : aucun endpoint `QUEST_SHARE_V1` n'est créé ni nécessaire pour le comportement actuel.
 
 9. **Application/reset de talents — À ADAPTER AVEC PRUDENCE**
    - endpoint `TALENT_APPLY` ;
@@ -544,6 +551,9 @@ Critère de sortie : version stabilisée, documentée et reproductible du projet
 - **Destruction d'un item exact** : `ITEM_DESTROY` validé via endpoint spécialisé.
 - **Vente unitaire exacte** : `ITEM_SELL_SINGLE_V1` validé avec source exacte, vendeur proche revalidé, protections des objets non vendables/protégés, rate limit/replay et absence de mutation optimiste.
 - **Rachat vendeur** : `VENDOR_BUYBACK_V1` validé avec liste structurée, vendeur proche revalidé, exécution via le handler natif de Buyback et rafraîchissements autoritatifs de l'inventaire et de la liste de rachat.
+- **Échange générique exact** : `ITEM_TRADE_V1` validé en jeu dans les deux sens, avec source exacte, Trade WoW natif préservé, résultat structuré et fallback historique explicitement conditionné.
+- **Abandon de quête** : `QUEST_ABANDON_V1` compilé et validé avec un bot, via le paquet Quest AzerothCore typé et le handler natif ; zéro spam chat et zéro erreur Lua. Le test multi-bots mixte reste différé faute de bots disponibles.
+- **Partage de quête** : déjà natif/chatless via `QuestLogPushQuest()` ; aucun endpoint Bridge additionnel n'est nécessaire.
 
 Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte** et n'introduisent aucun exécuteur générique de commande Playerbots.
 
@@ -575,16 +585,14 @@ Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte*
 
 ### Jellypowered restant à étudier
 
-Ordre recommandé après la synchronisation documentaire :
+Ordre recommandé après cette synchronisation documentaire :
 
-1. `ITEM_TRADE` — premier sous-chantier : item exact, quantité, partenaire, distance, Trade actif, propriété et contrôle du bot ; ne pas régresser `ENCHANT_TRADE_V1`.
-2. `BAG_MOVE` — uniquement déplacement/rééquipement des **sacs équipés eux-mêmes** ; priorité faible. Les déplacements d'items entre conteneurs sont déjà terminés via `ITEM_MOVE_V1`.
-3. `QUEST_ABANDON` — endpoint spécialisé uniquement.
-4. `QUEST_SHARE` — endpoint spécialisé uniquement.
-5. `TALENT_APPLY` — audit strict des API Playerbots locales, points, niveau, reset/coût, combat et dual spec avant toute proposition.
-6. `CRAFT_RECIPE_TARGET` — profession/recette/matériaux/outils/cible/Trade à revalider.
-7. Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
-8. Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
+1. `TALENT_APPLY` — **prochain sous-chantier actif** ; audit strict des API Playerbots/AzerothCore locales, points, niveau, reset/coût, combat et dual spec avant toute proposition.
+2. `CRAFT_RECIPE_TARGET` — profession/recette/matériaux/outils/cible/Trade à revalider.
+3. Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
+4. Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
+
+**Résiduel basse priorité, non bloquant :** `BAG_MOVE` concerne uniquement le déplacement/rééquipement des **sacs équipés eux-mêmes**. Les déplacements d'items entre Backpack / sacs 1..4 / Keyring sont déjà terminés via `ITEM_MOVE_V1`.
 
 ### Chantiers suspendus — inchangés
 
@@ -599,4 +607,4 @@ Ordre recommandé après la synchronisation documentaire :
 
 Le **prochain chantier normal** reste : **ajout/retrait d'items précis dans les règles de loot**.
 
-La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Après application et vérification de cette synchronisation documentaire, un commit documentaire séparé sera créé dans chaque dépôt avant de reprendre `ITEM_TRADE`. Aucune PR n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.
+La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire accompagne les commits Addon/Bridge de `ITEM_TRADE_V1` et `QUEST_ABANDON_V1`. Après commit/push de ces branches, le prochain sous-chantier Jellypowered actif est `TALENT_APPLY`. Aucune PR vers `main` n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.
