@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local zhCNValues = {
+  -- MB_TALENT_APPLY_I18N_V1_BEGIN
+  ["talent.apply.success"] = "已成功为 %s 应用天赋。",
+  ["talent.apply.failed"] = "为 %s 应用天赋失败（%s）。",
+  -- MB_TALENT_APPLY_I18N_V1_END
   -- MB_SELFACTION_I18N_V1_BEGIN
   ["selfaction.bridge_unavailable"] = "Bridge 不可用：SelfBot 操作未发送。",
   ["selfaction.failed"] = "SelfBot 操作失败：%s",

@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local enUSValues = {
+  -- MB_TALENT_APPLY_I18N_V1_BEGIN
+  ["talent.apply.success"] = "Talents applied successfully to %s.",
+  ["talent.apply.failed"] = "Failed to apply talents to %s (%s).",
+  -- MB_TALENT_APPLY_I18N_V1_END
   -- MB_SELFACTION_I18N_V1_BEGIN
   ["selfaction.bridge_unavailable"] = "The bridge is unavailable: the SelfBot action was not sent.",
   ["selfaction.failed"] = "SelfBot action failed: %s",

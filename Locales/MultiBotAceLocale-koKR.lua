@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local koKRValues = {
+  -- MB_TALENT_APPLY_I18N_V1_BEGIN
+  ["talent.apply.success"] = "%s에게 특성이 성공적으로 적용되었습니다.",
+  ["talent.apply.failed"] = "%s에게 특성을 적용하지 못했습니다. (%s)",
+  -- MB_TALENT_APPLY_I18N_V1_END
   -- MB_SELFACTION_I18N_V1_BEGIN
   ["selfaction.bridge_unavailable"] = "브리지를 사용할 수 없어 SelfBot 동작을 보내지 못했습니다.",
   ["selfaction.failed"] = "SelfBot 동작 실패: %s",

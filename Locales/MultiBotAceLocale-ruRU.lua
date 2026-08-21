@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local ruRUValues = {
+  -- MB_TALENT_APPLY_I18N_V1_BEGIN
+  ["talent.apply.success"] = "Таланты успешно применены к %s.",
+  ["talent.apply.failed"] = "Не удалось применить таланты к %s (%s).",
+  -- MB_TALENT_APPLY_I18N_V1_END
   -- MB_SELFACTION_I18N_V1_BEGIN
   ["selfaction.bridge_unavailable"] = "Мост недоступен: действие SelfBot не было отправлено.",
   ["selfaction.failed"] = "Ошибка действия SelfBot: %s",

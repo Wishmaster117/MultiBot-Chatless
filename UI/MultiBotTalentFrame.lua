@@ -1039,8 +1039,50 @@ function MultiBot.InitializeTalentFrameModule()
 	return tValues
     end
 
+    local function showTalentApplyResult(result)
+        result = type(result) == "table" and result or {}
+        local botName = tostring(result.botName or "")
+        if result.status == "ok" then
+            if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                DEFAULT_CHAT_FRAME:AddMessage(string.format(MultiBot.L("talent.apply.success"), botName), 1, 1, 1)
+            end
+            return
+        end
+
+        if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+            DEFAULT_CHAT_FRAME:AddMessage(
+                string.format(MultiBot.L("talent.apply.failed"), botName, tostring(result.reason or "UNKNOWN")),
+                1, 0.2, 0.2
+            )
+        end
+    end
+
+    function MultiBot.talent.requestTalentApply(botName)
+        botName = type(botName) == "string" and botName or ""
+        local build = MultiBot.talent.buildTalentApplyValues()
+
+        if MultiBot.Comm and MultiBot.Comm.RunTalentApply then
+            local token = MultiBot.Comm.RunTalentApply(botName, build, showTalentApplyResult)
+            if token then
+                return true
+            end
+        end
+
+        if MultiBot.allowLegacyChatFallback == true then
+            SendChatMessage("talents apply " .. build, "WHISPER", nil, botName)
+            return true
+        end
+
+        showTalentApplyResult({
+            status = "error",
+            botName = botName,
+            reason = "BRIDGE_UNAVAILABLE",
+        })
+        return false
+    end
+
     function MultiBot.talent.applyCustomTalents()
-	SendChatMessage("talents apply " .. MultiBot.talent.buildTalentApplyValues(), "WHISPER", nil, MultiBot.talent.name)
+        return MultiBot.talent.requestTalentApply(MultiBot.talent.name)
     end
 
     function MultiBot.talent.copyCustomTalentsToTarget()
@@ -1053,7 +1095,7 @@ function MultiBot.InitializeTalentFrameModule()
 	local tUnit = MultiBot.toUnit(MultiBot.talent.name)
 	if(UnitLevel(tUnit) ~= UnitLevel("target")) then return SendChatMessage("The Levels do not match.", "SAY") end
 
-	SendChatMessage("talents apply " .. MultiBot.talent.buildTalentApplyValues(), "WHISPER", nil, tName)
+	return MultiBot.talent.requestTalentApply(tName)
     end
 
     -- Talent trees frame initialization in scoped blocks

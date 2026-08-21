@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local deDEValues = {
+  -- MB_TALENT_APPLY_I18N_V1_BEGIN
+  ["talent.apply.success"] = "Talente wurden erfolgreich auf %s angewendet.",
+  ["talent.apply.failed"] = "Talente konnten nicht auf %s angewendet werden (%s).",
+  -- MB_TALENT_APPLY_I18N_V1_END
   -- MB_SELFACTION_I18N_V1_BEGIN
   ["selfaction.bridge_unavailable"] = "Die Bridge ist nicht verfügbar: Die SelfBot-Aktion wurde nicht gesendet.",
   ["selfaction.failed"] = "SelfBot-Aktion fehlgeschlagen: %s",

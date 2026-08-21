@@ -29,6 +29,7 @@ local INVENTORY_OPEN_CAPABILITY = "INVENTORY_OPEN_V1"
 local GROUP_ROLL_CAPABILITY = "GROUP_ROLL_V1"
 local ENCHANT_TRADE_CAPABILITY = "ENCHANT_TRADE_V1"
 local QUEST_ABANDON_CAPABILITY = "QUEST_ABANDON_V1"
+local TALENT_APPLY_CAPABILITY = "TALENT_APPLY_V1"
 -- MB_LUA51_UPVALUE_REFACTOR_V1_BEGIN
 -- Keep capability-to-state mapping outside Comm.HandleAddonMessage so each
 -- capability does not consume a separate Lua 5.1 upvalue in that dispatcher.
@@ -53,6 +54,7 @@ local CAPABILITY_STATE_FIELDS = {
   [GROUP_ROLL_CAPABILITY] = "groupRollCapable",
   [ENCHANT_TRADE_CAPABILITY] = "enchantTradeCapable",
   [QUEST_ABANDON_CAPABILITY] = "questAbandonCapable",
+  [TALENT_APPLY_CAPABILITY] = "talentApplyCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
 -- MB_LUA51_UPVALUE_REFACTOR_V1_END
@@ -60,6 +62,7 @@ local SELF_BOT_TIMEOUT_SECONDS = 5.0
 local GROUP_ROLL_TIMEOUT_SECONDS = 5.0
 local ENCHANT_TRADE_TIMEOUT_SECONDS = 5.0
 local QUEST_ABANDON_TIMEOUT_SECONDS = 5.0
+local TALENT_APPLY_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_MOVE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_TRADE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_EQUIP_TIMEOUT_SECONDS = 5.0
@@ -325,6 +328,7 @@ local function ensureBridgeState()
   state.groupRollCapable = state.groupRollCapable or false
   state.enchantTradeCapable = state.enchantTradeCapable or false
   state.questAbandonCapable = state.questAbandonCapable or false
+  state.talentApplyCapable = state.talentApplyCapable or false
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -341,6 +345,8 @@ local function ensureBridgeState()
   state.groupRollCommands = state.groupRollCommands or {}
   state.questAbandonSeq = state.questAbandonSeq or 0
   state.questAbandonCommands = state.questAbandonCommands or {}
+  state.talentApplySeq = state.talentApplySeq or 0
+  state.talentApplyCommands = state.talentApplyCommands or {}
   state.strategyMutationSeq = state.strategyMutationSeq or 0
   state.strategyMutationCommands = state.strategyMutationCommands or {}
   state.selfStrategySeq = state.selfStrategySeq or 0
@@ -3200,6 +3206,139 @@ function Comm.RunProfessionRecipeCraft(name, skillId, spellId, itemId)
   return token
 end
 
+-- MB_TALENT_APPLY_V1_BEGIN
+local function finishTalentApplyCommand(token, result)
+  local state = ensureBridgeState()
+  local pending = state.talentApplyCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.talentApplyCommands[token] = nil
+  result = type(result) == "table" and result or {}
+  result.botName = result.botName or pending.botName
+  result.build = result.build or pending.build
+
+  if type(pending.callback) == "function" then
+    pending.callback(result)
+  end
+  return true
+end
+
+function Comm.IsTalentApplyCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.talentApplyCapable == true
+end
+
+function Comm.RunTalentApply(botName, build, callback)
+  local state = ensureBridgeState()
+  botName = trim(botName or "")
+  build = type(build) == "string" and build or ""
+
+  if not state.connected or state.talentApplyCapable ~= true then
+    state.lastError = "TALENT_APPLY_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+  if botName == "" or #botName > 64 then
+    state.lastError = "TALENT_APPLY_BAD_BOT"
+    return false
+  end
+  if #build == 0 or #build > 128 or not string.match(build, "^[0-5]+%-[0-5]+%-[0-5]+$") then
+    state.lastError = "TALENT_APPLY_BAD_BUILD"
+    return false
+  end
+  if countTableEntries(state.talentApplyCommands) >= 8 then
+    state.lastError = "TALENT_APPLY_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  state.talentApplySeq = (tonumber(state.talentApplySeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-talent-apply-" .. tostring(state.talentApplySeq)
+  state.talentApplyCommands[token] = {
+    botName = botName,
+    botNameKey = string.lower(botName),
+    build = build,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "TALENT_APPLY~" .. token .. "~" .. urlEncodeField(botName) .. "~" .. build
+  if not Comm.Send("RUN", payload) then
+    state.talentApplyCommands[token] = nil
+    state.lastError = "TALENT_APPLY_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(TALENT_APPLY_TIMEOUT_SECONDS, function()
+    local bridgeState = ensureBridgeState()
+    local pending = bridgeState.talentApplyCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    bridgeState.lastError = "TALENT_APPLY_TIMEOUT"
+    finishTalentApplyCommand(token, {
+      status = "error",
+      reason = "TIMEOUT",
+      botName = pending.botName,
+      build = pending.build,
+      treePoints = {0, 0, 0},
+    })
+  end)
+
+  return token
+end
+
+local function handleTalentApplyResponse(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 7 then
+    state.lastError = "TALENT_APPLY_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local botName = urlDecodeFieldStrict(fields[2], 64, false)
+  local status = string.upper(trim(fields[3]))
+  local reason = urlDecodeFieldStrict(fields[4], 64, false)
+  local tree0 = parseBoundedInteger(fields[5], 0, 255)
+  local tree1 = parseBoundedInteger(fields[6], 0, 255)
+  local tree2 = parseBoundedInteger(fields[7], 0, 255)
+  local pending = state.talentApplyCommands[token]
+
+  local valid = isValidStateToken(token)
+      and botName ~= nil
+      and (status == "OK" or status == "ERR")
+      and reason ~= nil
+      and tree0 ~= nil and tree1 ~= nil and tree2 ~= nil
+      and type(pending) == "table"
+      and string.lower(botName) == pending.botNameKey
+
+  if not valid then
+    state.lastError = "TALENT_APPLY_BAD_RESPONSE"
+    if type(pending) == "table" then
+      finishTalentApplyCommand(token, {
+        status = "error",
+        reason = "BAD_RESPONSE",
+        botName = pending.botName,
+        build = pending.build,
+        treePoints = {0, 0, 0},
+      })
+    end
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("TALENT_APPLY_" .. reason)
+  finishTalentApplyCommand(token, {
+    status = status == "OK" and "ok" or "error",
+    reason = reason,
+    botName = botName,
+    build = pending.build,
+    treePoints = {tree0, tree1, tree2},
+  })
+  return true
+end
+-- MB_TALENT_APPLY_V1_END
 -- MB_QUEST_ABANDON_V1_BEGIN
 local function finishQuestAbandonCommand(token, result)
   local state = ensureBridgeState()
@@ -3560,6 +3699,21 @@ function Comm.MarkDisconnected(reason)
   state.guildBankActive = nil
   state.inventoryItemActions = {}
 
+  local pendingTalentApplyTokens = {}
+  for token in pairs(state.talentApplyCommands or {}) do
+    pendingTalentApplyTokens[#pendingTalentApplyTokens + 1] = token
+  end
+  for _, token in ipairs(pendingTalentApplyTokens) do
+    local pending = state.talentApplyCommands[token]
+    finishTalentApplyCommand(token, {
+      status = "error",
+      reason = "DISCONNECTED",
+      botName = pending and pending.botName or "",
+      build = pending and pending.build or "",
+      treePoints = {0, 0, 0},
+    })
+  end
+  state.talentApplyCommands = {}
   local pendingQuestAbandonTokens = {}
   for token in pairs(state.questAbandonCommands or {}) do
     pendingQuestAbandonTokens[#pendingQuestAbandonTokens + 1] = token
@@ -5934,6 +6088,7 @@ end
 local STRUCTURED_OPCODE_HANDLERS = {
   INVENTORY_ITEM_TRADE = handleInventoryItemTradeResponse,
   QUEST_ABANDON_RESULT = handleQuestAbandonResponse,
+  TALENT_APPLY_RESULT = handleTalentApplyResponse,
 }
 
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
