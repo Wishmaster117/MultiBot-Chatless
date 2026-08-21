@@ -377,7 +377,7 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 		else
 			local tUnits = MultiBot.frames["MultiBar"].frames["Units"]
 			for key, value in pairs(MultiBot.index.actives) do
-				if(tUnits.buttons[value].name ~= UnitName("player")) then
+				if(tUnits.buttons[value] and tUnits.buttons[value].name ~= UnitName("player") and tUnits.frames[value]) then
 					tUnits.frames[value].getButton("Spellbook").setDisable()
 				end
 			end
