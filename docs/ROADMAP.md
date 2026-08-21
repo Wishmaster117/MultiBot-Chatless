@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
-Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 20 août 2026 après les merges Jellypowered et SelfBot et la création des nouvelles branches `jellypowered-chatless-integration-v2`.
-Dernière mise à jour : 20/08/2026 — l'ancien lot Jellypowered est déjà mergé dans `main` dans les deux dépôts ; les nouvelles branches v2 partent des `main` incluant également le chantier SelfBot séparé. `ITEM_MOVE_V1` couvre déjà les déplacements de piles entières entre Backpack / sacs 1..4 / Keyring, y compris inter-conteneurs. Le résiduel `BAG_MOVE` désigne uniquement le déplacement/rééquipement des **sacs eux-mêmes** dans les emplacements de sacs équipés. `ITEM_TRADE_V1` est maintenant implémenté et validé en jeu dans les deux sens. `QUEST_ABANDON_V1` est implémenté, compilé et validé avec un bot sans spam chat ni erreur Lua ; le scénario mixte multi-bots reste différé faute de bots disponibles. `QUEST_SHARE` reste volontairement natif/chatless via `QuestLogPushQuest()`. Le prochain sous-chantier Jellypowered actif devient `TALENT_APPLY`.
+Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 21 août 2026 après validation des migrations talents sur les branches `jellypowered-chatless-integration-v2`.
+Dernière mise à jour : 21/08/2026 — `TALENT_APPLY_V1` et `TALENT_SPEC_APPLY_V1` sont maintenant implémentés, compilés et validés en jeu avec résultats structurés autoritatifs, messages localisés et sans spam chat sur les chemins Bridge normaux. `TALENT_SPEC_APPLY_V1` couvre aussi le slot 2/dual spec et conserve le fallback historique uniquement sous `MultiBot.allowLegacyChatFallback == true`. `TODO.md` reste séparé et inchangé. Le prochain sous-chantier Jellypowered actif devient `CRAFT_RECIPE_TARGET`.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -554,6 +554,8 @@ Critère de sortie : version stabilisée, documentée et reproductible du projet
 - **Échange générique exact** : `ITEM_TRADE_V1` validé en jeu dans les deux sens, avec source exacte, Trade WoW natif préservé, résultat structuré et fallback historique explicitement conditionné.
 - **Abandon de quête** : `QUEST_ABANDON_V1` compilé et validé avec un bot, via le paquet Quest AzerothCore typé et le handler natif ; zéro spam chat et zéro erreur Lua. Le test multi-bots mixte reste différé faute de bots disponibles.
 - **Partage de quête** : déjà natif/chatless via `QuestLogPushQuest()` ; aucun endpoint Bridge additionnel n'est nécessaire.
+- **Application de talents personnalisés** : `TALENT_APPLY_V1` compilé et validé en jeu ; validation classe/DBC/points côté Bridge, réutilisation du chemin Playerbots audité, vérification serveur des trois arbres via `BuildTalentTabPoints`, reset des stratégies uniquement après succès et confirmation visuelle localisée côté Addon après `OK`.
+- **Sélecteur de spécialisations prémontées** : `TALENT_SPEC_APPLY_V1` compilé et validé en jeu en clic gauche/slot 1 et clic droit/slot 2. `TALENT_SPEC_CURRENT` fournit l'état courant sans whisper normal ; le Bridge revalide l'index du modèle, gère le dual spec, interrompt le cast, applique talents + glyphes, vérifie les totaux finaux et renvoie un résultat structuré. Les anciens `talents`, `talents spec list`, `stopcasting`, `talents switch` et `talents spec` ne restent que dans le fallback explicitement activé.
 
 Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte** et n'introduisent aucun exécuteur générique de commande Playerbots.
 
@@ -587,10 +589,11 @@ Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte*
 
 Ordre recommandé après cette synchronisation documentaire :
 
-1. `TALENT_APPLY` — **prochain sous-chantier actif** ; audit strict des API Playerbots/AzerothCore locales, points, niveau, reset/coût, combat et dual spec avant toute proposition.
-2. `CRAFT_RECIPE_TARGET` — profession/recette/matériaux/outils/cible/Trade à revalider.
-3. Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
-4. Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
+1. `CRAFT_RECIPE_TARGET` — **prochain sous-chantier actif** ; profession/recette/matériaux/outils/cible/Trade à revalider contre le code local avant toute proposition.
+2. Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
+3. Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
+
+`TALENT_APPLY_V1` et `TALENT_SPEC_APPLY_V1` ont quitté cette liste : les deux sont implémentés, compilés et validés en jeu sur la branche v2.
 
 **Résiduel basse priorité, non bloquant :** `BAG_MOVE` concerne uniquement le déplacement/rééquipement des **sacs équipés eux-mêmes**. Les déplacements d'items entre Backpack / sacs 1..4 / Keyring sont déjà terminés via `ITEM_MOVE_V1`.
 
@@ -607,4 +610,4 @@ Ordre recommandé après cette synchronisation documentaire :
 
 Le **prochain chantier normal** reste : **ajout/retrait d'items précis dans les règles de loot**.
 
-La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire accompagne les commits Addon/Bridge de `ITEM_TRADE_V1` et `QUEST_ABANDON_V1`. Après commit/push de ces branches, le prochain sous-chantier Jellypowered actif est `TALENT_APPLY`. Aucune PR vers `main` n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.
+La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire rattrape `TALENT_APPLY_V1` déjà commité/poussé et accompagne `TALENT_SPEC_APPLY_V1` maintenant compilé et validé en jeu. Le prochain sous-chantier Jellypowered actif est `CRAFT_RECIPE_TARGET`. Aucune PR vers `main` n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.

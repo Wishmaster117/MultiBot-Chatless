@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local ruRUValues = {
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
+  ["talent.spec.apply.success"] = "Специализация %s успешно применена к %s.",
+  ["talent.spec.apply.failed"] = "Не удалось применить специализацию %s к %s (%s).",
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_END
   -- MB_TALENT_APPLY_I18N_V1_BEGIN
   ["talent.apply.success"] = "Таланты успешно применены к %s.",
   ["talent.apply.failed"] = "Не удалось применить таланты к %s (%s).",

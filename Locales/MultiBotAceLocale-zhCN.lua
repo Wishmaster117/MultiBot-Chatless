@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local zhCNValues = {
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
+  ["talent.spec.apply.success"] = "已成功将天赋专精 %s 应用于 %s。",
+  ["talent.spec.apply.failed"] = "无法将天赋专精 %s 应用于 %s（%s）。",
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_END
   -- MB_TALENT_APPLY_I18N_V1_BEGIN
   ["talent.apply.success"] = "已成功为 %s 应用天赋。",
   ["talent.apply.failed"] = "为 %s 应用天赋失败（%s）。",

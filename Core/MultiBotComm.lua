@@ -30,6 +30,7 @@ local GROUP_ROLL_CAPABILITY = "GROUP_ROLL_V1"
 local ENCHANT_TRADE_CAPABILITY = "ENCHANT_TRADE_V1"
 local QUEST_ABANDON_CAPABILITY = "QUEST_ABANDON_V1"
 local TALENT_APPLY_CAPABILITY = "TALENT_APPLY_V1"
+local TALENT_SPEC_APPLY_CAPABILITY = "TALENT_SPEC_APPLY_V1"
 -- MB_LUA51_UPVALUE_REFACTOR_V1_BEGIN
 -- Keep capability-to-state mapping outside Comm.HandleAddonMessage so each
 -- capability does not consume a separate Lua 5.1 upvalue in that dispatcher.
@@ -55,6 +56,7 @@ local CAPABILITY_STATE_FIELDS = {
   [ENCHANT_TRADE_CAPABILITY] = "enchantTradeCapable",
   [QUEST_ABANDON_CAPABILITY] = "questAbandonCapable",
   [TALENT_APPLY_CAPABILITY] = "talentApplyCapable",
+  [TALENT_SPEC_APPLY_CAPABILITY] = "talentSpecApplyCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
 -- MB_LUA51_UPVALUE_REFACTOR_V1_END
@@ -63,6 +65,7 @@ local GROUP_ROLL_TIMEOUT_SECONDS = 5.0
 local ENCHANT_TRADE_TIMEOUT_SECONDS = 5.0
 local QUEST_ABANDON_TIMEOUT_SECONDS = 5.0
 local TALENT_APPLY_TIMEOUT_SECONDS = 5.0
+local TALENT_SPEC_APPLY_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_MOVE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_TRADE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_EQUIP_TIMEOUT_SECONDS = 5.0
@@ -329,6 +332,7 @@ local function ensureBridgeState()
   state.enchantTradeCapable = state.enchantTradeCapable or false
   state.questAbandonCapable = state.questAbandonCapable or false
   state.talentApplyCapable = state.talentApplyCapable or false
+  state.talentSpecApplyCapable = state.talentSpecApplyCapable or false
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -347,6 +351,8 @@ local function ensureBridgeState()
   state.questAbandonCommands = state.questAbandonCommands or {}
   state.talentApplySeq = state.talentApplySeq or 0
   state.talentApplyCommands = state.talentApplyCommands or {}
+  state.talentSpecApplySeq = state.talentSpecApplySeq or 0
+  state.talentSpecApplyCommands = state.talentSpecApplyCommands or {}
   state.strategyMutationSeq = state.strategyMutationSeq or 0
   state.strategyMutationCommands = state.strategyMutationCommands or {}
   state.selfStrategySeq = state.selfStrategySeq or 0
@@ -3339,7 +3345,161 @@ local function handleTalentApplyResponse(payload, state)
   return true
 end
 -- MB_TALENT_APPLY_V1_END
--- MB_QUEST_ABANDON_V1_BEGIN
+-- MB_TALENT_SPEC_APPLY_V1_BEGIN
+local function finishTalentSpecApplyCommand(token, result)
+  local state = ensureBridgeState()
+  local pending = state.talentSpecApplyCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.talentSpecApplyCommands[token] = nil
+  result = type(result) == "table" and result or {}
+  result.botName = result.botName or pending.botName
+  result.slot = result.slot or pending.slot
+  result.specIndex = result.specIndex or pending.specIndex
+  result.specName = result.specName or pending.specName
+
+  if type(pending.callback) == "function" then
+    pending.callback(result)
+  end
+  return true
+end
+
+function Comm.IsTalentSpecApplyCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.talentSpecApplyCapable == true
+end
+
+function Comm.RunTalentSpecApply(botName, slot, specIndex, specName, callback)
+  local state = ensureBridgeState()
+  botName = trim(botName or "")
+  slot = tonumber(slot or 0) or 0
+  specIndex = tonumber(specIndex or -1) or -1
+  specName = trim(specName or "")
+
+  if not state.connected or state.talentSpecApplyCapable ~= true then
+    state.lastError = "TALENT_SPEC_APPLY_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+  if botName == "" or #botName > 64 then
+    state.lastError = "TALENT_SPEC_APPLY_BAD_BOT"
+    return false
+  end
+  if slot ~= 1 and slot ~= 2 then
+    state.lastError = "TALENT_SPEC_APPLY_BAD_SLOT"
+    return false
+  end
+  if specIndex < 0 or specIndex > 30 or math.floor(specIndex) ~= specIndex then
+    state.lastError = "TALENT_SPEC_APPLY_BAD_SPEC"
+    return false
+  end
+  if countTableEntries(state.talentSpecApplyCommands) >= 8 then
+    state.lastError = "TALENT_SPEC_APPLY_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  state.talentSpecApplySeq = (tonumber(state.talentSpecApplySeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-talent-spec-apply-" .. tostring(state.talentSpecApplySeq)
+  state.talentSpecApplyCommands[token] = {
+    botName = botName,
+    botNameKey = string.lower(botName),
+    slot = slot,
+    specIndex = specIndex,
+    specName = specName,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "TALENT_SPEC_APPLY~" .. token .. "~" .. urlEncodeField(botName) .. "~" .. slot .. "~" .. specIndex
+  if not Comm.Send("RUN", payload) then
+    state.talentSpecApplyCommands[token] = nil
+    state.lastError = "TALENT_SPEC_APPLY_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(TALENT_SPEC_APPLY_TIMEOUT_SECONDS, function()
+    local bridgeState = ensureBridgeState()
+    local pending = bridgeState.talentSpecApplyCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    bridgeState.lastError = "TALENT_SPEC_APPLY_TIMEOUT"
+    finishTalentSpecApplyCommand(token, {
+      status = "error",
+      reason = "TIMEOUT",
+      botName = pending.botName,
+      slot = pending.slot,
+      specIndex = pending.specIndex,
+      specName = pending.specName,
+      treePoints = {0, 0, 0},
+    })
+  end)
+
+  return token
+end
+
+local function handleTalentSpecApplyResponse(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 9 then
+    state.lastError = "TALENT_SPEC_APPLY_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local botName = urlDecodeFieldStrict(fields[2], 64, false)
+  local status = string.upper(trim(fields[3]))
+  local reason = urlDecodeFieldStrict(fields[4], 64, false)
+  local slot = parseBoundedInteger(fields[5], 1, 2)
+  local specIndex = parseBoundedInteger(fields[6], 0, 30)
+  local tree0 = parseBoundedInteger(fields[7], 0, 255)
+  local tree1 = parseBoundedInteger(fields[8], 0, 255)
+  local tree2 = parseBoundedInteger(fields[9], 0, 255)
+  local pending = state.talentSpecApplyCommands[token]
+
+  local valid = isValidStateToken(token)
+      and botName ~= nil
+      and (status == "OK" or status == "ERR")
+      and reason ~= nil
+      and slot ~= nil and specIndex ~= nil
+      and tree0 ~= nil and tree1 ~= nil and tree2 ~= nil
+      and type(pending) == "table"
+      and string.lower(botName) == pending.botNameKey
+      and slot == pending.slot
+      and specIndex == pending.specIndex
+
+  if not valid then
+    state.lastError = "TALENT_SPEC_APPLY_BAD_RESPONSE"
+    if type(pending) == "table" then
+      finishTalentSpecApplyCommand(token, {
+        status = "error",
+        reason = "BAD_RESPONSE",
+        botName = pending.botName,
+        slot = pending.slot,
+        specIndex = pending.specIndex,
+        specName = pending.specName,
+        treePoints = {0, 0, 0},
+      })
+    end
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("TALENT_SPEC_APPLY_" .. reason)
+  finishTalentSpecApplyCommand(token, {
+    status = status == "OK" and "ok" or "error",
+    reason = reason,
+    botName = botName,
+    slot = slot,
+    specIndex = specIndex,
+    specName = pending.specName,
+    treePoints = {tree0, tree1, tree2},
+  })
+  return true
+end
+-- MB_TALENT_SPEC_APPLY_V1_END-- MB_QUEST_ABANDON_V1_BEGIN
+
 local function finishQuestAbandonCommand(token, result)
   local state = ensureBridgeState()
   local pending = state.questAbandonCommands[token]
@@ -4724,7 +4884,38 @@ function Comm.ApplyTalentSpecBeginPayload(payload)
   return true
 end
 
+local function handleTalentSpecCurrentResponse(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 6 then
+    state.lastError = "TALENT_SPEC_CURRENT_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local botName = urlDecodeFieldStrict(fields[1], 64, false)
+  local token = trim(fields[2])
+  local slot = parseBoundedInteger(fields[3], 1, 2)
+  local tree0 = parseBoundedInteger(fields[4], 0, 255)
+  local tree1 = parseBoundedInteger(fields[5], 0, 255)
+  local tree2 = parseBoundedInteger(fields[6], 0, 255)
+
+  if not botName or not isValidStateToken(token) or not slot
+      or tree0 == nil or tree1 == nil or tree2 == nil
+      or not getActiveTalentSpecRequest(botName, token) then
+    state.lastError = "TALENT_SPEC_CURRENT_BAD_RESPONSE"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = nil
+  if MultiBot.ApplyBridgeTalentSpecCurrent then
+    MultiBot.ApplyBridgeTalentSpecCurrent(botName, token, slot, tree0, tree1, tree2)
+  end
+
+  debugPrint("ADDON:RX", "TALENT_SPEC_CURRENT", botName, slot, tree0, tree1, tree2)
+  return true
+end
 function Comm.ApplyTalentSpecItemPayload(payload)
+
   local botName, rest = splitOnce(payload or "", "~")
   local token, rest2 = splitOnce(rest or "", "~")
   local index, rest3 = splitOnce(rest2 or "", "~")
@@ -6089,6 +6280,8 @@ local STRUCTURED_OPCODE_HANDLERS = {
   INVENTORY_ITEM_TRADE = handleInventoryItemTradeResponse,
   QUEST_ABANDON_RESULT = handleQuestAbandonResponse,
   TALENT_APPLY_RESULT = handleTalentApplyResponse,
+  TALENT_SPEC_CURRENT = handleTalentSpecCurrentResponse,
+  TALENT_SPEC_APPLY_RESULT = handleTalentSpecApplyResponse,
 }
 
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)

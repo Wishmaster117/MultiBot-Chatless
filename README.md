@@ -243,8 +243,12 @@ The endpoint and safe Firestone/Spellstone switching code are present, but the p
     <td><strong>Bridge-first</strong></td>
   </tr>
   <tr>
-    <td>Talent spec lists</td>
-    <td><strong>Bridge-first</strong> template listing without automatic <code>talents spec list</code> chat spam</td>
+    <td>Talent spec templates</td>
+    <td><strong>Bridge-first and runtime validated</strong> — <code>GET~TALENT_SPEC_LIST</code> lists server-side premade templates; <code>TALENT_SPEC_CURRENT</code> returns the authoritative active slot/tree totals, and <code>TALENT_SPEC_APPLY_V1</code> applies a server-revalidated template index to slot 1 or 2 with dual-spec handling, glyph initialization and structured verification without normal chat commands</td>
+  </tr>
+  <tr>
+    <td>Custom talent apply</td>
+    <td><strong>Bridge-first and runtime validated</strong> — <code>TALENT_APPLY_V1</code> validates the complete custom talent build against the bot class/DBC/available points, applies it through the audited Playerbots factory path and confirms success only after authoritative tree-point verification</td>
   </tr>
   <tr>
     <td>Inventory</td>
@@ -666,14 +670,25 @@ Validated development milestones on the current line:
 - Group Roll runtime validation on 2026-08-14: normal roll, item roll, eligibility, no chat spam, duplicate protection, invalid/empty item rejection and pending cleanup all validated.
 - Enchanting Trade Service runtime validation on 2026-08-14: enchanter-only button, list/search/tooltips, localized 440 px frame, normal WoW Trade flow and real item enchant application all validated with no automatic chat executor.
 
+<!-- MULTIBOT_TALENT_PROGRESS_SYNC_2026-08-21 -->
+## Talent migration progress — 2026-08-21
+
+- `TALENT_APPLY_V1` is implemented, compiled and runtime validated for the editable **Custom Talents** flow. The Bridge validates the complete build, reuses the audited Playerbots parse/apply path, verifies the resulting three talent-tree totals with `BuildTalentTabPoints`, resets strategies only after successful verification, and the Addon displays localized success only after the structured server `OK`.
+- `TALENT_SPEC_APPLY_V1` is implemented, compiled and runtime validated for the EveryBar premade specialization selector. `TALENT_SPEC_CURRENT` replaces the normal current-spec whisper, left-click applies slot 1, right-click applies slot 2 including dual-spec creation/validation where eligible, the server reproduces cast interruption, revalidates the premade spec index, applies talents, resets `custom_glyphs`, runs `InitGlyphs(false)`, verifies final tree totals and returns one structured result.
+- Normal Bridge operation no longer needs `talents`, `talents spec list`, `stopcasting`, `talents switch <slot>` or `talents spec <name>` for these selector flows. The historical chat path remains available only when `MultiBot.allowLegacyChatFallback == true`.
+- Both talent success/failure messages are localized in the 8 currently loaded locales; successful operations are shown in white only after authoritative server confirmation.
+- `mod-playerbots` remains strictly read-only and no generic Playerbots command executor was introduced.
+
+The next active Jellypowered v2 subtask is `CRAFT_RECIPE_TARGET`.
 Known migration remaining:
+
 
 - Remaining direct `SendChatMessage` occurrences outside migrated paths still need to be classified as manual command, diagnostic fallback, information message, UI mechanism to migrate, compatibility fallback, or dead code.
 - Item enchanting is now **implemented and runtime validated** through the closed `ENCHANT_TRADE_V1` Trade Service; it does not expose a generic cast or arbitrary Playerbots command executor.
 - `ITEM_MOVE_V1` already covers whole-stack movement between allowed Backpack / Bag 1..4 / Keyring physical slots, including inter-container moves. A future `BAG_MOVE` item must therefore mean moving/re-equipping the **bag objects themselves** in equipped bag slots, not moving ordinary inventory items.
 - Generic exact-item Trade is now implemented and runtime validated through `ITEM_TRADE_V1`; it remains distinct from the specialized `ENCHANT_TRADE_V1` service and does not expose a generic command executor.
 - Quest abandon is now implemented through `QUEST_ABANDON_V1` and runtime validated with one bot. Quest sharing remains native through `QuestLogPushQuest()`. The mixed multi-bot Quest Abandon runtime scenario is deferred until suitable bots are available.
-- The active Jellypowered v2 continuation should audit `TALENT_APPLY` next; equipped-bag reassignment remains a low-priority residual. After the remaining Jellypowered batch, the normal roadmap resumes with item-specific loot-rule add/remove, the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
+- `TALENT_APPLY_V1` and `TALENT_SPEC_APPLY_V1` are complete and runtime validated. The active Jellypowered v2 continuation is now `CRAFT_RECIPE_TARGET`; equipped-bag reassignment remains a low-priority residual. After the remaining Jellypowered batch, the normal roadmap resumes with item-specific loot-rule add/remove, the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
 - The project should be described as **bridge-first / mostly chatless**, not fully chatless, until these remaining paths are classified/migrated and the final runtime matrix is closed.
 
 Kept intentionally:
@@ -691,9 +706,10 @@ The current `jellypowered-chatless-integration-v2` line starts from the merged J
 
 Immediate Jellypowered v2 work:
 
-1. Audit `TALENT_APPLY` against the exact local Playerbots/AzerothCore APIs before any endpoint proposal; revalidate points, level, reset/cost, combat state and dual-spec behavior.
-2. Audit `CRAFT_RECIPE_TARGET` separately: profession, known recipe, materials, tools, exact target and Trade/runtime state must be revalidated.
-3. Compare bank / guild-bank / vendor and inventory-selection residuals only when an actual current defect or demonstrable improvement exists.
+1. Audit `CRAFT_RECIPE_TARGET` separately: profession, known recipe, materials, tools, exact target and Trade/runtime state must be revalidated.
+2. Compare bank / guild-bank / vendor and inventory-selection residuals only when an actual current defect or demonstrable improvement exists.
+
+Completed on the current v2 line before this next step: `TALENT_APPLY_V1` and `TALENT_SPEC_APPLY_V1`, both compiled and runtime validated with server-authoritative structured results.
 
 Low-priority residual: moving/re-equipping the **equipped bag objects themselves** (`BAG_MOVE`) only if the need remains; ordinary item moves between Backpack / Bag 1..4 / Keyring are already covered by `ITEM_MOVE_V1`.
 

@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local esESValues = {
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
+  ["talent.spec.apply.success"] = "Especialización %s aplicada correctamente a %s.",
+  ["talent.spec.apply.failed"] = "No se pudo aplicar la especialización %s a %s (%s).",
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_END
   -- MB_TALENT_APPLY_I18N_V1_BEGIN
   ["talent.apply.success"] = "Talentos aplicados correctamente a %s.",
   ["talent.apply.failed"] = "No se pudieron aplicar los talentos a %s (%s).",

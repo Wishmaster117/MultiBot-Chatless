@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local koKRValues = {
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
+  ["talent.spec.apply.success"] = "%s 특성이 %s에게 성공적으로 적용되었습니다.",
+  ["talent.spec.apply.failed"] = "%s 특성을 %s에게 적용하지 못했습니다. (%s)",
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_END
   -- MB_TALENT_APPLY_I18N_V1_BEGIN
   ["talent.apply.success"] = "%s에게 특성이 성공적으로 적용되었습니다.",
   ["talent.apply.failed"] = "%s에게 특성을 적용하지 못했습니다. (%s)",

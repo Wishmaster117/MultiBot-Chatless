@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local deDEValues = {
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
+  ["talent.spec.apply.success"] = "Talentspezialisierung %s wurde erfolgreich auf %s angewendet.",
+  ["talent.spec.apply.failed"] = "Talentspezialisierung %s konnte nicht auf %s angewendet werden (%s).",
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_END
   -- MB_TALENT_APPLY_I18N_V1_BEGIN
   ["talent.apply.success"] = "Talente wurden erfolgreich auf %s angewendet.",
   ["talent.apply.failed"] = "Talente konnten nicht auf %s angewendet werden (%s).",

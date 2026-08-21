@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local frFRValues = {
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
+  ["talent.spec.apply.success"] = "Spécialisation %s appliquée avec succès à %s.",
+  ["talent.spec.apply.failed"] = "Échec de l'application de la spécialisation %s à %s (%s).",
+  -- MB_TALENT_SPEC_APPLY_I18N_V1_END
   -- MB_TALENT_APPLY_I18N_V1_BEGIN
   ["talent.apply.success"] = "Talents appliqués avec succès à %s.",
   ["talent.apply.failed"] = "Échec de l'application des talents à %s (%s).",
