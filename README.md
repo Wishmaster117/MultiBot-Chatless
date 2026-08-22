@@ -104,6 +104,7 @@ GET~QUESTS
 GET~GAMEOBJECTS
 GET~FORMATIONS
 RUN~CRAFT_RECIPE
+RUN~CRAFT_RECIPE_TARGET
 RUN~ITEM_ACTION
 RUN~ITEM_EQUIP
 RUN~ITEM_UNEQUIP
@@ -155,6 +156,7 @@ INVENTORY_BULK_SELL_V1
 INVENTORY_OPEN_V1
 GROUP_ROLL_V1
 ENCHANT_TRADE_V1
+CRAFT_RECIPE_TARGET_V1
 QUEST_ABANDON_V1
 SELF_BOT_V1
 SELF_STRATEGY_V1
@@ -166,6 +168,8 @@ SELF_ACTION_V1
 `STRATEGY_MUTATION_V1` provides structured `co/nc` mutations through `RUN~STRATEGY` and completion through `STRATEGY_ACK`. The bridge reports matched, succeeded and failed bot counts, while the addon applies explicit timeout and rejection diagnostics.
 
 `INVENTORY_V1` provides the established native inventory read/refresh path. `INVENTORY_EXACT_V1` complements it with exact physical topology for Backpack, Bag 1..4 and Keyring, including empty slots and per-container filtering in the inventory UI. `ITEM_MOVE_V1` adds server-authoritative whole-stack drag/drop between allowed physical slots. The addon keeps only synthetic drag state: it does not call `PickupContainerItem`, `PickupInventoryItem`, `GetCursorInfo` or `ClearCursor`, and it does not mutate the displayed inventory optimistically; an exact snapshot refresh follows the server result. Stack splitting remains outside this capability. `ITEM_EQUIP_V1` equips an exact item from Backpack or Bag 1..4 through a structured bridge request and waits for the authoritative result before refreshing. `ITEM_UNEQUIP_V1` routes Inspect right-click through the exact equipment slot plus item ID, converts client Inspect slots 1..19 to Core slots 0..18, waits for the structured result and then refreshes. `ITEM_TRADE_V1` routes Inventory -> Trade through an exact source identity, preserves the native WoW Trade UI, waits for the structured `INVENTORY_ITEM_TRADE` result and keeps the historical give path behind the explicit compatibility fallback flag. The historical `ue` whisper fallback is used only when `MultiBot.allowLegacyChatFallback == true`; normal bridge-first configuration keeps that fallback disabled. `ITEM_USE_V1` uses the exact physical source, waits for the structured `INVENTORY_ITEM_USE` result and delegates execution to the native use-item path. `ITEM_DESTROY` is a specialized exact-item destruction path with server-side source revalidation and an authoritative result. `ITEM_SELL_SINGLE_V1` validates the exact source and nearby vendor before native single-item sale and returns `INVENTORY_ITEM_SELL`. `VENDOR_BUYBACK_V1` exposes a structured Buyback list/result flow and uses the native Buyback handler before authoritative inventory/list refreshes. `INVENTORY_BULK_SELL_V1` and `INVENTORY_OPEN_V1` gate the current bulk-sell and `OPEN_ITEMS` bridge paths. `GROUP_ROLL_V1` gates the group Roll workflow; normal rolls and item-linked rolls are tokenized and completed through a structured `GROUP_ROLL_ACK`. `ENCHANT_TRADE_V1` gates the Enchanting Trade Service: the addon lists only known Enchanting spells exposed by the bot, uses the native WoW Trade window and the non-traded item slot, then requests one validated numeric spell ID through the bridge. `QUEST_ABANDON_V1` routes bot quest abandon through a tokenized structured request/result; the player still abandons locally with the native WoW quest API, while the legacy `drop` group-chat fallback is available only when `MultiBot.allowLegacyChatFallback == true`. Quest sharing remains intentionally native through `QuestLogPushQuest()` and does not require a `QUEST_SHARE_V1` bridge capability.
+
+`CRAFT_RECIPE_TARGET_V1` handles profession recipes that require an exact bot-owned item target. Normal `RUN~CRAFT_RECIPE` remains unchanged for ordinary crafting and returns `TARGET_REQUIRED` for exact-item recipes. The addon then reuses the selected bot's Inventory and Inspect views, sends the exact `bag` / `slot` / `itemId` identity, keeps at most 8 pending target requests with a 5-second timeout and consumes `CRAFT_RECIPE_TARGET_RESULT` through the structured opcode dispatcher. Target selection is limited to equipment, Backpack and equipped Bag 1..4; Bank, Keyring and player Trade items are outside this capability. Recipes with `craftable > 0` are highlighted with a bright-green name, while non-craftable recipes keep their existing difficulty color.
 
 `SELF_BOT_V1` controls the player's own SelfBot mode with explicit ENABLE/DISABLE requests and authoritative state/result replies. `SELF_STRATEGY_V1` reads and mutates only the active SelfBot's whitelisted combat/non-combat strategies through framed state plus `SELF_STRATEGY_ACK`; it is not a generic strategy executor. `SELF_ACTION_V1` exposes only the audited SelfBot actions `AUTOGEAR`, `MAINTENANCE` and `WAIT_ATTACK_TIME`, with server-side SelfBot/security/rate-limit checks. These SelfBot paths are a separate completed workstream inherited by the Jellypowered v2 branch; normal-bot Maintenance/Autogear paths that still use legacy chat are not implicitly migrated by these capabilities.
 
@@ -308,11 +312,11 @@ The endpoint and safe Firestone/Spellstone switching code are present, but the p
   </tr>
   <tr>
     <td>Profession recipe frame</td>
-    <td><strong>Bridge-first</strong> recipe listing and recipe crafting opened from Character Info profession and secondary skill rows</td>
+    <td><strong>Bridge-first and runtime validated</strong> — recipe listing and normal crafting remain on <code>RUN~CRAFT_RECIPE</code>; item-target recipes return <code>TARGET_REQUIRED</code> and continue through <code>CRAFT_RECIPE_TARGET_V1</code> with exact Inventory/Inspect selection by <code>bag/slot/itemId</code>. Recipes currently craftable are highlighted with a bright-green name.</td>
   </tr>
   <tr>
     <td>Enchanting Trade Service</td>
-    <td><strong>Bridge-first and runtime validated</strong> — <code>ENCHANT_TRADE_V1</code> exposes known Enchanting services, reagent/tool availability and native Trade-slot execution without a generic cast/chat executor; the same dedicated window is available from the enchanter EveryBar and Character Info, with UI text localized in all eight runtime locales</td>
+    <td><strong>Bridge-first and runtime validated</strong> — <code>ENCHANT_TRADE_V1</code> exposes known Enchanting services, reagent/tool availability and native Trade-slot execution without a generic cast/chat executor; the same dedicated window is available from the enchanter EveryBar and Character Info, with UI text localized in all eight runtime locales. Enchantments for which all reagents and required tools are present are highlighted with a bright-green name.</td>
   </tr>
   <tr>
     <td>Trade inventory chat suppression</td>
@@ -628,8 +632,8 @@ Implemented bridge-first / chatless areas:
 - Spellbook refresh, with profession/crafting spells separated from the combat spellbook path.
 - Character Info frame through the bridge with Blizzard-style tabs for class, profession, secondary, weapon and armor skills, reputations and currencies/emblems.
 - Bot bank and guild bank snapshots through the bridge, plus bank deposit/withdraw, guild bank deposit/withdraw and vendor buy item actions.
-- Profession recipe frame through the bridge, opened from profession and secondary skill rows.
-- Enchanting Trade Service through `ENCHANT_TRADE_V1`: dedicated enchanter-only UI from EveryBar/Character Info, known-spell listing, reagent/tool availability, native `TRADE_SLOT_NONTRADED` targeting and validated numeric spell execution without generic Playerbots command/chat dispatch.
+- Profession recipe frame through the bridge, opened from profession and secondary skill rows. Normal recipes use `RUN~CRAFT_RECIPE`; exact-item recipes continue through the runtime-validated `CRAFT_RECIPE_TARGET_V1` flow after `TARGET_REQUIRED`, using exact Inventory/Inspect `bag/slot/itemId` selection. Recipes with `craftable > 0` use a bright-green name.
+- Enchanting Trade Service through `ENCHANT_TRADE_V1`: dedicated enchanter-only UI from EveryBar/Character Info, known-spell listing, reagent/tool availability, native `TRADE_SLOT_NONTRADED` targeting and validated numeric spell execution without generic Playerbots command/chat dispatch. Entries with all required reagents and tools available use a bright-green name.
 - Glyph refresh with icons and glyph tooltips.
 - Outfits refresh and actions through the bridge.
 - Outfit equip/replace without detailed `Equipping [item] ...` chat spam.
@@ -679,7 +683,7 @@ Validated development milestones on the current line:
 - Both talent success/failure messages are localized in the 8 currently loaded locales; successful operations are shown in white only after authoritative server confirmation.
 - `mod-playerbots` remains strictly read-only and no generic Playerbots command executor was introduced.
 
-The next active Jellypowered v2 subtask is `CRAFT_RECIPE_TARGET`.
+`CRAFT_RECIPE_TARGET_V1` is now implemented, compiled and runtime validated. The next Jellypowered comparison step is bank / guild-bank / vendor and inventory-selection residuals, and only demonstrable improvements should be taken forward.
 Known migration remaining:
 
 
@@ -688,7 +692,7 @@ Known migration remaining:
 - `ITEM_MOVE_V1` already covers whole-stack movement between allowed Backpack / Bag 1..4 / Keyring physical slots, including inter-container moves. A future `BAG_MOVE` item must therefore mean moving/re-equipping the **bag objects themselves** in equipped bag slots, not moving ordinary inventory items.
 - Generic exact-item Trade is now implemented and runtime validated through `ITEM_TRADE_V1`; it remains distinct from the specialized `ENCHANT_TRADE_V1` service and does not expose a generic command executor.
 - Quest abandon is now implemented through `QUEST_ABANDON_V1` and runtime validated with one bot. Quest sharing remains native through `QuestLogPushQuest()`. The mixed multi-bot Quest Abandon runtime scenario is deferred until suitable bots are available.
-- `TALENT_APPLY_V1` and `TALENT_SPEC_APPLY_V1` are complete and runtime validated. The active Jellypowered v2 continuation is now `CRAFT_RECIPE_TARGET`; equipped-bag reassignment remains a low-priority residual. After the remaining Jellypowered batch, the normal roadmap resumes with item-specific loot-rule add/remove, the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
+- `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1` and `CRAFT_RECIPE_TARGET_V1` are complete and runtime validated. The current Jellypowered continuation is the bank / guild-bank / vendor and inventory-selection comparison, with equipped-bag reassignment remaining a low-priority residual. After the remaining Jellypowered batch, the normal roadmap resumes with item-specific loot-rule add/remove, the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
 - The project should be described as **bridge-first / mostly chatless**, not fully chatless, until these remaining paths are classified/migrated and the final runtime matrix is closed.
 
 Kept intentionally:
@@ -706,10 +710,10 @@ The current `jellypowered-chatless-integration-v2` line starts from the merged J
 
 Immediate Jellypowered v2 work:
 
-1. Audit `CRAFT_RECIPE_TARGET` separately: profession, known recipe, materials, tools, exact target and Trade/runtime state must be revalidated.
-2. Compare bank / guild-bank / vendor and inventory-selection residuals only when an actual current defect or demonstrable improvement exists.
+1. Compare bank / guild-bank / vendor and inventory-selection residuals only when an actual current defect or demonstrable improvement exists.
+2. Keep equipped-bag reassignment (`BAG_MOVE`) as a low-priority residual unless a concrete need is demonstrated.
 
-Completed on the current v2 line before this next step: `TALENT_APPLY_V1` and `TALENT_SPEC_APPLY_V1`, both compiled and runtime validated with server-authoritative structured results.
+Completed on the current v2 line before this next step: `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1` and `CRAFT_RECIPE_TARGET_V1`, compiled and runtime validated with server-authoritative structured results. `CRAFT_RECIPE_TARGET_V1` revalidates the recipe and exact bot-owned target and returns a structured result without a normal chat fallback.
 
 Low-priority residual: moving/re-equipping the **equipped bag objects themselves** (`BAG_MOVE`) only if the need remains; ordinary item moves between Backpack / Bag 1..4 / Keyring are already covered by `ITEM_MOVE_V1`.
 

@@ -487,6 +487,215 @@ local function getCraftReasonText(reason, skillId)
     return L("profession.recipes.craft.reason." .. reason, L("profession.recipes.craft.reason.UNKNOWN", "The server returned an unknown crafting error."))
 end
 
+
+-- MB_CRAFT_RECIPE_TARGET_V1_UI_BEGIN
+local function getRecipeTargetReasonText(reason, skillId)
+    reason = tostring(reason or "")
+    local specific = {
+        BAD_TARGET_POSITION = { "profession.recipes.target.reason.BAD_TARGET_POSITION", "That inventory or equipment position is not allowed." },
+        MISSING_TARGET_ITEM = { "profession.recipes.target.reason.MISSING_TARGET_ITEM", "The selected item is no longer present." },
+        TARGET_STALE = { "profession.recipes.target.reason.TARGET_STALE", "The selected slot now contains a different item." },
+        NOT_ITEM_TARGET_RECIPE = { "profession.recipes.target.reason.NOT_ITEM_TARGET_RECIPE", "This recipe does not accept an item target." },
+        INVALID_TARGET_ITEM = { "profession.recipes.target.reason.INVALID_TARGET_ITEM", "The selected item is not a valid target for this recipe." },
+        REPLAY = { "profession.recipes.target.reason.REPLAY", "This targeted request was already processed." },
+        RATE_LIMIT = { "profession.recipes.target.reason.RATE_LIMIT", "Too many targeted crafting requests. Try again shortly." },
+        BOT_UNAVAILABLE = { "profession.recipes.target.reason.BOT_UNAVAILABLE", "The bot is not available right now." },
+        BOT_DEAD = { "profession.recipes.target.reason.BOT_DEAD", "The bot must be alive to use this recipe." },
+        FORBIDDEN = { "profession.recipes.target.reason.FORBIDDEN", "You are not allowed to control this bot." },
+        TIMEOUT = { "profession.recipes.target.reason.TIMEOUT", "The targeted crafting request timed out." },
+        DISCONNECTED = { "profession.recipes.target.reason.DISCONNECTED", "The bridge disconnected before the targeted craft completed." },
+        BAD_RESPONSE = { "profession.recipes.target.reason.BAD_RESPONSE", "The bridge returned an invalid targeted crafting response." },
+    }
+
+    local entry = specific[reason]
+    if entry then
+        return L(entry[1], entry[2])
+    end
+    return getCraftReasonText(reason, skillId)
+end
+
+local function isAllowedRecipeTargetPosition(bag, slot)
+    bag = tonumber(bag)
+    slot = tonumber(slot)
+    if not bag or not slot then
+        return false
+    end
+
+    if bag == 255 then
+        return (slot >= 0 and slot <= 18) or (slot >= 23 and slot <= 38)
+    end
+
+    return bag >= 19 and bag <= 22 and slot >= 0 and slot <= 255
+end
+
+local function getRecipeTargetSelection()
+    local selection = MultiBot.professionRecipeTargetSelection
+    if type(selection) ~= "table" then
+        return nil
+    end
+    return selection
+end
+
+local function setRecipeTargetStatus(selection, text)
+    local frame = selection and selection.frame or MultiBot.professionRecipeFrame
+    if frame and frame.status and frame:IsShown() then
+        frame.status:SetText(text or "")
+    end
+end
+
+local function clearRecipeTargetSelection(frame)
+    local selection = getRecipeTargetSelection()
+    if selection and (not frame or selection.frame == frame) then
+        MultiBot.professionRecipeTargetSelection = nil
+    end
+end
+
+local function beginRecipeTargetSelection(frame, botName, skillId, spellId)
+    if not frame
+        or not MultiBot.Comm
+        or not MultiBot.Comm.IsProfessionRecipeTargetCapable
+        or not MultiBot.Comm.IsProfessionRecipeTargetCapable() then
+        if frame and frame.status then
+            frame.status:SetText(L(
+                "profession.recipes.target.unavailable",
+                "Exact item targeting via the bridge is unavailable."
+            ))
+        end
+        return false
+    end
+
+    local key = getRecipePendingKey(botName, skillId, spellId)
+    frame.targetRequiredRecipes[key] = true
+    MultiBot.professionRecipeTargetSelection = {
+        frame = frame,
+        botName = botName,
+        botNameKey = string.lower(tostring(botName or "")),
+        skillId = tonumber(skillId or 0) or 0,
+        spellId = tonumber(spellId or 0) or 0,
+    }
+
+    frame.status:SetText(L(
+        "profession.recipes.target.select",
+        "Select the exact item to modify in the bot's inventory or equipment."
+    ))
+    frame:render()
+
+    if MultiBot.RequestBotInventory then
+        MultiBot.RequestBotInventory(botName)
+    end
+    return true
+end
+
+local function runRecipeTargetSelection(selection, targetBag, targetSlot, targetItemId)
+    if not selection or not selection.frame then
+        return false
+    end
+
+    local frame = selection.frame
+    if not MultiBot.Comm
+        or not MultiBot.Comm.RunProfessionRecipeTarget
+        or not MultiBot.Comm.IsProfessionRecipeTargetCapable
+        or not MultiBot.Comm.IsProfessionRecipeTargetCapable() then
+        setRecipeTargetStatus(selection, L(
+            "profession.recipes.target.unavailable",
+            "Exact item targeting via the bridge is unavailable."
+        ))
+        return false
+    end
+
+    local token = MultiBot.Comm.RunProfessionRecipeTarget(
+        selection.botName,
+        selection.skillId,
+        selection.spellId,
+        targetBag,
+        targetSlot,
+        targetItemId
+    )
+
+    if not token then
+        setRecipeTargetStatus(selection, L(
+            "profession.recipes.target.send_failed",
+            "The targeted crafting request could not be sent."
+        ))
+        return false
+    end
+
+    frame.pendingCrafts[getRecipePendingKey(selection.botName, selection.skillId, selection.spellId)] = true
+    frame.status:SetText(L(
+        "profession.recipes.target.pending",
+        "Applying the recipe to the selected item..."
+    ))
+    clearRecipeTargetSelection(frame)
+    frame:render()
+    return true
+end
+
+function MultiBot.TryProfessionRecipeTargetInventoryItem(botName, item)
+    local selection = getRecipeTargetSelection()
+    if not selection then
+        return false
+    end
+
+    if string.lower(tostring(botName or "")) ~= selection.botNameKey then
+        setRecipeTargetStatus(selection, L(
+            "profession.recipes.target.wrong_bot",
+            "Select an item belonging to the bot whose recipe is open."
+        ))
+        return true
+    end
+
+    if type(item) ~= "table" or item.exactLocation ~= true then
+        setRecipeTargetStatus(selection, L(
+            "profession.recipes.target.exact_required",
+            "This target must come from the exact inventory view."
+        ))
+        return true
+    end
+
+    local bag = tonumber(item.bag)
+    local slot = tonumber(item.slot)
+    local itemId = tonumber(item.id or 0) or 0
+    if itemId <= 0 or not isAllowedRecipeTargetPosition(bag, slot) then
+        setRecipeTargetStatus(selection, L(
+            "profession.recipes.target.invalid_scope",
+            "Choose an equipped item or an item from the backpack or equipped bags."
+        ))
+        return true
+    end
+
+    runRecipeTargetSelection(selection, bag, slot, itemId)
+    return true
+end
+
+function MultiBot.TryProfessionRecipeTargetEquipmentItem(botName, serverSlot, itemId)
+    local selection = getRecipeTargetSelection()
+    if not selection then
+        return false
+    end
+
+    if string.lower(tostring(botName or "")) ~= selection.botNameKey then
+        setRecipeTargetStatus(selection, L(
+            "profession.recipes.target.wrong_bot",
+            "Select an item belonging to the bot whose recipe is open."
+        ))
+        return true
+    end
+
+    serverSlot = tonumber(serverSlot)
+    itemId = tonumber(itemId or 0) or 0
+    if itemId <= 0 or not isAllowedRecipeTargetPosition(255, serverSlot) or serverSlot > 18 then
+        setRecipeTargetStatus(selection, L(
+            "profession.recipes.target.invalid_scope",
+            "Choose an equipped item or an item from the backpack or equipped bags."
+        ))
+        return true
+    end
+
+    runRecipeTargetSelection(selection, 255, serverSlot, itemId)
+    return true
+end
+-- MB_CRAFT_RECIPE_TARGET_V1_UI_END
+
 local function scheduleRecipeRefresh(botName, skillId)
     if not MultiBot.Comm or not MultiBot.Comm.RequestProfessionRecipes then
         return
@@ -533,6 +742,7 @@ local function ensureRecipeFrame()
     frame.pageSize = 14
     frame.recipes = {}
     frame.pendingCrafts = {}
+    frame.targetRequiredRecipes = {}
 
     for i = 1, frame.pageSize do
         local row = CreateFrame("Button", nil, content)
@@ -582,10 +792,16 @@ local function ensureRecipeFrame()
                 return
             end
 
+            local pendingKey = getRecipePendingKey(frame.botName, skillId, spellId)
+            if frame.targetRequiredRecipes[pendingKey] then
+                beginRecipeTargetSelection(frame, frame.botName, skillId, spellId)
+                return
+            end
+
             if MultiBot.Comm and MultiBot.Comm.RunProfessionRecipeCraft then
                 local token = MultiBot.Comm.RunProfessionRecipeCraft(frame.botName, skillId, spellId, itemId)
                 if token then
-                    frame.pendingCrafts[getRecipePendingKey(frame.botName, skillId, spellId)] = true
+                    frame.pendingCrafts[pendingKey] = true
                     frame.status:SetText(L("profession.recipes.craft.pending", "Craft requested..."))
                     frame:render()
                 else
@@ -659,12 +875,18 @@ local function ensureRecipeFrame()
                 local name, icon = getSpellDisplay(recipe.spellId)
                 local color = DIFFICULTY_COLORS[recipe.difficulty or ""] or "|cffffffff"
                 local craftable = tonumber(recipe.craftable or 0) or 0
+                if craftable > 0 then color = "|cff00ff00" end
                 local pending = self.pendingCrafts[getRecipePendingKey(self.botName, recipe.skillId, recipe.spellId)]
                 local missing = getFirstMissingMaterial(recipe)
                 row.icon:SetTexture(MultiBot.SafeTexturePath(icon))
                 row.text:SetText(color .. name .. "|r |cff999999x" .. craftable .. "|r")
                 if craftable > 0 then
-                    row.craftButton:SetText(pending and "..." or L("profession.recipes.craft", "Craft"))
+                    local targetRequired = self.targetRequiredRecipes[getRecipePendingKey(self.botName, recipe.skillId, recipe.spellId)] == true
+                    row.craftButton:SetText(
+                        pending and "..."
+                        or (targetRequired and L("profession.recipes.target.apply", "Apply")
+                        or L("profession.recipes.craft", "Craft"))
+                    )
                     setButtonEnabled(row.craftButton, tonumber(recipe.spellId or 0) > 0 and not pending)
                 elseif missing then
                     row.craftButton:SetText(L("profession.recipes.buy_missing", "Buy"))
@@ -693,6 +915,15 @@ local function ensureRecipeFrame()
     end)
 
     frame.setRecipes = function(self, botName, skill, recipes)
+        local previousBot = string.lower(tostring(self.botName or ""))
+        local previousSkillId = self.skill and tonumber(self.skill.skillId or 0) or 0
+        local nextBot = string.lower(tostring(botName or ""))
+        local nextSkillId = skill and tonumber(skill.skillId or 0) or 0
+        if previousBot ~= nextBot or previousSkillId ~= nextSkillId then
+            self.targetRequiredRecipes = {}
+            clearRecipeTargetSelection(self)
+        end
+
         self.botName = botName
         self.skill = skill
         self.recipes = recipes or {}
@@ -701,6 +932,12 @@ local function ensureRecipeFrame()
         self.status:SetText(#self.recipes .. " " .. L("profession.recipes.count", "unknown recipe(s)"))
         self:render()
         self:Show()
+    end
+
+    if frame.HookScript then
+        frame:HookScript("OnHide", function()
+            clearRecipeTargetSelection(frame)
+        end)
     end
 
     frame:Hide()
@@ -1318,8 +1555,9 @@ function MultiBot.OnBridgeProfessionRecipeCraftResult(botName, skillId, spellId,
     local frame = ensureRecipeFrame()
     local sameBot = string.lower(tostring(frame.botName or "")) == string.lower(tostring(botName or ""))
     local sameSkill = frame.skill and tonumber(frame.skill.skillId or 0) == tonumber(skillId or 0)
+    local pendingKey = getRecipePendingKey(botName, skillId, spellId)
 
-    frame.pendingCrafts[getRecipePendingKey(botName, skillId, spellId)] = nil
+    frame.pendingCrafts[pendingKey] = nil
 
     if result == "OK" then
         if sameBot and sameSkill then
@@ -1330,12 +1568,58 @@ function MultiBot.OnBridgeProfessionRecipeCraftResult(botName, skillId, spellId,
         return
     end
 
+    if reason == "TARGET_REQUIRED" then
+        frame.targetRequiredRecipes[pendingKey] = true
+        if sameBot and sameSkill then
+            beginRecipeTargetSelection(frame, botName, skillId, spellId)
+        end
+        return
+    end
+
     if sameBot and sameSkill then
-        local reasonText = getCraftReasonText(reason, skillId)
+        local reasonText = getRecipeTargetReasonText(reason, skillId)
         if reasonText ~= "" then
             frame.status:SetText(string.format(L("profession.recipes.craft.err", "Craft failed: %s"), reasonText))
         else
             frame.status:SetText(L("profession.recipes.craft.failed", "Craft request failed."))
+        end
+        frame:render()
+    end
+end
+
+function MultiBot.OnBridgeProfessionRecipeTargetResult(botName, result, reason, skillId, spellId, _targetBag, _targetSlot, _targetItemId)
+    local frame = ensureRecipeFrame()
+    local sameBot = string.lower(tostring(frame.botName or "")) == string.lower(tostring(botName or ""))
+    local sameSkill = frame.skill and tonumber(frame.skill.skillId or 0) == tonumber(skillId or 0)
+    local pendingKey = getRecipePendingKey(botName, skillId, spellId)
+
+    frame.pendingCrafts[pendingKey] = nil
+    frame.targetRequiredRecipes[pendingKey] = true
+
+    if result == "OK" then
+        if sameBot and sameSkill then
+            frame.status:SetText(L(
+                "profession.recipes.target.ok",
+                "The recipe was applied to the selected item."
+            ))
+            frame:render()
+        end
+        scheduleRecipeRefresh(botName, skillId)
+        return
+    end
+
+    if sameBot and sameSkill then
+        local reasonText = getCraftReasonText(reason, skillId)
+        if reasonText ~= "" then
+            frame.status:SetText(string.format(
+                L("profession.recipes.target.err", "Targeted craft failed: %s"),
+                reasonText
+            ))
+        else
+            frame.status:SetText(L(
+                "profession.recipes.target.failed",
+                "The targeted crafting request failed."
+            ))
         end
         frame:render()
     end

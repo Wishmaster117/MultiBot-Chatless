@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
-Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 21 août 2026 après validation des migrations talents sur les branches `jellypowered-chatless-integration-v2`.
-Dernière mise à jour : 21/08/2026 — `TALENT_APPLY_V1` et `TALENT_SPEC_APPLY_V1` sont maintenant implémentés, compilés et validés en jeu avec résultats structurés autoritatifs, messages localisés et sans spam chat sur les chemins Bridge normaux. `TALENT_SPEC_APPLY_V1` couvre aussi le slot 2/dual spec et conserve le fallback historique uniquement sous `MultiBot.allowLegacyChatFallback == true`. `TODO.md` reste séparé et inchangé. Le prochain sous-chantier Jellypowered actif devient `CRAFT_RECIPE_TARGET`.
+Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 22 août 2026 après validation de `CRAFT_RECIPE_TARGET_V1` et des améliorations visuelles des recettes/enchantements sur les branches `jellypowered-chatless-integration-v2`.
+Dernière mise à jour : 22/08/2026 — `CRAFT_RECIPE_TARGET_V1` est maintenant implémenté, compilé et validé en jeu en plus des migrations talents déjà closes. Le craft simple reste inchangé ; les recettes nécessitant un objet exact renvoient `TARGET_REQUIRED`, puis utilisent une sélection `bag/slot/itemId` dans Inventory/Inspect et un résultat structuré sans fallback chat normal. Les recettes fabricables et les enchantements dont tous les composants/outils sont disponibles sont désormais affichés en vert. `TODO.md` reste séparé et inchangé. Le prochain sous-chantier Jellypowered est la comparaison banque / banque de guilde / vendeur et résiduels de sélection d'inventaire, uniquement pour des améliorations démontrables.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -174,9 +174,16 @@ La branche `Extended` est divergente et ne doit pas être mergée en bloc. Chaqu
    - valider build, niveau, points, coûts/reset, combat, double spécialisation et effets runtime ;
    - vérifier les API Playerbots/AzerothCore dans le dépôt local avant toute reprise.
 
-10. **Artisanat ciblé — À ADAPTER**
-    - étudier `CRAFT_RECIPE_TARGET` ;
-    - revalider profession, recette, matériaux, outils, cible exacte, compatibilité et état Trade.
+10. **Artisanat ciblé — TERMINÉ / COMPILÉ / VALIDÉ EN JEU — `CRAFT_RECIPE_TARGET_V1`**
+    - `RUN~CRAFT_RECIPE` reste inchangé pour le craft normal et renvoie `TARGET_REQUIRED` lorsqu'une recette exige une cible item exacte ;
+    - l'Addon réutilise Inventory + Inspect du bot pour sélectionner exactement `bag/slot/itemId`, avec au plus **8** requêtes ciblées en attente et un timeout de **5 s** ;
+    - scope cible autorisé : équipement, Backpack et sacs équipés 1..4 ; Bank, Keyring et objet Trade joueur sont exclus de `CRAFT_RECIPE_TARGET_V1` ;
+    - le Bridge revalide requester/session, contrôle du bot, profession/recette, matériaux/outils, position autorisée et identité courante de l'item avant exécution ;
+    - la cible est re-résolue par `GetItemByPos`, contrôlée par `Spell::InitExplicitTargets()` / `CheckCast(true)` puis exécutée sur l'`Item*` exact ;
+    - protections serveur validées pour ce service : **4 requêtes / 2 s / requester**, TTL anti-rejeu **10 s**, **32** tokens récents maximum et **512** états requester maximum ;
+    - résultat structuré `CRAFT_RECIPE_TARGET_RESULT`, sans fallback chat normal ; `ENCHANT_TRADE_V1` reste le service séparé pour l'objet joueur dans `TRADE_SLOT_NONTRADED` ;
+    - tests runtime : craft simple **OK**, enchantement d'un objet exact appartenant au bot **OK**, aucun spam chat observé ;
+    - amélioration UI validée : recette `craftable > 0` en vert vif, sinon couleur de difficulté conservée ; dans la fenêtre Enchantements, `entry.available ~= 0` (tous réactifs + outils requis présents) affiche également le nom en vert.
 
 11. **Banque / banque de guilde / vendeur — COMPARER PUIS ADAPTER**
     - ces familles existent déjà dans notre Bridge ;
@@ -589,11 +596,10 @@ Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte*
 
 Ordre recommandé après cette synchronisation documentaire :
 
-1. `CRAFT_RECIPE_TARGET` — **prochain sous-chantier actif** ; profession/recette/matériaux/outils/cible/Trade à revalider contre le code local avant toute proposition.
-2. Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
-3. Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
+1. Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
+2. Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
 
-`TALENT_APPLY_V1` et `TALENT_SPEC_APPLY_V1` ont quitté cette liste : les deux sont implémentés, compilés et validés en jeu sur la branche v2.
+`TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1` et `CRAFT_RECIPE_TARGET_V1` ont quitté cette liste : les trois sont implémentés, compilés lorsque nécessaire et validés en jeu sur la branche v2.
 
 **Résiduel basse priorité, non bloquant :** `BAG_MOVE` concerne uniquement le déplacement/rééquipement des **sacs équipés eux-mêmes**. Les déplacements d'items entre Backpack / sacs 1..4 / Keyring sont déjà terminés via `ITEM_MOVE_V1`.
 
@@ -610,4 +616,4 @@ Ordre recommandé après cette synchronisation documentaire :
 
 Le **prochain chantier normal** reste : **ajout/retrait d'items précis dans les règles de loot**.
 
-La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire rattrape `TALENT_APPLY_V1` déjà commité/poussé et accompagne `TALENT_SPEC_APPLY_V1` maintenant compilé et validé en jeu. Le prochain sous-chantier Jellypowered actif est `CRAFT_RECIPE_TARGET`. Aucune PR vers `main` n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.
+La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire couvre désormais `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1` et `CRAFT_RECIPE_TARGET_V1`, tous validés en jeu sur la ligne v2. Le prochain sous-chantier Jellypowered est la comparaison banque / banque de guilde / vendeur et résiduels de sélection d'inventaire. Aucune PR vers `main` n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.

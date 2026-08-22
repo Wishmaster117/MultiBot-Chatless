@@ -31,6 +31,7 @@ local ENCHANT_TRADE_CAPABILITY = "ENCHANT_TRADE_V1"
 local QUEST_ABANDON_CAPABILITY = "QUEST_ABANDON_V1"
 local TALENT_APPLY_CAPABILITY = "TALENT_APPLY_V1"
 local TALENT_SPEC_APPLY_CAPABILITY = "TALENT_SPEC_APPLY_V1"
+local CRAFT_RECIPE_TARGET_CAPABILITY = "CRAFT_RECIPE_TARGET_V1"
 -- MB_LUA51_UPVALUE_REFACTOR_V1_BEGIN
 -- Keep capability-to-state mapping outside Comm.HandleAddonMessage so each
 -- capability does not consume a separate Lua 5.1 upvalue in that dispatcher.
@@ -57,6 +58,7 @@ local CAPABILITY_STATE_FIELDS = {
   [QUEST_ABANDON_CAPABILITY] = "questAbandonCapable",
   [TALENT_APPLY_CAPABILITY] = "talentApplyCapable",
   [TALENT_SPEC_APPLY_CAPABILITY] = "talentSpecApplyCapable",
+  [CRAFT_RECIPE_TARGET_CAPABILITY] = "craftRecipeTargetCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
 -- MB_LUA51_UPVALUE_REFACTOR_V1_END
@@ -66,6 +68,8 @@ local ENCHANT_TRADE_TIMEOUT_SECONDS = 5.0
 local QUEST_ABANDON_TIMEOUT_SECONDS = 5.0
 local TALENT_APPLY_TIMEOUT_SECONDS = 5.0
 local TALENT_SPEC_APPLY_TIMEOUT_SECONDS = 5.0
+local CRAFT_RECIPE_TARGET_TIMEOUT_SECONDS = 5.0
+local CRAFT_RECIPE_TARGET_MAX_ACTIVE = 8
 local INVENTORY_ITEM_MOVE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_TRADE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_EQUIP_TIMEOUT_SECONDS = 5.0
@@ -333,6 +337,7 @@ local function ensureBridgeState()
   state.questAbandonCapable = state.questAbandonCapable or false
   state.talentApplyCapable = state.talentApplyCapable or false
   state.talentSpecApplyCapable = state.talentSpecApplyCapable or false
+  state.craftRecipeTargetCapable = state.craftRecipeTargetCapable or false
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -423,6 +428,8 @@ local function ensureBridgeState()
   state.professionRecipeActive = state.professionRecipeActive or nil
   state.professionRecipeCraftSeq = state.professionRecipeCraftSeq or 0
   state.professionRecipeCrafts = state.professionRecipeCrafts or {}
+  state.professionRecipeTargetSeq = state.professionRecipeTargetSeq or 0
+  state.professionRecipeTargetCommands = state.professionRecipeTargetCommands or {}
   state.outfitSeq = state.outfitSeq or 0
   state.outfitActive = state.outfitActive or nil
   state.outfitCommands = state.outfitCommands or {}
@@ -3212,6 +3219,159 @@ function Comm.RunProfessionRecipeCraft(name, skillId, spellId, itemId)
   return token
 end
 
+-- MB_CRAFT_RECIPE_TARGET_V1_COMM_BEGIN
+function Comm.IsProfessionRecipeTargetCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.craftRecipeTargetCapable == true
+end
+
+function Comm.RunProfessionRecipeTarget(name, skillId, spellId, targetBag, targetSlot, targetItemId)
+  local state = ensureBridgeState()
+  name = trim(name)
+  skillId = parseBoundedInteger(tostring(skillId or ""), 1, 4294967295)
+  spellId = parseBoundedInteger(tostring(spellId or ""), 1, 4294967295)
+  targetBag = parseBoundedInteger(tostring(targetBag or ""), 0, 255)
+  targetSlot = parseBoundedInteger(tostring(targetSlot or ""), 0, 255)
+  targetItemId = parseBoundedInteger(tostring(targetItemId or ""), 1, 4294967295)
+
+  if name == ""
+      or not skillId
+      or not spellId
+      or not targetBag
+      or not targetSlot
+      or not targetItemId
+      or not state.connected
+      or state.craftRecipeTargetCapable ~= true then
+    return false
+  end
+
+  if countTableEntries(state.professionRecipeTargetCommands) >= CRAFT_RECIPE_TARGET_MAX_ACTIVE then
+    return false
+  end
+
+  state.professionRecipeTargetSeq = (tonumber(state.professionRecipeTargetSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-craft-target-" .. tostring(state.professionRecipeTargetSeq)
+  state.professionRecipeTargetCommands[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    skillId = skillId,
+    spellId = spellId,
+    targetBag = targetBag,
+    targetSlot = targetSlot,
+    targetItemId = targetItemId,
+    token = token,
+    startedAt = safeNow(),
+  }
+
+  local payload = table.concat({
+    "CRAFT_RECIPE_TARGET",
+    token,
+    urlEncodeField(name),
+    tostring(skillId),
+    tostring(spellId),
+    tostring(targetBag),
+    tostring(targetSlot),
+    tostring(targetItemId),
+  }, "~")
+
+  if not Comm.Send("RUN", payload) then
+    state.professionRecipeTargetCommands[token] = nil
+    return false
+  end
+
+  safeDelay(CRAFT_RECIPE_TARGET_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    local pending = bridge.professionRecipeTargetCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    bridge.professionRecipeTargetCommands[token] = nil
+    bridge.lastError = "CRAFT_RECIPE_TARGET_TIMEOUT"
+    if MultiBot.OnBridgeProfessionRecipeTargetResult then
+      MultiBot.OnBridgeProfessionRecipeTargetResult(
+        pending.botName, "ERR", "TIMEOUT",
+        pending.skillId, pending.spellId,
+        pending.targetBag, pending.targetSlot, pending.targetItemId,
+        pending
+      )
+    end
+  end)
+
+  return token
+end
+
+function Comm.ApplyProfessionRecipeTargetResultPayload(payload)
+  local token, rest = splitOnce(payload or "", "~")
+  local encodedBotName, rest2 = splitOnce(rest or "", "~")
+  local status, rest3 = splitOnce(rest2 or "", "~")
+  local encodedReason, rest4 = splitOnce(rest3 or "", "~")
+  local skillIdValue, rest5 = splitOnce(rest4 or "", "~")
+  local spellIdValue, rest6 = splitOnce(rest5 or "", "~")
+  local targetBagValue, rest7 = splitOnce(rest6 or "", "~")
+  local targetSlotValue, targetItemIdValue = splitOnce(rest7 or "", "~")
+
+  token = trim(token)
+  local botName = trim(urlDecodeField(encodedBotName))
+  status = trim(status)
+  local reason = trim(urlDecodeField(encodedReason))
+  local skillId = parseBoundedInteger(skillIdValue or "", 1, 4294967295)
+  local spellId = parseBoundedInteger(spellIdValue or "", 1, 4294967295)
+  local targetBag = parseBoundedInteger(targetBagValue or "", 0, 255)
+  local targetSlot = parseBoundedInteger(targetSlotValue or "", 0, 255)
+  local targetItemId = parseBoundedInteger(targetItemIdValue or "", 1, 4294967295)
+
+  local state = ensureBridgeState()
+  local pending = state.professionRecipeTargetCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  local valid = botName ~= ""
+      and (status == "OK" or status == "ERR")
+      and reason ~= ""
+      and skillId ~= nil
+      and spellId ~= nil
+      and targetBag ~= nil
+      and targetSlot ~= nil
+      and targetItemId ~= nil
+      and string.lower(botName) == pending.botNameKey
+      and skillId == pending.skillId
+      and spellId == pending.spellId
+      and targetBag == pending.targetBag
+      and targetSlot == pending.targetSlot
+      and targetItemId == pending.targetItemId
+
+  state.professionRecipeTargetCommands[token] = nil
+
+  if not valid then
+    state.lastError = "CRAFT_RECIPE_TARGET_BAD_RESPONSE"
+    if MultiBot.OnBridgeProfessionRecipeTargetResult then
+      MultiBot.OnBridgeProfessionRecipeTargetResult(
+        pending.botName, "ERR", "BAD_RESPONSE",
+        pending.skillId, pending.spellId,
+        pending.targetBag, pending.targetSlot, pending.targetItemId,
+        pending
+      )
+    end
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("CRAFT_RECIPE_TARGET_" .. reason)
+  if MultiBot.OnBridgeProfessionRecipeTargetResult then
+    MultiBot.OnBridgeProfessionRecipeTargetResult(
+      botName, status, reason,
+      skillId, spellId, targetBag, targetSlot, targetItemId,
+      pending
+    )
+  end
+
+  debugPrint("ADDON:RX", "CRAFT_RECIPE_TARGET_RESULT", botName, skillId, spellId, status, reason)
+  return true
+end
+-- MB_CRAFT_RECIPE_TARGET_V1_COMM_END
+
 -- MB_TALENT_APPLY_V1_BEGIN
 local function finishTalentApplyCommand(token, result)
   local state = ensureBridgeState()
@@ -3910,6 +4070,17 @@ function Comm.MarkDisconnected(reason)
   state.botEmblemActive = nil
   state.professionRecipeActive = nil
   state.professionRecipeCrafts = {}
+  for _, command in pairs(state.professionRecipeTargetCommands or {}) do
+    if MultiBot.OnBridgeProfessionRecipeTargetResult then
+      MultiBot.OnBridgeProfessionRecipeTargetResult(
+        command.botName or "", "ERR", "DISCONNECTED",
+        command.skillId or 0, command.spellId or 0,
+        command.targetBag or 0, command.targetSlot or 0, command.targetItemId or 0,
+        command
+      )
+    end
+  end
+  state.professionRecipeTargetCommands = {}
 
   if type(state.enchantTradeActive) == "table" and MultiBot.OnBridgeEnchantTradeList then
     MultiBot.OnBridgeEnchantTradeList(state.enchantTradeActive.botName or "", {}, {
@@ -6274,6 +6445,10 @@ local function handleInventoryItemTradeResponse(payload, state)
   return true
 end
 
+local function handleProfessionRecipeTargetResponse(payload)
+  return Comm.ApplyProfessionRecipeTargetResultPayload(payload)
+end
+
 -- New structured response handlers should be registered here instead of adding
 -- another large branch directly inside Comm.HandleAddonMessage.
 local STRUCTURED_OPCODE_HANDLERS = {
@@ -6282,6 +6457,7 @@ local STRUCTURED_OPCODE_HANDLERS = {
   TALENT_APPLY_RESULT = handleTalentApplyResponse,
   TALENT_SPEC_CURRENT = handleTalentSpecCurrentResponse,
   TALENT_SPEC_APPLY_RESULT = handleTalentSpecApplyResponse,
+  CRAFT_RECIPE_TARGET_RESULT = handleProfessionRecipeTargetResponse,
 }
 
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
@@ -8521,6 +8697,7 @@ state.selfActionCapable = false
   state.professionRecipes = {}
   state.professionRecipeActive = nil
   state.professionRecipeCrafts = {}
+  state.professionRecipeTargetCommands = {}
   state.outfitActive = nil
   state.outfitCommands = {}
   state.trainerActive = nil

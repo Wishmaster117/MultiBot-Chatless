@@ -629,9 +629,15 @@ MultiBot.OnBridgeInventoryItemTradeResult = function(_, status, reason)
 end
 
 local function handleInventoryItemClick(button)
-    local action, botName = getInventoryItemActionState()
     local item = button and button.item or nil
+    local inventoryBotName = MultiBot.inventory and MultiBot.inventory.name or nil
+    if item
+        and MultiBot.TryProfessionRecipeTargetInventoryItem
+        and MultiBot.TryProfessionRecipeTargetInventoryItem(inventoryBotName, item) then
+        return
+    end
 
+    local action, botName = getInventoryItemActionState()
     if action == "" then
         sendInventoryFeedback("action", "Choose an action first")
         return
