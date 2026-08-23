@@ -740,11 +740,13 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        sendInventoryItemCommand("bank", button, botName, {
-            postActionRefresh = true,
-            refreshDelay = 0.45,
-            followupRefreshDelay = 1.20,
-        })
+        if MultiBot.allowLegacyChatFallback == true then
+            sendInventoryItemCommand("bank", button, botName, {
+                postActionRefresh = true,
+                refreshDelay = 0.45,
+                followupRefreshDelay = 1.20,
+            })
+        end
         return
     end
 
@@ -753,11 +755,13 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        sendInventoryItemCommand("gb", button, botName, {
-            postActionRefresh = true,
-            refreshDelay = 0.45,
-            followupRefreshDelay = 1.20,
-        })
+        if MultiBot.allowLegacyChatFallback == true then
+            sendInventoryItemCommand("gb", button, botName, {
+                postActionRefresh = true,
+                refreshDelay = 0.45,
+                followupRefreshDelay = 1.20,
+            })
+        end
         return
     end
 
@@ -766,11 +770,13 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        sendInventoryItemCommand("b", button, botName, {
-            postActionRefresh = true,
-            refreshDelay = 0.45,
-            followupRefreshDelay = 1.20,
-        })
+        if MultiBot.allowLegacyChatFallback == true then
+            sendInventoryItemCommand("b", button, botName, {
+                postActionRefresh = true,
+                refreshDelay = 0.45,
+                followupRefreshDelay = 1.20,
+            })
+        end
         return
     end
 
