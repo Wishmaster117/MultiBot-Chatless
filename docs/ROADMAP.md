@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
-Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 22 août 2026 après validation de `CRAFT_RECIPE_TARGET_V1` et des améliorations visuelles des recettes/enchantements sur les branches `jellypowered-chatless-integration-v2`.
-Dernière mise à jour : 22/08/2026 — `CRAFT_RECIPE_TARGET_V1` est maintenant implémenté, compilé et validé en jeu en plus des migrations talents déjà closes. Le craft simple reste inchangé ; les recettes nécessitant un objet exact renvoient `TARGET_REQUIRED`, puis utilisent une sélection `bag/slot/itemId` dans Inventory/Inspect et un résultat structuré sans fallback chat normal. Les recettes fabricables et les enchantements dont tous les composants/outils sont disponibles sont désormais affichés en vert. `TODO.md` reste séparé et inchangé. Le prochain sous-chantier Jellypowered est la comparaison banque / banque de guilde / vendeur et résiduels de sélection d'inventaire, uniquement pour des améliorations démontrables.
+Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 23 août 2026 après validation de `CRAFT_RECIPE_TARGET_V1`, des améliorations visuelles des recettes/enchantements et de la clôture du durcissement `SELL_VENDOR` sur les branches `jellypowered-chatless-integration-v2`.
+Dernière mise à jour : 23/08/2026 — `CRAFT_RECIPE_TARGET_V1` et les migrations talents restent clos et validés. `SELL_VENDOR` a aussi été revalidé : l'Addon reste bridge-first, le fallback historique `s vendor` n'est autorisé que lorsque `MultiBot.allowLegacyChatFallback == true`, et le Bridge limite désormais cette action à `ITEM_USAGE_VENDOR` en excluant `ITEM_USAGE_AH`. Les tests runtime ont confirmé que Symbol of Kings et Gold Ore sont conservés tout en gardant `SELL_VENDOR` fonctionnel. `TODO.md` reste séparé et inchangé. Le prochain sous-chantier Jellypowered reste la comparaison banque / banque de guilde / vendeur et résiduels de sélection d'inventaire, uniquement pour des améliorations démontrables.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -350,7 +350,7 @@ Les jalons suivants, postérieurs à la mise à jour du 08/08, sont présents da
 - Outfits : transport bridge-first et négociation `OUTFIT_V1` ;
 - inventaire : lecture/rafraîchissement natifs via `INVENTORY_V1` ;
 - banque, banque de guilde et achat vendeur : durcissements serveur des actions `ITEM_ACTION` ;
-- vente inventaire `SELL_VENDOR` : bridge-first lorsque `INVENTORY_BULK_SELL_V1` est négocié ; le fallback legacy de compatibilité demeure hors chemin normal ;
+- vente inventaire `SELL_VENDOR` : bridge-first lorsque `INVENTORY_BULK_SELL_V1` est négocié ; le fallback legacy `s vendor` n'est accessible que si `MultiBot.allowLegacyChatFallback == true` ; côté Bridge, `SELL_VENDOR` accepte uniquement `ITEM_USAGE_VENDOR` et exclut `ITEM_USAGE_AH` ; validation runtime du 23/08/2026 : Symbol of Kings et Gold Ore conservés, vente vendeur toujours fonctionnelle ;
 - `OPEN_ITEMS` : bridge-first via `INVENTORY_OPEN_V1`, avec traitement résiduel borné côté serveur ;
 - `GROUP ROLL` : bridge-first via `GROUP_ROLL_V1`, avec mode normal et mode item, filtrage aux bots visibles/contrôlables du groupe, rate-limit serveur et ACK structuré.
 
@@ -466,7 +466,7 @@ Ordre recommandé et état réel :
 3. **Infrastructure mutations stratégies `co/nc` : TERMINÉE pour les chemins migrés** via `STRATEGY_MUTATION_V1`, `RUN~STRATEGY`, `STRATEGY_ACK`, timeouts, limites et diagnostics explicites.
 4. **Sélecteurs Warlock Stones/Soulstones/Pets/Curses : TERMINÉS pour la migration chatless validée**. Les reliquats TEMP_ENCHANT réel et LuaLint sont suspendus et ne bloquent pas la roadmap normale.
 5. **`s *` / `SELL_GREY` : SUSPENDU** — le chemin actuel existe, mais le chantier `SELL_GREY / sell-grey core API / bridge-first` est explicitement reporté à la fin de la roadmap.
-6. **`s vendor` / `SELL_VENDOR` : TERMINÉ pour le chemin bridge-first inventaire** — `INVENTORY_BULK_SELL_V1`, validation serveur et résultat structuré ; fallback legacy de compatibilité conservé si la capacité n'est pas disponible.
+6. **`s vendor` / `SELL_VENDOR` : TERMINÉ / VALIDÉ EN JEU / SYNCHRONISÉ 23/08/2026** — `INVENTORY_BULK_SELL_V1`, validation serveur et résultat structuré ; fallback legacy conservé uniquement sous `MultiBot.allowLegacyChatFallback == true` ; le Bridge accepte seulement `ITEM_USAGE_VENDOR` et exclut `ITEM_USAGE_AH` pour cette action. Tests runtime : Symbol of Kings conservé, Gold Ore conservé, `SELL_VENDOR` fonctionnel. Commits validés : Addon `fe2c807785219b82ca885f1a95d7c1dc27f0eed0`, Bridge `3ccf5047f7994218b742312fe1437f4b303f7159`.
 7. **`open items` / `OPEN_ITEMS` : TERMINÉ / VALIDÉ / MERGÉ** — `INVENTORY_OPEN_V1`, Addon PR #60, Bridge PR #25.
 8. **`roll` et `roll [item]` : TERMINÉ / VALIDÉ / MERGÉ** — `GROUP_ROLL_V1`, Addon PR #61, Bridge PR #26.
 9. **Enchantement d'objet : TERMINÉ / VALIDÉ EN JEU / MERGÉ — Addon #63 / Bridge #27** — `ENCHANT_TRADE_V1`, UI dédiée aux enchanteurs, liste des enchantements réellement connus, composants/outils, Trade WoW natif via le slot « ne sera pas échangé », exécution par ID de sort numérique validé côté bridge, sans exécuteur générique de cast/chat ; layout 440 px et i18n des 8 locales validés.
@@ -616,4 +616,4 @@ Ordre recommandé après cette synchronisation documentaire :
 
 Le **prochain chantier normal** reste : **ajout/retrait d'items précis dans les règles de loot**.
 
-La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire couvre désormais `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1` et `CRAFT_RECIPE_TARGET_V1`, tous validés en jeu sur la ligne v2. Le prochain sous-chantier Jellypowered est la comparaison banque / banque de guilde / vendeur et résiduels de sélection d'inventaire. Aucune PR vers `main` n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.
+La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire couvre désormais `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1` et le durcissement final `SELL_VENDOR` validé le 23/08/2026. Le prochain sous-chantier Jellypowered est la comparaison banque / banque de guilde / vendeur et résiduels de sélection d'inventaire. Aucune PR vers `main` n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.
