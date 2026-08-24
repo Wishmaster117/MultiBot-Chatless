@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
-Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 23 août 2026 après validation de `CRAFT_RECIPE_TARGET_V1`, des améliorations visuelles des recettes/enchantements et de la clôture du durcissement `SELL_VENDOR` sur les branches `jellypowered-chatless-integration-v2`.
-Dernière mise à jour : 23/08/2026 — `CRAFT_RECIPE_TARGET_V1` et les migrations talents restent clos et validés. `SELL_VENDOR` a aussi été revalidé : l'Addon reste bridge-first, le fallback historique `s vendor` n'est autorisé que lorsque `MultiBot.allowLegacyChatFallback == true`, et le Bridge limite désormais cette action à `ITEM_USAGE_VENDOR` en excluant `ITEM_USAGE_AH`. Les tests runtime ont confirmé que Symbol of Kings et Gold Ore sont conservés tout en gardant `SELL_VENDOR` fonctionnel. `TODO.md` reste séparé et inchangé. Le prochain sous-chantier Jellypowered reste la comparaison banque / banque de guilde / vendeur et résiduels de sélection d'inventaire, uniquement pour des améliorations démontrables.
+Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 24 août 2026 après clôture de P3A `ITEM_DEPOSIT_EXACT_V1`, validation runtime des dépôts exacts BANK/GBANK et décision explicite de différer P3B/P3C sur les branches `jellypowered-chatless-integration-v2`.
+Dernière mise à jour : 24/08/2026 — P3A `ITEM_DEPOSIT_EXACT_V1` est terminé, validé en jeu, commité et poussé : `BANK_DEPOSIT` et `GBANK_DEPOSIT` utilisent désormais la source physique exacte `bag/slot/itemId/count`, déplacent uniquement la pile sélectionnée et rejettent une identité devenue obsolète avec `SOURCE_STALE` sans déplacer l'objet. P3B (retrait exact BANK) et P3C (retrait exact GBANK) sont explicitement différés car les snapshots de retrait actuels restent agrégés côté Addon/protocole et nécessitent une refonte plus large. Le libellé UI générique de `SOURCE_STALE` reste un résiduel non bloquant. `TODO.md` reste séparé et inchangé. Le prochain chantier fonctionnel est `LOOT_RULE_EXACT_ITEM_ADD_REMOVE`.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -592,28 +592,34 @@ Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte*
 - `GET~INVENTORY_BULK` : audité ; la forme Extended reste rejetée/différée tant qu'elle duplique sans bénéfice démontré `INVENTORY_EXACT_V1`.
 - `GET~BOT_SKILLS_BULK` : audité ; différé jusqu'à l'apparition d'un consommateur multi-bot réel.
 
-### Jellypowered restant à étudier
+### Clôture banque / banque de guilde — P3A validé le 24/08/2026
 
-Ordre recommandé après cette synchronisation documentaire :
+- **P3A — TERMINÉ / VALIDÉ EN JEU / COMMITÉ / PUSHÉ — `ITEM_DEPOSIT_EXACT_V1`** : `BANK_DEPOSIT` et `GBANK_DEPOSIT` utilisent désormais l'identité physique exacte `bag/slot/itemId/count` issue de l'inventaire exact et déplacent uniquement la pile entière sélectionnée.
+- Le Bridge revalide la position source, l'`itemId` et le `count` avant mutation. Le test négatif runtime avec un faux `count` a renvoyé `SOURCE_STALE` et la pile réelle est restée inchangée.
+- Les tests runtime avec deux piles distinctes du même objet ont validé que BANK et GBANK déplacent uniquement la pile cliquée, sans déplacer l'autre pile identique, sans erreur Lua, spam chat ou crash observé.
+- Protections du service exact-deposit : **8 requêtes / 2 s / requester**, TTL anti-rejeu **10 s**, **32** tokens récents maximum et **512** états requester maximum.
+- Commits P3A validés : Addon `b13ff797ab96144f2ae51cc4adf6a0d4a1c4e464`, Bridge `15abaae7adc6b983f25e9c4b5dec13ca314d5727`.
+- **P3B — DIFFÉRÉ : retrait exact BANK**. Le snapshot de retrait actuel est agrégé par `itemId`; exposer une pile source physique exacte nécessite une évolution protocole/UI plus large.
+- **P3C — DIFFÉRÉ : retrait exact GBANK**. Le Bridge manipule déjà des coordonnées physiques lors de l'exécution, mais la sélection source exacte n'est pas exposée de bout en bout jusqu'à l'Addon ; la refonte est reportée.
+- **Résiduel UI basse priorité, non bloquant :** `SOURCE_STALE` utilise encore le libellé générique d'erreur d'action d'objet.
+- **Résiduel basse priorité, non bloquant :** `BAG_MOVE` concerne uniquement le déplacement/rééquipement des **sacs équipés eux-mêmes**. Les déplacements d'items entre Backpack / sacs 1..4 / Keyring sont déjà terminés via `ITEM_MOVE_V1`.
 
-1. Banque / banque de guilde / vendeur — comparer avec l'existant et ne reprendre que des améliorations démontrables.
-2. Comptage d'inventaire / restauration de sélection — comparer puis adapter uniquement si un défaut actuel est démontré.
+Le lot banque/GBANK prioritaire est clos pour la roadmap courante. La roadmap normale reprend avec `LOOT_RULE_EXACT_ITEM_ADD_REMOVE`.
 
-`TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1` et `CRAFT_RECIPE_TARGET_V1` ont quitté cette liste : les trois sont implémentés, compilés lorsque nécessaire et validés en jeu sur la branche v2.
-
-**Résiduel basse priorité, non bloquant :** `BAG_MOVE` concerne uniquement le déplacement/rééquipement des **sacs équipés eux-mêmes**. Les déplacements d'items entre Backpack / sacs 1..4 / Keyring sont déjà terminés via `ITEM_MOVE_V1`.
-
-### Chantiers suspendus — inchangés
+### Chantiers suspendus — à reprendre seulement après la roadmap normale
 
 À ne pas reprendre pendant la roadmap normale sauf demande explicite :
 
+- **P3B** — retrait exact BANK, avec snapshot/protocole/UI de sélection physique à concevoir ;
+- **P3C** — retrait exact GBANK, avec sélection physique de source à exposer de bout en bout ;
+- libellé UI dédié pour `SOURCE_STALE`, actuellement générique et non bloquant ;
 - `SELL_GREY` / sell-grey core API / bridge-first ;
 - diagnostic réel final Firestone / Spellstone `TEMP_ENCHANTMENT_SLOT` ;
 - quatre warnings LuaLint restants dans `Strategies/MultiBotWarlock.lua` ;
 - autres petits reliquats déjà explicitement reportés.
 
-### Après le lot Jellypowered
+### Reprise de la roadmap normale
 
-Le **prochain chantier normal** reste : **ajout/retrait d'items précis dans les règles de loot**.
+Le **prochain chantier fonctionnel** est : **`LOOT_RULE_EXACT_ITEM_ADD_REMOVE` — ajout/retrait d'items précis dans les règles de loot**.
 
-La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire couvre désormais `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1` et le durcissement final `SELL_VENDOR` validé le 23/08/2026. Le prochain sous-chantier Jellypowered est la comparaison banque / banque de guilde / vendeur et résiduels de sélection d'inventaire. Aucune PR vers `main` n'est prévue à ce stade : les branches v2 doivent encore recevoir les prochains sous-chantiers Jellypowered.
+La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire couvre désormais `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1`, le durcissement final `SELL_VENDOR` et P3A `ITEM_DEPOSIT_EXACT_V1` validé le 24/08/2026. P3B/P3C restent différés et ne doivent pas interrompre la roadmap normale. Aucune PR vers `main` n'est prévue à ce stade sans demande explicite de l'utilisateur.

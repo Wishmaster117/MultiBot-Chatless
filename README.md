@@ -308,7 +308,7 @@ The endpoint and safe Firestone/Spellstone switching code are present, but the p
   </tr>
   <tr>
     <td>Bot bank / guild bank / vendor buy</td>
-    <td><strong>Bridge-first</strong> bank snapshots, guild bank snapshots, bank deposit/withdraw, guild bank deposit/withdraw and vendor buy actions</td>
+    <td><strong>Bridge-first</strong> bank and guild-bank snapshots plus vendor buy actions. `BANK_DEPOSIT` and `GBANK_DEPOSIT` use negotiated <code>ITEM_DEPOSIT_EXACT_V1</code> when available, carrying exact <code>bag/slot/itemId/count</code> source identity and whole-stack semantics. Bank and guild-bank withdrawals remain on the existing non-exact-stack path; exact withdrawals are deferred.</td>
   </tr>
   <tr>
     <td>Profession recipe frame</td>
@@ -631,7 +631,7 @@ Implemented bridge-first / chatless areas:
 - SelfBot EveryBar actions through `SELF_ACTION_V1` for `AUTOGEAR`, `MAINTENANCE` and `WAIT_ATTACK_TIME`; this does not migrate equivalent normal-bot legacy chat paths.
 - Spellbook refresh, with profession/crafting spells separated from the combat spellbook path.
 - Character Info frame through the bridge with Blizzard-style tabs for class, profession, secondary, weapon and armor skills, reputations and currencies/emblems.
-- Bot bank and guild bank snapshots through the bridge, plus bank deposit/withdraw, guild bank deposit/withdraw and vendor buy item actions.
+- Bot bank and guild bank snapshots through the bridge, plus vendor buy and bank/guild-bank item actions. Exact deposits use `ITEM_DEPOSIT_EXACT_V1`: the addon sends the selected inventory `bag/slot/itemId/count`, waits for the authoritative structured result and refreshes after success. Runtime validation confirmed only the clicked physical stack moves for both BANK and GBANK; stale source identity is rejected with `SOURCE_STALE`. Exact BANK/GBANK withdrawals are deferred because their current snapshots do not expose a selectable physical source stack end to end.
 - Profession recipe frame through the bridge, opened from profession and secondary skill rows. Normal recipes use `RUN~CRAFT_RECIPE`; exact-item recipes continue through the runtime-validated `CRAFT_RECIPE_TARGET_V1` flow after `TARGET_REQUIRED`, using exact Inventory/Inspect `bag/slot/itemId` selection. Recipes with `craftable > 0` use a bright-green name.
 - Enchanting Trade Service through `ENCHANT_TRADE_V1`: dedicated enchanter-only UI from EveryBar/Character Info, known-spell listing, reagent/tool availability, native `TRADE_SLOT_NONTRADED` targeting and validated numeric spell execution without generic Playerbots command/chat dispatch. Entries with all required reagents and tools available use a bright-green name.
 - Glyph refresh with icons and glyph tooltips.
@@ -687,7 +687,7 @@ Validated development milestones on the current line:
 
 `SELL_VENDOR` safety hardening was completed and runtime revalidated on 2026-08-23. The Addon remains bridge-first and exposes the historical `s vendor` whisper only when `MultiBot.allowLegacyChatFallback == true`; the Bridge accepts `ITEM_USAGE_VENDOR` only for this action and excludes `ITEM_USAGE_AH`. Symbol of Kings and Gold Ore were both preserved in the runtime regression test while `SELL_VENDOR` remained functional. Validated commits: Addon `fe2c807785219b82ca885f1a95d7c1dc27f0eed0`, Bridge `3ccf5047f7994218b742312fe1437f4b303f7159`.
 
-The next Jellypowered comparison step is bank / guild-bank / vendor and inventory-selection residuals, and only demonstrable improvements should be taken forward.
+The bank / guild-bank comparison produced the completed `ITEM_DEPOSIT_EXACT_V1` P3A path. Exact BANK withdrawal (P3B) and exact GBANK withdrawal (P3C) are intentionally deferred because their current read models do not expose a physical source stack end to end. The normal roadmap now resumes with `LOOT_RULE_EXACT_ITEM_ADD_REMOVE`.
 Known migration remaining:
 
 
@@ -696,7 +696,7 @@ Known migration remaining:
 - `ITEM_MOVE_V1` already covers whole-stack movement between allowed Backpack / Bag 1..4 / Keyring physical slots, including inter-container moves. A future `BAG_MOVE` item must therefore mean moving/re-equipping the **bag objects themselves** in equipped bag slots, not moving ordinary inventory items.
 - Generic exact-item Trade is now implemented and runtime validated through `ITEM_TRADE_V1`; it remains distinct from the specialized `ENCHANT_TRADE_V1` service and does not expose a generic command executor.
 - Quest abandon is now implemented through `QUEST_ABANDON_V1` and runtime validated with one bot. Quest sharing remains native through `QuestLogPushQuest()`. The mixed multi-bot Quest Abandon runtime scenario is deferred until suitable bots are available.
-- `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1` and `CRAFT_RECIPE_TARGET_V1` are complete and runtime validated. The current Jellypowered continuation is the bank / guild-bank / vendor and inventory-selection comparison, with equipped-bag reassignment remaining a low-priority residual. After the remaining Jellypowered batch, the normal roadmap resumes with item-specific loot-rule add/remove, the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
+- `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1` and P3A `ITEM_DEPOSIT_EXACT_V1` are complete and runtime validated. `ITEM_DEPOSIT_EXACT_V1` moves only the selected physical inventory stack for BANK/GBANK deposits and rejects stale `bag/slot/itemId/count` identity before mutation. P3B/P3C exact withdrawals are deferred. The normal roadmap now resumes with item-specific loot-rule add/remove, followed by the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
 - The project should be described as **bridge-first / mostly chatless**, not fully chatless, until these remaining paths are classified/migrated and the final runtime matrix is closed.
 
 Kept intentionally:
@@ -712,23 +712,21 @@ Kept intentionally:
 
 The current `jellypowered-chatless-integration-v2` line starts from the merged Jellypowered inventory baseline plus the separately completed SelfBot work. It continues the remaining Jellypowered items feature-family by feature-family rather than reapplying already merged code or jumping directly to final cleanup.
 
-Immediate Jellypowered v2 work:
+Immediate roadmap work:
 
-1. Compare bank / guild-bank / vendor and inventory-selection residuals only when an actual current defect or demonstrable improvement exists.
-2. Keep equipped-bag reassignment (`BAG_MOVE`) as a low-priority residual unless a concrete need is demonstrated.
-
-Completed on the current v2 line before this next step: `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1` and the 2026-08-23 `SELL_VENDOR` safety hardening. `CRAFT_RECIPE_TARGET_V1` was compiled and runtime validated with server-authoritative structured results; `SELL_VENDOR` was runtime revalidated with its Addon fallback explicitly gated and its Bridge acceptance narrowed to `ITEM_USAGE_VENDOR` only.
-
-Low-priority residual: moving/re-equipping the **equipped bag objects themselves** (`BAG_MOVE`) only if the need remains; ordinary item moves between Backpack / Bag 1..4 / Keyring are already covered by `ITEM_MOVE_V1`.
-
-Normal roadmap work queued after the remaining Jellypowered batch:
-
-1. Audit and implement item-specific loot-rule add/remove using verified Playerbots interfaces only.
+1. Audit and implement `LOOT_RULE_EXACT_ITEM_ADD_REMOVE` using verified Playerbots interfaces only.
 2. Decide the Quest/Skill versus Disenchant path from verified Playerbots capabilities.
 3. Audit collective `follow`, `attack` and `stay` selectors before any structured group-order migration.
 
+Completed on the current v2 line before this next step: `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1`, the 2026-08-23 `SELL_VENDOR` safety hardening and P3A `ITEM_DEPOSIT_EXACT_V1`. P3A was runtime validated for BANK and GBANK with two identical physical stacks: only the selected stack moved. A deliberately stale `count` returned `SOURCE_STALE` and left the real stack unchanged.
+
+Low-priority residual: moving/re-equipping the **equipped bag objects themselves** (`BAG_MOVE`) only if the need remains; ordinary item moves between Backpack / Bag 1..4 / Keyring are already covered by `ITEM_MOVE_V1`.
+
 Explicitly deferred until the normal roadmap is complete:
 
+- P3B — exact BANK withdrawal; current bank withdrawal snapshot is aggregated and needs a wider protocol/UI design.
+- P3C — exact GBANK withdrawal; physical source selection is not exposed end to end to the addon.
+- Dedicated localized UI text for `SOURCE_STALE`; the current generic error text is non-blocking.
 - SELL_GREY / sell-grey core API / bridge-first follow-up.
 - Final real Firestone/Spellstone `TEMP_ENCHANTMENT_SLOT` revalidation.
 - Four remaining LuaLint warnings in `Strategies/MultiBotWarlock.lua`.
