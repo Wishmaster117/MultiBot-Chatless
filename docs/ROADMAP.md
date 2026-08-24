@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
-Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 24 août 2026 après clôture de P3A `ITEM_DEPOSIT_EXACT_V1`, validation runtime des dépôts exacts BANK/GBANK et décision explicite de différer P3B/P3C sur les branches `jellypowered-chatless-integration-v2`.
-Dernière mise à jour : 24/08/2026 — P3A `ITEM_DEPOSIT_EXACT_V1` est terminé, validé en jeu, commité et poussé : `BANK_DEPOSIT` et `GBANK_DEPOSIT` utilisent désormais la source physique exacte `bag/slot/itemId/count`, déplacent uniquement la pile sélectionnée et rejettent une identité devenue obsolète avec `SOURCE_STALE` sans déplacer l'objet. P3B (retrait exact BANK) et P3C (retrait exact GBANK) sont explicitement différés car les snapshots de retrait actuels restent agrégés côté Addon/protocole et nécessitent une refonte plus large. Le libellé UI générique de `SOURCE_STALE` reste un résiduel non bloquant. `TODO.md` reste séparé et inchangé. Le prochain chantier fonctionnel est `LOOT_RULE_EXACT_ITEM_ADD_REMOVE`.
+Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 25 août 2026 après clôture de P3A `ITEM_DEPOSIT_EXACT_V1` puis de `LOOT_RULE_ITEM_V1`. Le lot fonctionnel courant des branches `jellypowered-chatless-integration-v2` est terminé et prêt pour la synchronisation documentaire finale puis les PR Addon/Bridge vers `main`; les prochains travaux de roadmap repartiront sur de nouvelles branches créées depuis les `main` mis à jour.
+Dernière mise à jour : 25/08/2026 — `LOOT_RULE_ITEM_V1` est terminé, validé en jeu, audité, archivé, commité et poussé après P3A `ITEM_DEPOSIT_EXACT_V1`. ADD/REMOVE modifie l'`always loot list` vérifiée dans Playerbots pour un `itemId` exact, avec résultats structurés, idempotence, persistance des seuls bots modifiés, budget global de 128 sauvegardes/10 s et rejet pré-mutation `PERSISTENCE_BUSY` lorsque le budget est insuffisant. La persistance a été validée après reconnexion et restart worldserver, le prompt et les résultats sont localisés dans les huit locales présentes, et aucun spam chat/whisper n'a été observé. P3B/P3C, `SOURCE_STALE` UI, SELL_GREY, Firestone/Spellstone et LuaLint restent différés. `TODO.md` reste séparé et inchangé. Le prochain chantier normal est la décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -471,8 +471,8 @@ Ordre recommandé et état réel :
 8. **`roll` et `roll [item]` : TERMINÉ / VALIDÉ / MERGÉ** — `GROUP_ROLL_V1`, Addon PR #61, Bridge PR #26.
 9. **Enchantement d'objet : TERMINÉ / VALIDÉ EN JEU / MERGÉ — Addon #63 / Bridge #27** — `ENCHANT_TRADE_V1`, UI dédiée aux enchanteurs, liste des enchantements réellement connus, composants/outils, Trade WoW natif via le slot « ne sera pas échangé », exécution par ID de sort numérique validé côté bridge, sans exécuteur générique de cast/chat ; layout 440 px et i18n des 8 locales validés.
 10. **Spam inventaire automatique à l'ouverture Trade : TERMINÉ / VALIDÉ EN JEU — PR ADDON #64 EN COURS** — réutilisation puis généralisation du filtre addon existant : détection du header exact `=== Inventory ===` pour un bot connu, suppression du dump lors des chemins Inventory → Trade, Enchanting → Trade et du menu natif WoW « Échanger », sans modification de Playerbots ni du Bridge.
-11. **PROCHAIN CHANTIER NORMAL — Ajout/retrait d'items précis dans les règles de loot.**
-12. **À FAIRE — Décision sur `Quest`/`Skill` versus `Disenchant`**, sans inventer de stratégie absente de Playerbots.
+11. **TERMINÉ / VALIDÉ EN JEU / COMMITÉ / PUSHÉ — `LOOT_RULE_ITEM_V1`** : ajout/retrait exact d'un `itemId` dans l'`always loot list`, résultats structurés, idempotence, persistance bornée et UI localisée.
+12. **PROCHAIN CHANTIER NORMAL — Décision sur `Quest`/`Skill` versus `Disenchant`**, uniquement à partir des capacités réellement présentes dans Playerbots ; ne pas réintroduire des modes issus de documentation historique non vérifiée.
 13. **À FAIRE — Ordres collectifs `follow`, `attack`, `stay`**, seulement après validation manuelle exacte des sélecteurs Playerbots ; ne pas réintroduire `RUN~ORDER` générique.
 
 Les commandes informatives `who`, `co ?`, `nc ?` et `ss ?` restent manuelles tant qu'aucune UI structurée ne les remplace. Les mutations UI automatiques `co/nc`, en revanche, doivent passer par le bridge dès qu'un contrat structuré validé existe.
@@ -540,7 +540,7 @@ Ces fonctions doivent rester séparées des patches de correction et de sécurit
 Critère de sortie : version stabilisée, documentée et reproductible du projet Multibot Chatless + Bridge.
 
 <!-- MULTIBOT_JELLYPOWERED_PROGRESS_SYNC_2026-08-17 -->
-<!-- NORMAL_ROADMAP_NEXT=LOOT_RULE_EXACT_ITEM_ADD_REMOVE -->
+<!-- NORMAL_ROADMAP_NEXT=LOOT_RULE_QUEST_SKILL_DISENCHANT_DECISION -->
 
 ## État consolidé Jellypowered / inventaire — 20/08/2026
 
@@ -604,7 +604,19 @@ Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte*
 - **Résiduel UI basse priorité, non bloquant :** `SOURCE_STALE` utilise encore le libellé générique d'erreur d'action d'objet.
 - **Résiduel basse priorité, non bloquant :** `BAG_MOVE` concerne uniquement le déplacement/rééquipement des **sacs équipés eux-mêmes**. Les déplacements d'items entre Backpack / sacs 1..4 / Keyring sont déjà terminés via `ITEM_MOVE_V1`.
 
-Le lot banque/GBANK prioritaire est clos pour la roadmap courante. La roadmap normale reprend avec `LOOT_RULE_EXACT_ITEM_ADD_REMOVE`.
+Le lot banque/GBANK prioritaire est clos pour la roadmap courante. Le chantier suivant, `LOOT_RULE_ITEM_V1`, est lui aussi désormais clos et validé ; la roadmap normale passe à la décision Quest/Skill versus Disenchant.
+
+### Clôture règles de loot exactes — `LOOT_RULE_ITEM_V1` validé le 24/08/2026
+
+- **TERMINÉ / VALIDÉ EN JEU / AUDITÉ / ARCHIVÉ / COMMITÉ / PUSHÉ** : ajout ou retrait d'un `itemId` exact dans la valeur Playerbots auditée `always loot list`, sans modification de `mod-playerbots`.
+- Contrat : `RUN~LOOT_RULE_ITEM~<scope>~<target>~<token>~<ADD|REMOVE>~<itemId>` et résultat structuré `LOOT_RULE_ITEM_RESULT`; scopes protocole `ALL`, `RAID`, `GROUP`, `PARTY`, `BOT`, l'UI actuelle envoyant volontairement `ALL`.
+- Prévalidation avant mutation : requester/session/world, scope/target, bots visibles et contrôlables, sécurité Playerbots, session/world/alive/context du bot, `ItemTemplate` valide ; maximum **128 bots**.
+- Protections : **8 requêtes / 2 s / requester**, anti-rejeu **10 s**, **32** tokens récents et **512** états requester.
+- Persistance : seuls les bots réellement modifiés sont sauvegardés ; budget serveur global **128 sauvegardes de bots / 10 s**. Un budget insuffisant renvoie `PERSISTENCE_BUSY` avant toute mutation.
+- Sémantique idempotente validée : `ADDED`, `REMOVED`, `ALREADY_PRESENT`, `ALREADY_ABSENT`, avec `PARTIAL` prévu pour les résultats mixtes et erreurs structurées côté Bridge.
+- Runtime validé : ADD/REMOVE et répétitions, itemId numérique, Shift+clic lien d'objet, entrée locale invalide sans envoi Bridge, item serveur invalide, persistance déconnexion/reconnexion, persistance après restart worldserver, nettoyage final de l'item de test 6948.
+- UI/i18n validée : prompt cliquable/éditable corrigé localement sans modifier AceGUI global, `/reload` sans erreur Lua, boutons/résultats localisés dans les huit locales présentes (`deDE`, `enGB`, `enUS`, `esES`, `frFR`, `koKR`, `ruRU`, `zhCN`), aucun spam chat/whisper observé.
+- Divergence documentaire conservée comme décision séparée : l'audit du build Playerbots courant ne permet pas de traiter `Quest`/`Skill` comme capacités validées sur la seule foi du wiki ; la prochaine étape doit trancher Quest/Skill versus Disenchant à partir du code réellement présent.
 
 ### Chantiers suspendus — à reprendre seulement après la roadmap normale
 
@@ -620,6 +632,6 @@ Le lot banque/GBANK prioritaire est clos pour la roadmap courante. La roadmap no
 
 ### Reprise de la roadmap normale
 
-Le **prochain chantier fonctionnel** est : **`LOOT_RULE_EXACT_ITEM_ADD_REMOVE` — ajout/retrait d'items précis dans les règles de loot**.
+Le **prochain chantier fonctionnel** est : **décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes**. Aucun endpoint, mode ou stratégie ne doit être conçu avant l'audit ciblé de ce point.
 
-La branche `jellypowered-chatless-integration-v2` reste la ligne de travail dédiée. Cette synchronisation documentaire couvre désormais `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1`, le durcissement final `SELL_VENDOR` et P3A `ITEM_DEPOSIT_EXACT_V1` validé le 24/08/2026. P3B/P3C restent différés et ne doivent pas interrompre la roadmap normale. Aucune PR vers `main` n'est prévue à ce stade sans demande explicite de l'utilisateur.
+Le lot fonctionnel courant de `jellypowered-chatless-integration-v2` est terminé avec `LOOT_RULE_ITEM_V1`. Cette synchronisation documentaire prépare la clôture de la branche : après commit/push des documents, les branches Addon et Bridge doivent être proposées par PR vers `main`. Aucun nouveau développement fonctionnel ne doit être empilé sur ces branches avant les PR. Après merge et mise à jour des `main`, la roadmap normale reprendra sur de nouvelles branches créées depuis ces baselines. P3B/P3C, le libellé `SOURCE_STALE`, `BAG_MOVE`, `SELL_GREY`, Firestone/Spellstone TEMP_ENCHANT, LuaLint et les autres reliquats explicitement différés restent hors du prochain chantier.

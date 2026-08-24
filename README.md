@@ -327,7 +327,7 @@ The endpoint and safe Firestone/Spellstone switching code are present, but the p
     <td><strong>Bridge-first</strong> with glyph icons and tooltips</td>
   </tr>  <tr>
     <td>Loot rules</td>
-    <td><strong>Bridge-first</strong> loot enable/disable and loot list profiles through <code>RUN~LOOT</code></td>
+    <td><strong>Bridge-first and runtime validated</strong> — loot enable/disable and loot-list profiles remain on <code>RUN~LOOT</code>; exact always-loot item add/remove uses negotiated <code>LOOT_RULE_ITEM_V1</code> with structured results and no normal chat/whisper path.</td>
   </tr>
   <tr>
     <td>Loot Master frame</td>
@@ -379,7 +379,7 @@ The endpoint and safe Firestone/Spellstone switching code are present, but the p
   </tr>
   <tr>
     <td>Loot rules</td>
-    <td><strong>Bridge-first</strong> loot enable/disable and loot list profiles through <code>RUN~LOOT</code></td>
+    <td><strong>Bridge-first and runtime validated</strong> — loot enable/disable and loot-list profiles remain on <code>RUN~LOOT</code>; exact always-loot item add/remove uses negotiated <code>LOOT_RULE_ITEM_V1</code> with structured results and no normal chat/whisper path.</td>
   </tr>
   <tr>
     <td>Loot Master frame</td>
@@ -647,7 +647,7 @@ Implemented bridge-first / chatless areas:
 - Disperse controls through the bridge with `disperse set <yards>` and `disperse disable`.
 - Party/raid-wide formation application through `RUN~FORMATION`, with per-bot effective formation inspection through `GET~FORMATIONS` and no PARTY/RAID chat output.
 - Localized formation status tooltip for all eight addon locale files.
-- Loot rules through the bridge with `nc +loot`, `nc -loot` and `ll all|normal|gray|quest|skill`.
+- Loot rules through the bridge with `nc +loot` and `nc -loot`. For the audited Playerbots build, the verified loot-list modes are `all`, `normal`, `gray` and `disenchant`; the older Quest/Skill wording is not treated as a validated capability and remains a separate roadmap decision. Exact always-loot item add/remove is handled by `LOOT_RULE_ITEM_V1`.
 - Loot Master UI for master-loot distribution with item tooltips, candidate scoring, profession/spec hints, saved preferences and recent loot history.
 - Bridge-visible bot discovery for AddClass bots, altbots and grouped randombots.
 - Custom glyph socket mapping and apply order.
@@ -687,7 +687,9 @@ Validated development milestones on the current line:
 
 `SELL_VENDOR` safety hardening was completed and runtime revalidated on 2026-08-23. The Addon remains bridge-first and exposes the historical `s vendor` whisper only when `MultiBot.allowLegacyChatFallback == true`; the Bridge accepts `ITEM_USAGE_VENDOR` only for this action and excludes `ITEM_USAGE_AH`. Symbol of Kings and Gold Ore were both preserved in the runtime regression test while `SELL_VENDOR` remained functional. Validated commits: Addon `fe2c807785219b82ca885f1a95d7c1dc27f0eed0`, Bridge `3ccf5047f7994218b742312fe1437f4b303f7159`.
 
-The bank / guild-bank comparison produced the completed `ITEM_DEPOSIT_EXACT_V1` P3A path. Exact BANK withdrawal (P3B) and exact GBANK withdrawal (P3C) are intentionally deferred because their current read models do not expose a physical source stack end to end. The normal roadmap now resumes with `LOOT_RULE_EXACT_ITEM_ADD_REMOVE`.
+The bank / guild-bank comparison produced the completed `ITEM_DEPOSIT_EXACT_V1` P3A path. Exact BANK withdrawal (P3B) and exact GBANK withdrawal (P3C) remain intentionally deferred because their current read models do not expose a physical source stack end to end. `LOOT_RULE_ITEM_V1` is now also complete, runtime validated, persistent and localized. The next normal-roadmap decision is Quest/Skill versus Disenchant based on the Playerbots capabilities actually present in the audited build.
+`LOOT_RULE_ITEM_V1` adds or removes one exact `itemId` from the audited Playerbots `always loot list` value. The protocol supports `ALL`, `RAID`, `GROUP`, `PARTY` and `BOT` scopes; the current Loot menu intentionally sends `ALL`. The Bridge revalidates requester/session/world state, strict scope/target syntax, visible controllable bots, Playerbots security, bot session/world/alive/context and the item template before mutation, with a maximum of 128 matched bots. Requests are bounded to 8 per requester per 2 seconds with 10-second replay protection, 32 recent tokens and 512 requester states. Only bots whose list actually changes are persisted, and a global budget of 128 bot saves per 10 seconds rejects the whole operation with `PERSISTENCE_BUSY` before mutation when insufficient capacity remains. Runtime validation covered ADD, idempotent ADD, REMOVE, idempotent REMOVE, invalid input/item rejection, item-link input, disconnect/reconnect persistence, full worldserver-restart persistence, localized results in the eight existing locale files and the corrected clickable/editable prompt, with no chat/whisper spam observed.
+
 Known migration remaining:
 
 
@@ -696,7 +698,7 @@ Known migration remaining:
 - `ITEM_MOVE_V1` already covers whole-stack movement between allowed Backpack / Bag 1..4 / Keyring physical slots, including inter-container moves. A future `BAG_MOVE` item must therefore mean moving/re-equipping the **bag objects themselves** in equipped bag slots, not moving ordinary inventory items.
 - Generic exact-item Trade is now implemented and runtime validated through `ITEM_TRADE_V1`; it remains distinct from the specialized `ENCHANT_TRADE_V1` service and does not expose a generic command executor.
 - Quest abandon is now implemented through `QUEST_ABANDON_V1` and runtime validated with one bot. Quest sharing remains native through `QuestLogPushQuest()`. The mixed multi-bot Quest Abandon runtime scenario is deferred until suitable bots are available.
-- `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1` and P3A `ITEM_DEPOSIT_EXACT_V1` are complete and runtime validated. `ITEM_DEPOSIT_EXACT_V1` moves only the selected physical inventory stack for BANK/GBANK deposits and rejects stale `bag/slot/itemId/count` identity before mutation. P3B/P3C exact withdrawals are deferred. The normal roadmap now resumes with item-specific loot-rule add/remove, followed by the Quest/Skill versus Disenchant decision and collective `follow` / `attack` / `stay` orders.
+- `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1`, P3A `ITEM_DEPOSIT_EXACT_V1` and `LOOT_RULE_ITEM_V1` are complete and runtime validated. `ITEM_DEPOSIT_EXACT_V1` moves only the selected physical inventory stack for BANK/GBANK deposits and rejects stale `bag/slot/itemId/count` identity before mutation. `LOOT_RULE_ITEM_V1` performs exact persistent always-loot add/remove with structured results and bounded persistence. P3B/P3C exact withdrawals are deferred. The next normal-roadmap item is the Quest/Skill versus Disenchant decision, followed by collective `follow` / `attack` / `stay` orders.
 - The project should be described as **bridge-first / mostly chatless**, not fully chatless, until these remaining paths are classified/migrated and the final runtime matrix is closed.
 
 Kept intentionally:
@@ -710,15 +712,14 @@ Kept intentionally:
 
 # Remaining Work
 
-The current `jellypowered-chatless-integration-v2` line starts from the merged Jellypowered inventory baseline plus the separately completed SelfBot work. It continues the remaining Jellypowered items feature-family by feature-family rather than reapplying already merged code or jumping directly to final cleanup.
+The current `jellypowered-chatless-integration-v2` line starts from the merged Jellypowered inventory baseline plus the separately completed SelfBot work. Its validated v2 feature batch is now complete through `LOOT_RULE_ITEM_V1`. No new functional work should be stacked onto this branch before the final documentation commit and the Addon/Bridge PRs to `main`; after merge, normal-roadmap development should restart on new branches created from the updated `main` baselines.
 
-Immediate roadmap work:
+Immediate roadmap work after those merges:
 
-1. Audit and implement `LOOT_RULE_EXACT_ITEM_ADD_REMOVE` using verified Playerbots interfaces only.
-2. Decide the Quest/Skill versus Disenchant path from verified Playerbots capabilities.
-3. Audit collective `follow`, `attack` and `stay` selectors before any structured group-order migration.
+1. Decide the Quest/Skill versus Disenchant path from verified Playerbots capabilities; do not infer unsupported loot modes from historical documentation.
+2. Audit collective `follow`, `attack` and `stay` selectors before any structured group-order migration.
 
-Completed on the current v2 line before this next step: `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1`, the 2026-08-23 `SELL_VENDOR` safety hardening and P3A `ITEM_DEPOSIT_EXACT_V1`. P3A was runtime validated for BANK and GBANK with two identical physical stacks: only the selected stack moved. A deliberately stale `count` returned `SOURCE_STALE` and left the real stack unchanged.
+Completed on the current v2 line: `TALENT_APPLY_V1`, `TALENT_SPEC_APPLY_V1`, `CRAFT_RECIPE_TARGET_V1`, the 2026-08-23 `SELL_VENDOR` safety hardening, P3A `ITEM_DEPOSIT_EXACT_V1` and `LOOT_RULE_ITEM_V1`. P3A was runtime validated for BANK and GBANK with two identical physical stacks: only the selected stack moved, while a deliberately stale `count` returned `SOURCE_STALE` and left the real stack unchanged. `LOOT_RULE_ITEM_V1` was validated for exact ADD/REMOVE, idempotence, persistence across reconnect and worldserver restart, localized UI/results and no chat/whisper spam.
 
 Low-priority residual: moving/re-equipping the **equipped bag objects themselves** (`BAG_MOVE`) only if the need remains; ordinary item moves between Backpack / Bag 1..4 / Keyring are already covered by `ITEM_MOVE_V1`.
 
