@@ -19,6 +19,7 @@ local INVENTORY_CAPABILITY = "INVENTORY_V1"
 local INVENTORY_EXACT_CAPABILITY = "INVENTORY_EXACT_V1"
 local INVENTORY_ITEM_MOVE_CAPABILITY = "ITEM_MOVE_V1"
 local INVENTORY_ITEM_TRADE_CAPABILITY = "ITEM_TRADE_V1"
+local INVENTORY_ITEM_DEPOSIT_EXACT_CAPABILITY = "ITEM_DEPOSIT_EXACT_V1"
 local INVENTORY_ITEM_EQUIP_CAPABILITY = "ITEM_EQUIP_V1"
 local INVENTORY_ITEM_UNEQUIP_CAPABILITY = "ITEM_UNEQUIP_V1"
 local INVENTORY_ITEM_DESTROY_CAPABILITY = "ITEM_DESTROY_V1"
@@ -45,6 +46,7 @@ local CAPABILITY_STATE_FIELDS = {
   [INVENTORY_EXACT_CAPABILITY] = "inventoryExactCapable",
   [INVENTORY_ITEM_MOVE_CAPABILITY] = "inventoryItemMoveCapable",
   [INVENTORY_ITEM_TRADE_CAPABILITY] = "inventoryItemTradeCapable",
+  [INVENTORY_ITEM_DEPOSIT_EXACT_CAPABILITY] = "inventoryItemDepositExactCapable",
   [INVENTORY_ITEM_EQUIP_CAPABILITY] = "inventoryItemEquipCapable",
   [INVENTORY_ITEM_UNEQUIP_CAPABILITY] = "inventoryItemUnequipCapable",
   [INVENTORY_ITEM_DESTROY_CAPABILITY] = "inventoryItemDestroyCapable",
@@ -72,6 +74,7 @@ local CRAFT_RECIPE_TARGET_TIMEOUT_SECONDS = 5.0
 local CRAFT_RECIPE_TARGET_MAX_ACTIVE = 8
 local INVENTORY_ITEM_MOVE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_TRADE_TIMEOUT_SECONDS = 5.0
+local INVENTORY_ITEM_DEPOSIT_EXACT_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_EQUIP_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_UNEQUIP_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_DESTROY_TIMEOUT_SECONDS = 5.0
@@ -80,6 +83,7 @@ local INVENTORY_ITEM_SELL_TIMEOUT_SECONDS = 5.0
 local INVENTORY_BUYBACK_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_MOVE_MAX_COUNT = 1000
 local INVENTORY_ITEM_TRADE_MAX_COUNT = 1000
+local INVENTORY_ITEM_DEPOSIT_EXACT_MAX_COUNT = 1000
 local INVENTORY_ITEM_EQUIP_MAX_COUNT = 1000
 local INVENTORY_ITEM_DESTROY_MAX_COUNT = 1000
 local INVENTORY_ITEM_USE_MAX_COUNT = 1000
@@ -324,6 +328,7 @@ local function ensureBridgeState()
   state.inventoryExactCapable = state.inventoryExactCapable or false
   state.inventoryItemMoveCapable = state.inventoryItemMoveCapable or false
   state.inventoryItemTradeCapable = state.inventoryItemTradeCapable or false
+  state.inventoryItemDepositExactCapable = state.inventoryItemDepositExactCapable or false
   state.inventoryItemEquipCapable = state.inventoryItemEquipCapable or false
   state.inventoryItemUnequipCapable = state.inventoryItemUnequipCapable or false
   state.inventoryItemDestroyCapable = state.inventoryItemDestroyCapable or false
@@ -389,6 +394,8 @@ local function ensureBridgeState()
   state.inventoryItemMoves = state.inventoryItemMoves or {}
   state.inventoryItemTradeSeq = state.inventoryItemTradeSeq or 0
   state.inventoryItemTrades = state.inventoryItemTrades or {}
+  state.inventoryItemDepositExactSeq = state.inventoryItemDepositExactSeq or 0
+  state.inventoryItemDepositExacts = state.inventoryItemDepositExacts or {}
   state.inventoryItemEquipSeq = state.inventoryItemEquipSeq or 0
   state.inventoryItemEquips = state.inventoryItemEquips or {}
   state.inventoryItemUnequipSeq = state.inventoryItemUnequipSeq or 0
@@ -924,6 +931,7 @@ state.selfActionCapable = false
     state.inventoryExactCapable = false
     state.inventoryItemMoveCapable = false
     state.inventoryItemTradeCapable = false
+    state.inventoryItemDepositExactCapable = false
     state.inventoryItemEquipCapable = false
     state.inventoryItemUnequipCapable = false
     state.inventoryItemDestroyCapable = false
@@ -2397,6 +2405,91 @@ function Comm.RunInventoryItemTrade(name, srcBag, srcSlot, srcItemId, srcCount)
       MultiBot.OnBridgeInventoryItemTradeResult(
         pending.botName, "ERR", "TIMEOUT",
         pending.srcBag, pending.srcSlot, pending.srcItemId, pending.srcCount, 255, pending
+      )
+    end
+  end)
+
+  return token
+end
+
+function Comm.IsInventoryItemDepositExactCapable()
+  local state = ensureBridgeState()
+  return state.connected == true
+      and state.inventoryExactCapable == true
+      and state.inventoryItemDepositExactCapable == true
+end
+
+function Comm.RunInventoryItemDepositExact(name, action, srcBag, srcSlot, srcItemId, srcCount)
+  local state = ensureBridgeState()
+  name = trim(name)
+  action = string.upper(trim(action))
+
+  srcBag = parseBoundedInteger(tostring(srcBag or ""), 0, 255)
+  srcSlot = parseBoundedInteger(tostring(srcSlot or ""), 0, 255)
+  srcItemId = parseBoundedInteger(tostring(srcItemId or ""), 1, 4294967295)
+  srcCount = parseBoundedInteger(tostring(srcCount or ""), 1, INVENTORY_ITEM_DEPOSIT_EXACT_MAX_COUNT)
+
+  if name == ""
+      or (action ~= "BANK_DEPOSIT" and action ~= "GBANK_DEPOSIT")
+      or not state.connected
+      or state.inventoryExactCapable ~= true
+      or state.inventoryItemDepositExactCapable ~= true then
+    return false
+  end
+  if srcBag == nil or srcSlot == nil or not srcItemId or not srcCount then
+    return false
+  end
+
+  local botNameKey = string.lower(name)
+  for _, pending in pairs(state.inventoryItemDepositExacts or {}) do
+    if pending.botNameKey == botNameKey
+        and pending.action == action
+        and pending.srcBag == srcBag
+        and pending.srcSlot == srcSlot
+        and pending.srcItemId == srcItemId
+        and pending.srcCount == srcCount then
+      return false
+    end
+  end
+
+  state.inventoryItemDepositExactSeq = (tonumber(state.inventoryItemDepositExactSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-deposit-" .. tostring(state.inventoryItemDepositExactSeq)
+  local command = {
+    token = token,
+    botName = name,
+    botNameKey = botNameKey,
+    action = action,
+    srcBag = srcBag,
+    srcSlot = srcSlot,
+    srcItemId = srcItemId,
+    srcCount = srcCount,
+    startedAt = safeNow(),
+  }
+  state.inventoryItemDepositExacts[token] = command
+
+  local payload = table.concat({
+    "ITEM_DEPOSIT_EXACT", name, token, action,
+    tostring(srcBag), tostring(srcSlot), tostring(srcItemId), tostring(srcCount),
+  }, "~")
+
+  if not Comm.Send("RUN", payload) then
+    state.inventoryItemDepositExacts[token] = nil
+    return false
+  end
+
+  safeDelay(INVENTORY_ITEM_DEPOSIT_EXACT_TIMEOUT_SECONDS, function()
+    local bridgeState = ensureBridgeState()
+    local pending = bridgeState.inventoryItemDepositExacts and bridgeState.inventoryItemDepositExacts[token] or nil
+    if not pending then
+      return
+    end
+
+    bridgeState.inventoryItemDepositExacts[token] = nil
+    bridgeState.lastError = "ITEM_DEPOSIT_EXACT_TIMEOUT"
+    if MultiBot.OnBridgeInventoryItemActionResult then
+      MultiBot.OnBridgeInventoryItemActionResult(
+        pending.botName, pending.action, pending.srcItemId,
+        "ERR", "TIMEOUT", 0, pending
       )
     end
   end)
@@ -3960,6 +4053,15 @@ function Comm.MarkDisconnected(reason)
     end
   end
   state.inventoryItemTrades = {}
+  for _, command in pairs(state.inventoryItemDepositExacts or {}) do
+    if MultiBot.OnBridgeInventoryItemActionResult then
+      MultiBot.OnBridgeInventoryItemActionResult(
+        command.botName or "", command.action or "BANK_DEPOSIT", command.srcItemId or 0,
+        "ERR", "DISCONNECTED", 0, command
+      )
+    end
+  end
+  state.inventoryItemDepositExacts = {}
   state.inventoryItemEquips = {}
   for _, command in pairs(state.inventoryItemUnequips or {}) do
     if MultiBot.OnBridgeInventoryItemUnequipResult then
@@ -4113,6 +4215,7 @@ state.selfActionCapable = false
   state.inventoryExactCapable = false
   state.inventoryItemMoveCapable = false
   state.inventoryItemTradeCapable = false
+  state.inventoryItemDepositExactCapable = false
   state.inventoryItemEquipCapable = false
   state.inventoryItemUnequipCapable = false
   state.inventoryItemDestroyCapable = false
@@ -6379,6 +6482,89 @@ local function handleCapabilityMessage(opcode, payload, state)
   return false
 end
 
+local function handleInventoryItemDepositExactResponse(payload, state)
+  local fields = splitFields(payload)
+  if #fields ~= 10 then
+    state.lastError = "ITEM_DEPOSIT_EXACT_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local botName = urlDecodeFieldStrict(fields[1], 64, false)
+  local token = trim(fields[2])
+  local status = string.upper(trim(fields[3]))
+  local reason = urlDecodeFieldStrict(fields[4], 64, false)
+  local action = string.upper(trim(fields[5]))
+  local srcBag = parseBoundedInteger(fields[6], 0, 255)
+  local srcSlot = parseBoundedInteger(fields[7], 0, 255)
+  local srcItemId = parseBoundedInteger(fields[8], 1, 4294967295)
+  local srcCount = parseBoundedInteger(fields[9], 1, INVENTORY_ITEM_DEPOSIT_EXACT_MAX_COUNT)
+  local movedCount = parseBoundedInteger(fields[10], 0, INVENTORY_ITEM_DEPOSIT_EXACT_MAX_COUNT)
+
+  state.connected = true
+  local command = state.inventoryItemDepositExacts and state.inventoryItemDepositExacts[token] or nil
+  if not botName
+      or not isValidStateToken(token)
+      or (status ~= "OK" and status ~= "ERR")
+      or not reason
+      or (action ~= "BANK_DEPOSIT" and action ~= "GBANK_DEPOSIT")
+      or srcBag == nil
+      or srcSlot == nil
+      or srcItemId == nil
+      or srcCount == nil
+      or movedCount == nil then
+    state.lastError = "ITEM_DEPOSIT_EXACT_BAD_RESPONSE"
+    if command then
+      state.inventoryItemDepositExacts[token] = nil
+      if MultiBot.OnBridgeInventoryItemActionResult then
+        MultiBot.OnBridgeInventoryItemActionResult(
+          command.botName, command.action, command.srcItemId,
+          "ERR", "BAD_RESPONSE", 0, command
+        )
+      end
+    end
+    return true
+  end
+
+  if not command then
+    return true
+  end
+
+  local responseMatches = string.lower(botName) == command.botNameKey
+      and action == command.action
+      and srcBag == command.srcBag
+      and srcSlot == command.srcSlot
+      and srcItemId == command.srcItemId
+      and srcCount == command.srcCount
+      and ((status == "OK" and movedCount == command.srcCount)
+        or (status == "ERR" and movedCount == 0))
+
+  state.inventoryItemDepositExacts[token] = nil
+  if not responseMatches then
+    status = "ERR"
+    reason = "RESPONSE_MISMATCH"
+    movedCount = 0
+    state.lastError = "ITEM_DEPOSIT_EXACT_RESPONSE_MISMATCH"
+  elseif status == "OK" then
+    state.lastError = nil
+  else
+    state.lastError = "ITEM_DEPOSIT_EXACT_" .. reason
+  end
+
+  if MultiBot.OnBridgeInventoryItemActionResult then
+    MultiBot.OnBridgeInventoryItemActionResult(
+      command.botName, command.action, command.srcItemId,
+      status, reason, movedCount, command
+    )
+  end
+
+  debugPrint(
+    "ADDON:RX", "ITEM_DEPOSIT_EXACT",
+    botName, token, status, reason, action,
+    srcBag, srcSlot, srcItemId, srcCount, movedCount
+  )
+  return true
+end
+
 local function handleInventoryItemTradeResponse(payload, state)
   local fields = splitFields(payload)
   if #fields ~= 9 then
@@ -6452,6 +6638,7 @@ end
 -- New structured response handlers should be registered here instead of adding
 -- another large branch directly inside Comm.HandleAddonMessage.
 local STRUCTURED_OPCODE_HANDLERS = {
+  ITEM_DEPOSIT_EXACT = handleInventoryItemDepositExactResponse,
   INVENTORY_ITEM_TRADE = handleInventoryItemTradeResponse,
   QUEST_ABANDON_RESULT = handleQuestAbandonResponse,
   TALENT_APPLY_RESULT = handleTalentApplyResponse,
@@ -8659,6 +8846,7 @@ state.selfActionCapable = false
   state.inventoryExactCapable = false
   state.inventoryItemMoveCapable = false
   state.inventoryItemTradeCapable = false
+  state.inventoryItemDepositExactCapable = false
   state.inventoryItemEquipCapable = false
   state.inventoryItemUnequipCapable = false
   state.inventoryItemDestroyCapable = false

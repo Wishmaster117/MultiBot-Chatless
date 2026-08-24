@@ -473,6 +473,37 @@ local function runBridgeInventoryItemAction(action, button, botName, options)
     return true
 end
 
+local function runBridgeInventoryItemDepositExact(action, button, botName)
+    if not action or action == "" or not button or not button.item or not botName or botName == "" then
+        return false
+    end
+
+    local item = button.item
+    if item.exactLocation ~= true then
+        return false
+    end
+
+    local srcBag = tonumber(item.bag)
+    local srcSlot = tonumber(item.slot)
+    local srcItemId = tonumber(item.id or 0) or 0
+    local srcCount = tonumber(item._serverCount or item.count or 1) or 1
+    if srcBag == nil or srcSlot == nil or srcItemId <= 0 or srcCount < 1 then
+        return false
+    end
+
+    if not MultiBot.Comm
+        or not MultiBot.Comm.IsInventoryItemDepositExactCapable
+        or not MultiBot.Comm.IsInventoryItemDepositExactCapable()
+        or not MultiBot.Comm.RunInventoryItemDepositExact then
+        return false
+    end
+
+    local token = MultiBot.Comm.RunInventoryItemDepositExact(
+        botName, action, srcBag, srcSlot, srcItemId, srcCount
+    )
+    return token and true or false
+end
+
 -- MB_ITEM_SELL_SINGLE_V1_HELPER_BEGIN
 local function runBridgeInventoryItemSell(button, botName)
     if not button or not button.item or not botName or botName == "" then
@@ -736,6 +767,16 @@ local function handleInventoryItemClick(button)
     end
 
     if action == "bank" then
+        local exactDepositCapable = item.exactLocation == true
+            and MultiBot.Comm
+            and MultiBot.Comm.IsInventoryItemDepositExactCapable
+            and MultiBot.Comm.IsInventoryItemDepositExactCapable()
+
+        if exactDepositCapable then
+            runBridgeInventoryItemDepositExact("BANK_DEPOSIT", button, botName)
+            return
+        end
+
         if runBridgeInventoryItemAction("BANK_DEPOSIT", button, botName) then
             return
         end
@@ -751,6 +792,16 @@ local function handleInventoryItemClick(button)
     end
 
     if action == "gb" then
+        local exactDepositCapable = item.exactLocation == true
+            and MultiBot.Comm
+            and MultiBot.Comm.IsInventoryItemDepositExactCapable
+            and MultiBot.Comm.IsInventoryItemDepositExactCapable()
+
+        if exactDepositCapable then
+            runBridgeInventoryItemDepositExact("GBANK_DEPOSIT", button, botName)
+            return
+        end
+
         if runBridgeInventoryItemAction("GBANK_DEPOSIT", button, botName) then
             return
         end
