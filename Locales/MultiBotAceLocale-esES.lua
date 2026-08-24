@@ -4,6 +4,38 @@ if type(register) ~= "function" then
 end
 
 local esESValues = {
+  -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
+  ["loot.item.add"] = "Despojar siempre: añadir objeto",
+  ["loot.item.remove"] = "Despojar siempre: retirar objeto",
+  ["loot.item.bridge.required"] = "Las reglas exactas de botín por objeto requieren LOOT_RULE_ITEM_V1.",
+  ["loot.item.prompt.required"] = "La ventana de entrada del objeto no está disponible.",
+  ["loot.item.add.prompt"] = "ID o enlace del objeto que se debe despojar siempre",
+  ["loot.item.remove.prompt"] = "ID o enlace del objeto que se debe retirar de Despojar siempre",
+  ["loot.item.invalid"] = "ID o enlace de objeto no válido.",
+  ["loot.item.send.failed"] = "No se envió la solicitud de regla de botín por objeto.",
+  ["loot.item.result.added"] = "%s - añadido en %d bot(s).",
+  ["loot.item.result.removed"] = "%s - retirado en %d bot(s).",
+  ["loot.item.result.already_present"] = "%s - ya presente en %d bot(s).",
+  ["loot.item.result.already_absent"] = "%s - ya ausente en %d bot(s).",
+  ["loot.item.result.partial"] = "%s - actualizado parcialmente (%d/%d bot(s)).",
+  ["loot.item.result.ok"] = "%s - %s (%d/%d bot(s)).",
+  ["loot.item.result.failed"] = "%s - error en la regla de botín: %s.",
+  ["loot.item.reason.RATE_LIMIT"] = "demasiadas solicitudes; inténtalo de nuevo en unos segundos",
+  ["loot.item.reason.NO_REQUESTER_SESSION"] = "sesión del jugador no disponible",
+  ["loot.item.reason.REQUESTER_NOT_IN_WORLD"] = "el jugador no está en el mundo",
+  ["loot.item.reason.DUPLICATE"] = "solicitud duplicada",
+  ["loot.item.reason.BAD_ACTION"] = "acción no válida",
+  ["loot.item.reason.INVALID_ITEM"] = "objeto no válido",
+  ["loot.item.reason.NO_BOTS"] = "no hay bots elegibles",
+  ["loot.item.reason.TOO_MANY_BOTS"] = "demasiados bots seleccionados",
+  ["loot.item.reason.FORBIDDEN"] = "control del bot no permitido",
+  ["loot.item.reason.NO_BOT_SESSION"] = "sesión del bot no disponible",
+  ["loot.item.reason.BOT_NOT_IN_WORLD"] = "el bot no está en el mundo",
+  ["loot.item.reason.BOT_DEAD"] = "el bot está muerto",
+  ["loot.item.reason.NO_BOT_CONTEXT"] = "contexto de IA del bot no disponible",
+  ["loot.item.reason.PERSISTENCE_BUSY"] = "la persistencia está ocupada; inténtalo de nuevo en unos segundos",
+  ["loot.item.reason.FAILED"] = "operación fallida",
+  -- MB_LOOT_RULE_ITEM_I18N_V1_END
   -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
   ["talent.spec.apply.success"] = "Especialización %s aplicada correctamente a %s.",
   ["talent.spec.apply.failed"] = "No se pudo aplicar la especialización %s a %s (%s).",

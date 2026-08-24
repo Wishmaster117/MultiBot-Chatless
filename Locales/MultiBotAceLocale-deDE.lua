@@ -4,6 +4,38 @@ if type(register) ~= "function" then
 end
 
 local deDEValues = {
+  -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
+  ["loot.item.add"] = "Immer plündern: Gegenstand hinzufügen",
+  ["loot.item.remove"] = "Immer plündern: Gegenstand entfernen",
+  ["loot.item.bridge.required"] = "Exakte Beuteregeln pro Gegenstand benötigen LOOT_RULE_ITEM_V1.",
+  ["loot.item.prompt.required"] = "Das Eingabefenster für Gegenstände ist nicht verfügbar.",
+  ["loot.item.add.prompt"] = "Gegenstands-ID oder Link zu Immer plündern hinzufügen",
+  ["loot.item.remove.prompt"] = "Gegenstands-ID oder Link aus Immer plündern entfernen",
+  ["loot.item.invalid"] = "Ungültige Gegenstands-ID oder ungültiger Gegenstandslink.",
+  ["loot.item.send.failed"] = "Die Anfrage für die Gegenstands-Beuteregel wurde nicht gesendet.",
+  ["loot.item.result.added"] = "%s - bei %d Bot(s) hinzugefügt.",
+  ["loot.item.result.removed"] = "%s - bei %d Bot(s) entfernt.",
+  ["loot.item.result.already_present"] = "%s - bei %d Bot(s) bereits vorhanden.",
+  ["loot.item.result.already_absent"] = "%s - bei %d Bot(s) bereits nicht vorhanden.",
+  ["loot.item.result.partial"] = "%s - teilweise aktualisiert (%d/%d Bot(s)).",
+  ["loot.item.result.ok"] = "%s - %s (%d/%d Bot(s)).",
+  ["loot.item.result.failed"] = "%s - Beuteregel fehlgeschlagen: %s.",
+  ["loot.item.reason.RATE_LIMIT"] = "zu viele Anfragen; bitte kurz warten",
+  ["loot.item.reason.NO_REQUESTER_SESSION"] = "Spielersitzung nicht verfügbar",
+  ["loot.item.reason.REQUESTER_NOT_IN_WORLD"] = "Spieler ist nicht in der Welt",
+  ["loot.item.reason.DUPLICATE"] = "doppelte Anfrage",
+  ["loot.item.reason.BAD_ACTION"] = "ungültige Aktion",
+  ["loot.item.reason.INVALID_ITEM"] = "ungültiger Gegenstand",
+  ["loot.item.reason.NO_BOTS"] = "keine geeigneten Bots",
+  ["loot.item.reason.TOO_MANY_BOTS"] = "zu viele ausgewählte Bots",
+  ["loot.item.reason.FORBIDDEN"] = "Bot-Steuerung nicht erlaubt",
+  ["loot.item.reason.NO_BOT_SESSION"] = "Bot-Sitzung nicht verfügbar",
+  ["loot.item.reason.BOT_NOT_IN_WORLD"] = "Bot ist nicht in der Welt",
+  ["loot.item.reason.BOT_DEAD"] = "Bot ist tot",
+  ["loot.item.reason.NO_BOT_CONTEXT"] = "Bot-KI-Kontext nicht verfügbar",
+  ["loot.item.reason.PERSISTENCE_BUSY"] = "Persistenz ist ausgelastet; bitte kurz warten",
+  ["loot.item.reason.FAILED"] = "Vorgang fehlgeschlagen",
+  -- MB_LOOT_RULE_ITEM_I18N_V1_END
   -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
   ["talent.spec.apply.success"] = "Talentspezialisierung %s wurde erfolgreich auf %s angewendet.",
   ["talent.spec.apply.failed"] = "Talentspezialisierung %s konnte nicht auf %s angewendet werden (%s).",

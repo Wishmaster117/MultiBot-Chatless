@@ -4,6 +4,38 @@ if type(register) ~= "function" then
 end
 
 local koKRValues = {
+  -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
+  ["loot.item.add"] = "항상 획득: 아이템 추가",
+  ["loot.item.remove"] = "항상 획득: 아이템 제거",
+  ["loot.item.bridge.required"] = "아이템별 정확한 전리품 규칙에는 LOOT_RULE_ITEM_V1이 필요합니다.",
+  ["loot.item.prompt.required"] = "아이템 입력 창을 사용할 수 없습니다.",
+  ["loot.item.add.prompt"] = "항상 획득에 추가할 아이템 ID 또는 링크",
+  ["loot.item.remove.prompt"] = "항상 획득에서 제거할 아이템 ID 또는 링크",
+  ["loot.item.invalid"] = "아이템 ID 또는 아이템 링크가 올바르지 않습니다.",
+  ["loot.item.send.failed"] = "아이템 전리품 규칙 요청을 보내지 못했습니다.",
+  ["loot.item.result.added"] = "%s - %d개 봇에 추가했습니다.",
+  ["loot.item.result.removed"] = "%s - %d개 봇에서 제거했습니다.",
+  ["loot.item.result.already_present"] = "%s - %d개 봇에 이미 있습니다.",
+  ["loot.item.result.already_absent"] = "%s - %d개 봇에 이미 없습니다.",
+  ["loot.item.result.partial"] = "%s - 일부만 업데이트했습니다 (%d/%d개 봇).",
+  ["loot.item.result.ok"] = "%s - %s (%d/%d개 봇).",
+  ["loot.item.result.failed"] = "%s - 전리품 규칙 실패: %s.",
+  ["loot.item.reason.RATE_LIMIT"] = "요청이 너무 많습니다. 잠시 후 다시 시도하세요",
+  ["loot.item.reason.NO_REQUESTER_SESSION"] = "플레이어 세션을 사용할 수 없습니다",
+  ["loot.item.reason.REQUESTER_NOT_IN_WORLD"] = "플레이어가 월드에 없습니다",
+  ["loot.item.reason.DUPLICATE"] = "중복 요청",
+  ["loot.item.reason.BAD_ACTION"] = "잘못된 동작",
+  ["loot.item.reason.INVALID_ITEM"] = "잘못된 아이템",
+  ["loot.item.reason.NO_BOTS"] = "대상 봇이 없습니다",
+  ["loot.item.reason.TOO_MANY_BOTS"] = "선택된 봇이 너무 많습니다",
+  ["loot.item.reason.FORBIDDEN"] = "봇 제어 권한이 없습니다",
+  ["loot.item.reason.NO_BOT_SESSION"] = "봇 세션을 사용할 수 없습니다",
+  ["loot.item.reason.BOT_NOT_IN_WORLD"] = "봇이 월드에 없습니다",
+  ["loot.item.reason.BOT_DEAD"] = "봇이 죽어 있습니다",
+  ["loot.item.reason.NO_BOT_CONTEXT"] = "봇 AI 컨텍스트를 사용할 수 없습니다",
+  ["loot.item.reason.PERSISTENCE_BUSY"] = "저장 처리가 바쁩니다. 잠시 후 다시 시도하세요",
+  ["loot.item.reason.FAILED"] = "작업 실패",
+  -- MB_LOOT_RULE_ITEM_I18N_V1_END
   -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
   ["talent.spec.apply.success"] = "%s 특성이 %s에게 성공적으로 적용되었습니다.",
   ["talent.spec.apply.failed"] = "%s 특성을 %s에게 적용하지 못했습니다. (%s)",

@@ -4,6 +4,38 @@ if type(register) ~= "function" then
 end
 
 local frFRValues = {
+  -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
+  ["loot.item.add"] = "Toujours ramasser : ajouter un objet",
+  ["loot.item.remove"] = "Toujours ramasser : retirer un objet",
+  ["loot.item.bridge.required"] = "Les règles exactes de butin par objet nécessitent LOOT_RULE_ITEM_V1.",
+  ["loot.item.prompt.required"] = "La fenêtre de saisie de l'objet est indisponible.",
+  ["loot.item.add.prompt"] = "ID ou lien de l'objet à toujours ramasser",
+  ["loot.item.remove.prompt"] = "ID ou lien de l'objet à retirer de Toujours ramasser",
+  ["loot.item.invalid"] = "ID ou lien d'objet invalide.",
+  ["loot.item.send.failed"] = "La demande de règle de butin par objet n'a pas été envoyée.",
+  ["loot.item.result.added"] = "%s - ajouté à la liste de %d bot(s).",
+  ["loot.item.result.removed"] = "%s - retiré de la liste de %d bot(s).",
+  ["loot.item.result.already_present"] = "%s - déjà présent sur %d bot(s).",
+  ["loot.item.result.already_absent"] = "%s - déjà absent sur %d bot(s).",
+  ["loot.item.result.partial"] = "%s - mise à jour partielle (%d/%d bot(s)).",
+  ["loot.item.result.ok"] = "%s - %s (%d/%d bot(s)).",
+  ["loot.item.result.failed"] = "%s - échec de la règle de butin : %s.",
+  ["loot.item.reason.RATE_LIMIT"] = "trop de requêtes ; réessayez dans quelques secondes",
+  ["loot.item.reason.NO_REQUESTER_SESSION"] = "session du joueur indisponible",
+  ["loot.item.reason.REQUESTER_NOT_IN_WORLD"] = "le joueur n'est pas dans le monde",
+  ["loot.item.reason.DUPLICATE"] = "requête en double",
+  ["loot.item.reason.BAD_ACTION"] = "action invalide",
+  ["loot.item.reason.INVALID_ITEM"] = "objet invalide",
+  ["loot.item.reason.NO_BOTS"] = "aucun bot éligible",
+  ["loot.item.reason.TOO_MANY_BOTS"] = "trop de bots sélectionnés",
+  ["loot.item.reason.FORBIDDEN"] = "contrôle du bot interdit",
+  ["loot.item.reason.NO_BOT_SESSION"] = "session du bot indisponible",
+  ["loot.item.reason.BOT_NOT_IN_WORLD"] = "le bot n'est pas dans le monde",
+  ["loot.item.reason.BOT_DEAD"] = "le bot est mort",
+  ["loot.item.reason.NO_BOT_CONTEXT"] = "contexte IA du bot indisponible",
+  ["loot.item.reason.PERSISTENCE_BUSY"] = "persistance occupée ; réessayez dans quelques secondes",
+  ["loot.item.reason.FAILED"] = "opération échouée",
+  -- MB_LOOT_RULE_ITEM_I18N_V1_END
   -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
   ["talent.spec.apply.success"] = "Spécialisation %s appliquée avec succès à %s.",
   ["talent.spec.apply.failed"] = "Échec de l'application de la spécialisation %s à %s (%s).",

@@ -4,6 +4,38 @@ if type(register) ~= "function" then
 end
 
 local zhCNValues = {
+  -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
+  ["loot.item.add"] = "始终拾取：添加物品",
+  ["loot.item.remove"] = "始终拾取：移除物品",
+  ["loot.item.bridge.required"] = "精确的按物品拾取规则需要 LOOT_RULE_ITEM_V1。",
+  ["loot.item.prompt.required"] = "物品输入窗口不可用。",
+  ["loot.item.add.prompt"] = "要加入始终拾取的物品 ID 或链接",
+  ["loot.item.remove.prompt"] = "要从始终拾取移除的物品 ID 或链接",
+  ["loot.item.invalid"] = "无效的物品 ID 或物品链接。",
+  ["loot.item.send.failed"] = "物品拾取规则请求未发送。",
+  ["loot.item.result.added"] = "%s - 已添加到 %d 个机器人。",
+  ["loot.item.result.removed"] = "%s - 已从 %d 个机器人移除。",
+  ["loot.item.result.already_present"] = "%s - 已存在于 %d 个机器人。",
+  ["loot.item.result.already_absent"] = "%s - 已在 %d 个机器人中不存在。",
+  ["loot.item.result.partial"] = "%s - 部分更新（%d/%d 个机器人）。",
+  ["loot.item.result.ok"] = "%s - %s（%d/%d 个机器人）。",
+  ["loot.item.result.failed"] = "%s - 拾取规则失败：%s。",
+  ["loot.item.reason.RATE_LIMIT"] = "请求过多；请稍后重试",
+  ["loot.item.reason.NO_REQUESTER_SESSION"] = "玩家会话不可用",
+  ["loot.item.reason.REQUESTER_NOT_IN_WORLD"] = "玩家不在世界中",
+  ["loot.item.reason.DUPLICATE"] = "重复请求",
+  ["loot.item.reason.BAD_ACTION"] = "无效操作",
+  ["loot.item.reason.INVALID_ITEM"] = "无效物品",
+  ["loot.item.reason.NO_BOTS"] = "没有符合条件的机器人",
+  ["loot.item.reason.TOO_MANY_BOTS"] = "选择的机器人过多",
+  ["loot.item.reason.FORBIDDEN"] = "无权控制机器人",
+  ["loot.item.reason.NO_BOT_SESSION"] = "机器人会话不可用",
+  ["loot.item.reason.BOT_NOT_IN_WORLD"] = "机器人不在世界中",
+  ["loot.item.reason.BOT_DEAD"] = "机器人已死亡",
+  ["loot.item.reason.NO_BOT_CONTEXT"] = "机器人 AI 上下文不可用",
+  ["loot.item.reason.PERSISTENCE_BUSY"] = "持久化繁忙；请稍后重试",
+  ["loot.item.reason.FAILED"] = "操作失败",
+  -- MB_LOOT_RULE_ITEM_I18N_V1_END
   -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
   ["talent.spec.apply.success"] = "已成功将天赋专精 %s 应用于 %s。",
   ["talent.spec.apply.failed"] = "无法将天赋专精 %s 应用于 %s（%s）。",

@@ -33,6 +33,7 @@ local QUEST_ABANDON_CAPABILITY = "QUEST_ABANDON_V1"
 local TALENT_APPLY_CAPABILITY = "TALENT_APPLY_V1"
 local TALENT_SPEC_APPLY_CAPABILITY = "TALENT_SPEC_APPLY_V1"
 local CRAFT_RECIPE_TARGET_CAPABILITY = "CRAFT_RECIPE_TARGET_V1"
+local LOOT_RULE_ITEM_CAPABILITY = "LOOT_RULE_ITEM_V1"
 -- MB_LUA51_UPVALUE_REFACTOR_V1_BEGIN
 -- Keep capability-to-state mapping outside Comm.HandleAddonMessage so each
 -- capability does not consume a separate Lua 5.1 upvalue in that dispatcher.
@@ -61,6 +62,7 @@ local CAPABILITY_STATE_FIELDS = {
   [TALENT_APPLY_CAPABILITY] = "talentApplyCapable",
   [TALENT_SPEC_APPLY_CAPABILITY] = "talentSpecApplyCapable",
   [CRAFT_RECIPE_TARGET_CAPABILITY] = "craftRecipeTargetCapable",
+  [LOOT_RULE_ITEM_CAPABILITY] = "lootRuleItemCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
 -- MB_LUA51_UPVALUE_REFACTOR_V1_END
@@ -72,6 +74,8 @@ local TALENT_APPLY_TIMEOUT_SECONDS = 5.0
 local TALENT_SPEC_APPLY_TIMEOUT_SECONDS = 5.0
 local CRAFT_RECIPE_TARGET_TIMEOUT_SECONDS = 5.0
 local CRAFT_RECIPE_TARGET_MAX_ACTIVE = 8
+local LOOT_RULE_ITEM_TIMEOUT_SECONDS = 5.0
+local LOOT_RULE_ITEM_MAX_ACTIVE = 32
 local INVENTORY_ITEM_MOVE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_TRADE_TIMEOUT_SECONDS = 5.0
 local INVENTORY_ITEM_DEPOSIT_EXACT_TIMEOUT_SECONDS = 5.0
@@ -343,6 +347,7 @@ local function ensureBridgeState()
   state.talentApplyCapable = state.talentApplyCapable or false
   state.talentSpecApplyCapable = state.talentSpecApplyCapable or false
   state.craftRecipeTargetCapable = state.craftRecipeTargetCapable or false
+  state.lootRuleItemCapable = state.lootRuleItemCapable or false
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -450,6 +455,8 @@ local function ensureBridgeState()
   state.rtiSeq = state.rtiSeq or 0
   state.combatSeq = state.combatSeq or 0
   state.positionSeq = state.positionSeq or 0
+  state.lootRuleItemSeq = state.lootRuleItemSeq or 0
+  state.lootRuleItemCommands = state.lootRuleItemCommands or {}
   state.lootSeq = state.lootSeq or 0
   state.formationSeq = state.formationSeq or 0
   state.formationCommands = state.formationCommands or {}
@@ -940,6 +947,7 @@ state.selfActionCapable = false
     state.inventoryBuybackCapable = false
     state.inventoryBulkSellCapable = false
     state.inventoryOpenCapable = false
+    state.lootRuleItemCapable = false
     state.groupRollCapable = false
     state.enchantTradeCapable = false
     state.selfBotCapable = false
@@ -1389,6 +1397,108 @@ function Comm.RunLootCommand(scope, target, command)
   return Comm.Send("RUN", "LOOT~" .. scope .. "~" .. urlEncodeField(target) .. "~" .. token .. "~" .. urlEncodeField(command))
 end
 
+-- MB_LOOT_RULE_ITEM_V1_TX_BEGIN
+function Comm.IsLootRuleItemCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.lootRuleItemCapable == true
+end
+
+function Comm.RunLootRuleItem(scope, target, action, itemId)
+  local state = ensureBridgeState()
+  if not state.connected or state.lootRuleItemCapable ~= true then
+    state.lastError = "LOOT_RULE_ITEM_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  scope = string.upper(trim(scope or "ALL"))
+  target = trim(target or "")
+  action = string.upper(trim(action or ""))
+  itemId = parseBoundedInteger(tostring(itemId or ""), 1, 4294967295)
+
+  local validScope = scope == "ALL" or scope == "RAID" or scope == "GROUP"
+      or scope == "PARTY" or scope == "BOT"
+  if not validScope then
+    state.lastError = "LOOT_RULE_ITEM_BAD_SCOPE"
+    return false
+  end
+  if string.len(target) > 64
+      or (scope == "BOT" and target == "")
+      or ((scope == "ALL" or scope == "RAID") and target ~= "") then
+    state.lastError = "LOOT_RULE_ITEM_BAD_TARGET"
+    return false
+  end
+  if (scope == "GROUP" or scope == "PARTY") and target ~= "" then
+    local groupNumber = tonumber(target)
+    if not groupNumber or math.floor(groupNumber) ~= groupNumber or groupNumber < 1 or groupNumber > 8 then
+      state.lastError = "LOOT_RULE_ITEM_BAD_TARGET"
+      return false
+    end
+  end
+  if action ~= "ADD" and action ~= "REMOVE" then
+    state.lastError = "LOOT_RULE_ITEM_BAD_ACTION"
+    return false
+  end
+  if not itemId then
+    state.lastError = "LOOT_RULE_ITEM_BAD_ITEM"
+    return false
+  end
+  if countTableEntries(state.lootRuleItemCommands) >= LOOT_RULE_ITEM_MAX_ACTIVE then
+    state.lastError = "LOOT_RULE_ITEM_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  local targetKey = string.lower(target)
+  for _, pending in pairs(state.lootRuleItemCommands) do
+    if type(pending) == "table"
+        and pending.scope == scope
+        and pending.targetKey == targetKey
+        and pending.action == action
+        and pending.itemId == itemId then
+      state.lastError = "LOOT_RULE_ITEM_ALREADY_PENDING"
+      return false
+    end
+  end
+
+  state.lootRuleItemSeq = (tonumber(state.lootRuleItemSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-loot-item-" .. tostring(state.lootRuleItemSeq)
+  state.lootRuleItemCommands[token] = {
+    scope = scope,
+    target = target,
+    targetKey = targetKey,
+    action = action,
+    itemId = itemId,
+    startedAt = safeNow(),
+  }
+
+  local payload = table.concat({
+    "LOOT_RULE_ITEM", scope, urlEncodeField(target), token, action, tostring(itemId),
+  }, "~")
+  if not Comm.Send("RUN", payload) then
+    state.lootRuleItemCommands[token] = nil
+    state.lastError = "LOOT_RULE_ITEM_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(LOOT_RULE_ITEM_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    local pending = bridge.lootRuleItemCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    bridge.lootRuleItemCommands[token] = nil
+    bridge.lastError = "LOOT_RULE_ITEM_TIMEOUT"
+    if MultiBot.OnLootRuleItemResult then
+      MultiBot.OnLootRuleItemResult(
+        pending.scope, pending.target, pending.action, pending.itemId,
+        "ERR", "TIMEOUT", 0, 0, pending
+      )
+    end
+  end)
+
+  return token
+end
+-- MB_LOOT_RULE_ITEM_V1_TX_END
 function Comm.RunPositionCommand(scope, target, command)
   local state = ensureBridgeState()
 
@@ -4166,6 +4276,16 @@ function Comm.MarkDisconnected(reason)
   end
   state.groupRollCommands = {}
 
+  for _, pending in pairs(state.lootRuleItemCommands or {}) do
+    if MultiBot.OnLootRuleItemResult then
+      MultiBot.OnLootRuleItemResult(
+        pending.scope or "ALL", pending.target or "", pending.action or "ADD", pending.itemId or 0,
+        "ERR", "DISCONNECTED", 0, 0, pending
+      )
+    end
+  end
+  state.lootRuleItemCommands = {}
+
   state.spellbookActive = nil
   state.botSkillActive = nil
   state.botReputationActive = nil
@@ -4224,6 +4344,7 @@ state.selfActionCapable = false
   state.inventoryBuybackCapable = false
   state.inventoryBulkSellCapable = false
   state.inventoryOpenCapable = false
+  state.lootRuleItemCapable = false
   state.groupRollCapable = false
   state.enchantTradeCapable = false
   state.selfBotCapable = false
@@ -6565,6 +6686,89 @@ local function handleInventoryItemDepositExactResponse(payload, state)
   return true
 end
 
+-- MB_LOOT_RULE_ITEM_V1_RX_BEGIN
+local function handleLootRuleItemResponse(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 9 then
+    state.lastError = "LOOT_RULE_ITEM_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local scope = string.upper(trim(fields[1]))
+  local target = urlDecodeFieldStrict(fields[2], 64, true)
+  local token = trim(fields[3])
+  local action = string.upper(trim(fields[4]))
+  local itemId = parseBoundedInteger(fields[5], 1, 4294967295)
+  local status = string.upper(trim(fields[6]))
+  local reason = urlDecodeFieldStrict(fields[7], 64, false)
+  local matched = parseBoundedInteger(fields[8], 0, 128)
+  local changed = parseBoundedInteger(fields[9], 0, 128)
+  local pending = state.lootRuleItemCommands[token]
+  local validScope = scope == "ALL" or scope == "RAID" or scope == "GROUP"
+      or scope == "PARTY" or scope == "BOT"
+
+  state.connected = true
+  if not validScope
+      or target == nil
+      or not isValidStateToken(token)
+      or (action ~= "ADD" and action ~= "REMOVE")
+      or itemId == nil
+      or (status ~= "OK" and status ~= "ERR")
+      or reason == nil
+      or matched == nil
+      or changed == nil
+      or changed > matched
+      or (status == "OK" and matched == 0)
+      or (status == "ERR" and changed ~= 0) then
+    state.lastError = "LOOT_RULE_ITEM_BAD_RESPONSE"
+    if type(pending) == "table" then
+      state.lootRuleItemCommands[token] = nil
+      if MultiBot.OnLootRuleItemResult then
+        MultiBot.OnLootRuleItemResult(
+          pending.scope, pending.target, pending.action, pending.itemId,
+          "ERR", "BAD_RESPONSE", 0, 0, pending
+        )
+      end
+    end
+    return true
+  end
+
+  if type(pending) ~= "table" then
+    return true
+  end
+
+  local responseMatches = scope == pending.scope
+      and string.lower(target) == pending.targetKey
+      and action == pending.action
+      and itemId == pending.itemId
+  state.lootRuleItemCommands[token] = nil
+
+  if not responseMatches then
+    status = "ERR"
+    reason = "RESPONSE_MISMATCH"
+    matched = 0
+    changed = 0
+    state.lastError = "LOOT_RULE_ITEM_RESPONSE_MISMATCH"
+  elseif status == "OK" then
+    state.lastError = nil
+  else
+    state.lastError = "LOOT_RULE_ITEM_" .. reason
+  end
+
+  if MultiBot.OnLootRuleItemResult then
+    MultiBot.OnLootRuleItemResult(
+      pending.scope, pending.target, pending.action, pending.itemId,
+      status, reason, matched, changed, pending
+    )
+  end
+
+  debugPrint(
+    "ADDON:RX", "LOOT_RULE_ITEM_RESULT",
+    scope, target, token, action, itemId, status, reason, matched, changed
+  )
+  return true
+end
+-- MB_LOOT_RULE_ITEM_V1_RX_END
 local function handleInventoryItemTradeResponse(payload, state)
   local fields = splitFields(payload)
   if #fields ~= 9 then
@@ -6639,6 +6843,7 @@ end
 -- another large branch directly inside Comm.HandleAddonMessage.
 local STRUCTURED_OPCODE_HANDLERS = {
   ITEM_DEPOSIT_EXACT = handleInventoryItemDepositExactResponse,
+  LOOT_RULE_ITEM_RESULT = handleLootRuleItemResponse,
   INVENTORY_ITEM_TRADE = handleInventoryItemTradeResponse,
   QUEST_ABANDON_RESULT = handleQuestAbandonResponse,
   TALENT_APPLY_RESULT = handleTalentApplyResponse,
@@ -8777,6 +8982,16 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
           return true
         elseif Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state) then
           return true
+        elseif requestType == "LOOT_RULE_ITEM" and state.lootRuleItemCommands[token] then
+          local pending = state.lootRuleItemCommands[token]
+          state.lootRuleItemCommands[token] = nil
+          state.lastError = "LOOT_RULE_ITEM_" .. reason
+          if MultiBot.OnLootRuleItemResult then
+            MultiBot.OnLootRuleItemResult(
+              pending.scope, pending.target, pending.action, pending.itemId,
+              "ERR", reason, 0, 0, pending
+            )
+          end
         elseif requestType == "GROUP_ROLL" and state.groupRollCommands[token] then
           finishGroupRollCommand(token, {
             status = "error",
@@ -8855,11 +9070,13 @@ state.selfActionCapable = false
   state.inventoryBuybackCapable = false
   state.inventoryBulkSellCapable = false
   state.inventoryOpenCapable = false
+  state.lootRuleItemCapable = false
   state.groupRollCapable = false
   state.enchantTradeCapable = false
   state.questAbandonCapable = false
   state.selfBotCapable = false
   state.strategyMutationCommands = {}
+  state.lootRuleItemCommands = {}
   state.details = {}
   state.stats = {}
   state.pvpStats = {}

@@ -4,6 +4,38 @@ if type(register) ~= "function" then
 end
 
 local enGBValues = {
+  -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
+  ["loot.item.add"] = "Always loot: add item",
+  ["loot.item.remove"] = "Always loot: remove item",
+  ["loot.item.bridge.required"] = "Exact loot-item rules require LOOT_RULE_ITEM_V1.",
+  ["loot.item.prompt.required"] = "Item prompt is unavailable.",
+  ["loot.item.add.prompt"] = "Add always-loot item ID or link",
+  ["loot.item.remove.prompt"] = "Remove always-loot item ID or link",
+  ["loot.item.invalid"] = "Invalid item ID or item link.",
+  ["loot.item.send.failed"] = "Loot item rule request was not sent.",
+  ["loot.item.result.added"] = "%s - added to %d bot(s).",
+  ["loot.item.result.removed"] = "%s - removed from %d bot(s).",
+  ["loot.item.result.already_present"] = "%s - already present on %d bot(s).",
+  ["loot.item.result.already_absent"] = "%s - already absent on %d bot(s).",
+  ["loot.item.result.partial"] = "%s - partially updated (%d/%d bot(s)).",
+  ["loot.item.result.ok"] = "%s - %s (%d/%d bot(s)).",
+  ["loot.item.result.failed"] = "%s - loot rule failed: %s.",
+  ["loot.item.reason.RATE_LIMIT"] = "too many requests; try again shortly",
+  ["loot.item.reason.NO_REQUESTER_SESSION"] = "requester session unavailable",
+  ["loot.item.reason.REQUESTER_NOT_IN_WORLD"] = "requester is not in world",
+  ["loot.item.reason.DUPLICATE"] = "duplicate request",
+  ["loot.item.reason.BAD_ACTION"] = "invalid action",
+  ["loot.item.reason.INVALID_ITEM"] = "invalid item",
+  ["loot.item.reason.NO_BOTS"] = "no eligible bots",
+  ["loot.item.reason.TOO_MANY_BOTS"] = "too many selected bots",
+  ["loot.item.reason.FORBIDDEN"] = "bot control forbidden",
+  ["loot.item.reason.NO_BOT_SESSION"] = "bot session unavailable",
+  ["loot.item.reason.BOT_NOT_IN_WORLD"] = "bot is not in world",
+  ["loot.item.reason.BOT_DEAD"] = "bot is dead",
+  ["loot.item.reason.NO_BOT_CONTEXT"] = "bot AI context unavailable",
+  ["loot.item.reason.PERSISTENCE_BUSY"] = "persistence is busy; try again shortly",
+  ["loot.item.reason.FAILED"] = "operation failed",
+  -- MB_LOOT_RULE_ITEM_I18N_V1_END
   -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
   ["talent.spec.apply.success"] = "Talent specialization %s applied successfully to %s.",
   ["talent.spec.apply.failed"] = "Failed to apply talent specialization %s to %s (%s).",

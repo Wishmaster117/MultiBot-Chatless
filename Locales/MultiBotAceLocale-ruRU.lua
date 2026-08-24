@@ -4,6 +4,38 @@ if type(register) ~= "function" then
 end
 
 local ruRUValues = {
+  -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
+  ["loot.item.add"] = "Всегда собирать: добавить предмет",
+  ["loot.item.remove"] = "Всегда собирать: убрать предмет",
+  ["loot.item.bridge.required"] = "Точные правила добычи для предметов требуют LOOT_RULE_ITEM_V1.",
+  ["loot.item.prompt.required"] = "Окно ввода предмета недоступно.",
+  ["loot.item.add.prompt"] = "ID или ссылка предмета для списка «Всегда собирать»",
+  ["loot.item.remove.prompt"] = "ID или ссылка предмета для удаления из списка «Всегда собирать»",
+  ["loot.item.invalid"] = "Недопустимый ID или ссылка предмета.",
+  ["loot.item.send.failed"] = "Запрос правила добычи для предмета не был отправлен.",
+  ["loot.item.result.added"] = "%s - добавлено для %d бот(ов).",
+  ["loot.item.result.removed"] = "%s - удалено для %d бот(ов).",
+  ["loot.item.result.already_present"] = "%s - уже есть у %d бот(ов).",
+  ["loot.item.result.already_absent"] = "%s - уже отсутствует у %d бот(ов).",
+  ["loot.item.result.partial"] = "%s - обновлено частично (%d/%d бот(ов)).",
+  ["loot.item.result.ok"] = "%s - %s (%d/%d бот(ов)).",
+  ["loot.item.result.failed"] = "%s - ошибка правила добычи: %s.",
+  ["loot.item.reason.RATE_LIMIT"] = "слишком много запросов; повторите через несколько секунд",
+  ["loot.item.reason.NO_REQUESTER_SESSION"] = "сессия игрока недоступна",
+  ["loot.item.reason.REQUESTER_NOT_IN_WORLD"] = "игрок не находится в мире",
+  ["loot.item.reason.DUPLICATE"] = "повторный запрос",
+  ["loot.item.reason.BAD_ACTION"] = "недопустимое действие",
+  ["loot.item.reason.INVALID_ITEM"] = "недопустимый предмет",
+  ["loot.item.reason.NO_BOTS"] = "нет подходящих ботов",
+  ["loot.item.reason.TOO_MANY_BOTS"] = "выбрано слишком много ботов",
+  ["loot.item.reason.FORBIDDEN"] = "управление ботом запрещено",
+  ["loot.item.reason.NO_BOT_SESSION"] = "сессия бота недоступна",
+  ["loot.item.reason.BOT_NOT_IN_WORLD"] = "бот не находится в мире",
+  ["loot.item.reason.BOT_DEAD"] = "бот мёртв",
+  ["loot.item.reason.NO_BOT_CONTEXT"] = "контекст ИИ бота недоступен",
+  ["loot.item.reason.PERSISTENCE_BUSY"] = "сохранение занято; повторите через несколько секунд",
+  ["loot.item.reason.FAILED"] = "операция завершилась ошибкой",
+  -- MB_LOOT_RULE_ITEM_I18N_V1_END
   -- MB_TALENT_SPEC_APPLY_I18N_V1_BEGIN
   ["talent.spec.apply.success"] = "Специализация %s успешно применена к %s.",
   ["talent.spec.apply.failed"] = "Не удалось применить специализацию %s к %s (%s).",
