@@ -950,6 +950,10 @@ state.selfActionCapable = false
     state.lootRuleItemCapable = false
     state.groupRollCapable = false
     state.enchantTradeCapable = false
+    state.questAbandonCapable = false
+    state.talentApplyCapable = false
+    state.talentSpecApplyCapable = false
+    state.craftRecipeTargetCapable = false
     state.selfBotCapable = false
   end
 
@@ -4246,6 +4250,25 @@ function Comm.MarkDisconnected(reason)
     })
   end
   state.talentApplyCommands = {}
+
+  local pendingTalentSpecApplyTokens = {}
+  for token in pairs(state.talentSpecApplyCommands or {}) do
+    pendingTalentSpecApplyTokens[#pendingTalentSpecApplyTokens + 1] = token
+  end
+  for _, token in ipairs(pendingTalentSpecApplyTokens) do
+    local pending = state.talentSpecApplyCommands[token]
+    finishTalentSpecApplyCommand(token, {
+      status = "error",
+      reason = "DISCONNECTED",
+      botName = pending and pending.botName or "",
+      slot = pending and pending.slot or 1,
+      specIndex = pending and pending.specIndex or 0,
+      specName = pending and pending.specName or "",
+      treePoints = {0, 0, 0},
+    })
+  end
+  state.talentSpecApplyCommands = {}
+
   local pendingQuestAbandonTokens = {}
   for token in pairs(state.questAbandonCommands or {}) do
     pendingQuestAbandonTokens[#pendingQuestAbandonTokens + 1] = token
@@ -4347,6 +4370,10 @@ state.selfActionCapable = false
   state.lootRuleItemCapable = false
   state.groupRollCapable = false
   state.enchantTradeCapable = false
+  state.questAbandonCapable = false
+  state.talentApplyCapable = false
+  state.talentSpecApplyCapable = false
+  state.craftRecipeTargetCapable = false
   state.selfBotCapable = false
   state.stateFramingCapable = false
   state.capabilityFallbackDeadline = 0
@@ -9074,6 +9101,9 @@ state.selfActionCapable = false
   state.groupRollCapable = false
   state.enchantTradeCapable = false
   state.questAbandonCapable = false
+  state.talentApplyCapable = false
+  state.talentSpecApplyCapable = false
+  state.craftRecipeTargetCapable = false
   state.selfBotCapable = false
   state.strategyMutationCommands = {}
   state.lootRuleItemCommands = {}
