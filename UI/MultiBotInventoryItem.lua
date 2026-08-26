@@ -773,7 +773,14 @@ local function handleInventoryItemClick(button)
             and MultiBot.Comm.IsInventoryItemDepositExactCapable()
 
         if exactDepositCapable then
-            runBridgeInventoryItemDepositExact("BANK_DEPOSIT", button, botName)
+            if runBridgeInventoryItemDepositExact("BANK_DEPOSIT", button, botName) then
+                return
+            end
+
+            addInventorySystemMessage(inventoryItemL(
+                "inventory.item_deposit_exact.send_failed",
+                "The exact deposit request could not be sent."
+            ))
             return
         end
 
@@ -798,7 +805,14 @@ local function handleInventoryItemClick(button)
             and MultiBot.Comm.IsInventoryItemDepositExactCapable()
 
         if exactDepositCapable then
-            runBridgeInventoryItemDepositExact("GBANK_DEPOSIT", button, botName)
+            if runBridgeInventoryItemDepositExact("GBANK_DEPOSIT", button, botName) then
+                return
+            end
+
+            addInventorySystemMessage(inventoryItemL(
+                "inventory.item_deposit_exact.send_failed",
+                "The exact deposit request could not be sent."
+            ))
             return
         end
 
