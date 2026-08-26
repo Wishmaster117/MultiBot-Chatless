@@ -72,12 +72,19 @@ function ShowPrompt(title, onOk, defaultText, anchorFrame)
         end
         window:AddChild(edit)
 
-        -- The bundled AceGUI EditBox binds OnMouseDown to drag handling, which
-        -- clears focus even when no drag payload exists. Keep this override
-        -- local to the universal prompt so the field remains clickable/editable.
+        -- The bundled AceGUI EditBox binds OnMouseDown to drag handling. Preserve
+        -- that handler for item/spell cursor payloads, but avoid calling it for a
+        -- normal click because it clears focus even when there is no payload.
         local nativeEditBox = edit.editbox
         if nativeEditBox and nativeEditBox.SetScript then
-            nativeEditBox:SetScript("OnMouseDown", function(frame)
+            local originalOnMouseDown = nativeEditBox.GetScript and nativeEditBox:GetScript("OnMouseDown") or nil
+            nativeEditBox:SetScript("OnMouseDown", function(frame, ...)
+                local cursorType = GetCursorInfo and GetCursorInfo() or nil
+                if (cursorType == "item" or cursorType == "spell") and originalOnMouseDown then
+                    originalOnMouseDown(frame, ...)
+                    return
+                end
+
                 if frame and frame.SetFocus then
                     frame:SetFocus()
                 end
