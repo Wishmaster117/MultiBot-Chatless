@@ -176,7 +176,7 @@ local function onInspectSlotClick(self, mouseButton)
         local itemLink = getSlotItemLink(self)
         local inspectSlotId = getInspectSlotId(self)
         local itemId = getItemIdFromLink(itemLink)
-        if inspectSlotId and itemId and MultiBot.TryProfessionRecipeTargetEquipmentItem then
+        if inspectSlotId and MultiBot.TryProfessionRecipeTargetEquipmentItem then
             local serverSlot = inspectSlotId - 1
             if MultiBot.TryProfessionRecipeTargetEquipmentItem(botName, serverSlot, itemId) then
                 return

@@ -55,7 +55,6 @@ local RECIPE_CRAFT_BUTTON_WIDTH = 62
 local RECIPE_TEXT_WIDTH = 176
 local RECIPE_REFRESH_DELAY = 3.0
 local COOKING_SKILL_ID = 185
-local ENCHANTING_SKILL_ID = 333
 
 local REPUTATION_BAR_COLORS = {
     [0] = { 0.80, 0.12, 0.12 }, -- Hated
@@ -574,10 +573,13 @@ local function beginRecipeTargetSelection(frame, botName, skillId, spellId)
         spellId = tonumber(spellId or 0) or 0,
     }
 
-    frame.status:SetText(L(
-        "profession.recipes.target.select",
-        "Select the exact item to modify in the bot's inventory or equipment."
-    ))
+    local spellName = getSpellDisplay(spellId)
+    frame.status:SetText(
+        spellName .. " - " .. L(
+            "profession.recipes.target.select",
+            "Select the exact item to modify in the bot's inventory or equipment."
+        )
+    )
     frame:render()
 
     if MultiBot.RequestBotInventory then
@@ -1088,14 +1090,6 @@ local function ensureCharacterFrame()
 
             if not self.skill then return end
             if self.skill.category ~= "profession" and self.skill.category ~= "secondary" then return end
-
-            if tonumber(self.skill.skillId or 0) == ENCHANTING_SKILL_ID
-                and MultiBot.IsBotEnchantingServiceAvailable
-                and MultiBot.IsBotEnchantingServiceAvailable(frame.botName)
-                and MultiBot.OpenBotEnchanting then
-                MultiBot.OpenBotEnchanting(frame.botName, nil)
-                return
-            end
 
             if MultiBot.Comm and MultiBot.Comm.RequestProfessionRecipes then
                 ensureRecipeFrame()
@@ -1609,7 +1603,7 @@ function MultiBot.OnBridgeProfessionRecipeTargetResult(botName, result, reason, 
     end
 
     if sameBot and sameSkill then
-        local reasonText = getCraftReasonText(reason, skillId)
+        local reasonText = getRecipeTargetReasonText(reason, skillId)
         if reasonText ~= "" then
             frame.status:SetText(string.format(
                 L("profession.recipes.target.err", "Targeted craft failed: %s"),
