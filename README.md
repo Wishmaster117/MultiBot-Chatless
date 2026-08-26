@@ -378,10 +378,6 @@ The endpoint and safe Firestone/Spellstone switching code are present, but the p
     <td><strong>Bridge-first</strong> distance set and disable actions through <code>RUN~POSITION</code></td>
   </tr>
   <tr>
-    <td>Loot rules</td>
-    <td><strong>Bridge-first and runtime validated</strong> — loot enable/disable and loot-list profiles remain on <code>RUN~LOOT</code>; exact always-loot item add/remove uses negotiated <code>LOOT_RULE_ITEM_V1</code> with structured results and no normal chat/whisper path.</td>
-  </tr>
-  <tr>
     <td>Loot Master frame</td>
     <td><strong>Implemented</strong> optional auto-opening master-loot UI with candidate scoring, preferences and recent loot history</td>
   </tr>
@@ -712,7 +708,7 @@ Kept intentionally:
 
 # Remaining Work
 
-The current `jellypowered-chatless-integration-v2` line starts from the merged Jellypowered inventory baseline plus the separately completed SelfBot work. Its validated v2 feature batch is now complete through `LOOT_RULE_ITEM_V1`. No new functional work should be stacked onto this branch before the final documentation commit and the Addon/Bridge PRs to `main`; after merge, normal-roadmap development should restart on new branches created from the updated `main` baselines.
+The current `jellypowered-chatless-integration-v2` line starts from the merged Jellypowered inventory baseline plus the separately completed SelfBot work. Its validated v2 feature batch is complete through `LOOT_RULE_ITEM_V1`. Addon PR #73 and Bridge PR #32 are already open from `jellypowered-chatless-integration-v2` toward `main`. No new functional work should be stacked onto these branches before their closure/merge; after merge, normal-roadmap development should restart on new branches created from the updated `main` baselines.
 
 Immediate roadmap work after those merges:
 

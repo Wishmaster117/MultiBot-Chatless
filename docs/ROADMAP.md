@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
-Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 25 août 2026 après clôture de P3A `ITEM_DEPOSIT_EXACT_V1` puis de `LOOT_RULE_ITEM_V1`. Le lot fonctionnel courant des branches `jellypowered-chatless-integration-v2` est terminé et prêt pour la synchronisation documentaire finale puis les PR Addon/Bridge vers `main`; les prochains travaux de roadmap repartiront sur de nouvelles branches créées depuis les `main` mis à jour.
-Dernière mise à jour : 25/08/2026 — `LOOT_RULE_ITEM_V1` est terminé, validé en jeu, audité, archivé, commité et poussé après P3A `ITEM_DEPOSIT_EXACT_V1`. ADD/REMOVE modifie l'`always loot list` vérifiée dans Playerbots pour un `itemId` exact, avec résultats structurés, idempotence, persistance des seuls bots modifiés, budget global de 128 sauvegardes/10 s et rejet pré-mutation `PERSISTENCE_BUSY` lorsque le budget est insuffisant. La persistance a été validée après reconnexion et restart worldserver, le prompt et les résultats sont localisés dans les huit locales présentes, et aucun spam chat/whisper n'a été observé. P3B/P3C, `SOURCE_STALE` UI, SELL_GREY, Firestone/Spellstone et LuaLint restent différés. `TODO.md` reste séparé et inchangé. Le prochain chantier normal est la décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes.
+Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 26 août 2026 après clôture de P3A `ITEM_DEPOSIT_EXACT_V1` puis de `LOOT_RULE_ITEM_V1`. Le lot fonctionnel courant des branches `jellypowered-chatless-integration-v2` est terminé. Les PR Addon #73 et Bridge #32 sont ouvertes vers `main` ; aucun nouveau développement fonctionnel ne doit être ajouté à ces branches avant leur clôture/merge. Après merge, la roadmap reprendra sur de nouvelles branches créées depuis les `main` mis à jour.
+Dernière mise à jour : 26/08/2026 — `LOOT_RULE_ITEM_V1` est terminé, validé en jeu, audité, archivé, commité et poussé après P3A `ITEM_DEPOSIT_EXACT_V1`. ADD/REMOVE modifie l'`always loot list` vérifiée dans Playerbots pour un `itemId` exact, avec résultats structurés, idempotence, persistance des seuls bots modifiés, budget global de 128 sauvegardes/10 s et rejet pré-mutation `PERSISTENCE_BUSY` lorsque le budget est insuffisant. La persistance a été validée après reconnexion et restart worldserver, le prompt et les résultats sont localisés dans les huit locales présentes, et aucun spam chat/whisper n'a été observé. P3B/P3C, `SOURCE_STALE` UI, SELL_GREY, Firestone/Spellstone et LuaLint restent différés. `TODO.md` reste séparé et inchangé. Le prochain chantier normal est la décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -169,10 +169,10 @@ La branche `Extended` est divergente et ne doit pas être mergée en bloc. Chaqu
    - **test différé roadmap** — `DEFERRED_RUNTIME_TEST_NO_BOTS_AVAILABLE` : scénario avec plusieurs bots dont au moins un sans la quête, faute de bots disponibles au moment de la validation ;
    - `QUEST_SHARE` est déjà natif/chatless via `QuestLogPushQuest()` : aucun endpoint `QUEST_SHARE_V1` n'est créé ni nécessaire pour le comportement actuel.
 
-9. **Application/reset de talents — À ADAPTER AVEC PRUDENCE**
-   - endpoint `TALENT_APPLY` ;
-   - valider build, niveau, points, coûts/reset, combat, double spécialisation et effets runtime ;
-   - vérifier les API Playerbots/AzerothCore dans le dépôt local avant toute reprise.
+9. **Application/reset de talents — TERMINÉ / VALIDÉ EN JEU — `TALENT_APPLY_V1` / `TALENT_SPEC_APPLY_V1`**
+   - `TALENT_APPLY_V1` applique un build personnalisé complet après validation serveur de la classe, des DBC et des points disponibles, puis confirme le résultat par vérification autoritative des points d'arbres ;
+   - `TALENT_SPEC_APPLY_V1` applique un modèle prémade revalidé côté serveur au slot 1 ou 2, avec gestion de la double spécialisation et initialisation des glyphes ;
+   - ces chemins utilisent des résultats structurés et ont été validés en jeu sans commande chat normale.
 
 10. **Artisanat ciblé — TERMINÉ / COMPILÉ / VALIDÉ EN JEU — `CRAFT_RECIPE_TARGET_V1`**
     - `RUN~CRAFT_RECIPE` reste inchangé pour le craft normal et renvoie `TARGET_REQUIRED` lorsqu'une recette exige une cible item exacte ;
@@ -224,7 +224,7 @@ Aucune fonction Extended ne doit être marquée comme intégrée avant validatio
   `Design inspired by the Jellypowered bridge contribution.` ;
 - les crédits sont ajoutés uniquement pour les parties réellement intégrées et validées.
 
-Statut : **audit Extended validé ; reprise sélective prioritaire avant la roadmap normale ; merge direct du fork interdit.** Le travail Jellypowered courant est isolé sur `feature/jellypowered-chatless-integration` dans l'Addon et le Bridge ; les commits validés y sont accumulés et aucune PR/merge vers `main` ne doit être lancée avant demande explicite de l'utilisateur.
+Statut : **audit Extended validé ; reprise sélective prioritaire avant la roadmap normale ; merge direct du fork interdit.** L'ancienne branche `feature/jellypowered-chatless-integration` est conservée ici comme référence historique. Le travail courant de clôture est porté par `jellypowered-chatless-integration-v2` dans l'Addon et le Bridge. Les PR Addon #73 et Bridge #32 sont ouvertes vers `main` ; aucun nouveau développement fonctionnel ne doit être ajouté à ces branches avant leur clôture/merge. Après merge, la reprise se fera sur de nouvelles branches créées depuis les `main` mis à jour.
 
 
 ## Phase 0 — Assainissement documentaire — TERMINÉE
@@ -342,7 +342,7 @@ Décision de roadmap au 14/08/2026 :
 - les **quatre warnings LuaLint restants dans `Strategies/MultiBotWarlock.lua`** restent également suspendus ;
 - ces reliquats ne doivent pas interrompre le chantier suivant de la Phase 5.
 
-## Synchronisation post-merge — État livré au 14/08/2026
+## Synchronisation post-merge — État livré et validations consolidées jusqu'au 26/08/2026
 
 Les jalons suivants, postérieurs à la mise à jour du 08/08, sont présents dans les branches `main` auditées :
 
