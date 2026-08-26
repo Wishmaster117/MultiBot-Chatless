@@ -1615,7 +1615,7 @@ local function runInventoryInstantAction(botName, command, options)
             return false
         end
 
-        if cmd == "s vendor" and MultiBot.allowLegacyChatFallback ~= true then
+        if MultiBot.allowLegacyChatFallback ~= true then
             return false
         end
 
