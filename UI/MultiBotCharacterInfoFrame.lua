@@ -602,6 +602,7 @@ local function runRecipeTargetSelection(selection, targetBag, targetSlot, target
             "profession.recipes.target.unavailable",
             "Exact item targeting via the bridge is unavailable."
         ))
+        clearRecipeTargetSelection(frame)
         return false
     end
 
@@ -619,6 +620,7 @@ local function runRecipeTargetSelection(selection, targetBag, targetSlot, target
             "profession.recipes.target.send_failed",
             "The targeted crafting request could not be sent."
         ))
+        clearRecipeTargetSelection(frame)
         return false
     end
 
