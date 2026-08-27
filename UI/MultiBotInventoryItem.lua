@@ -646,7 +646,7 @@ MultiBot.OnBridgeInventoryItemDestroyResult = function(botName, _, reason)
 
     requestInventoryRefresh(0.15, botName)
 end
-MultiBot.OnBridgeInventoryItemTradeResult = function(_, status, reason)
+MultiBot.OnBridgeInventoryItemTradeResult = function(botName, status, reason)
     if reason == "DISCONNECTED" then
         return
     end
@@ -656,6 +656,10 @@ MultiBot.OnBridgeInventoryItemTradeResult = function(_, status, reason)
             inventoryItemL("inventory.item_trade.failed", "The item could not be added to the trade.")
                 .. " [" .. tostring(reason or "FAILED") .. "]"
         )
+
+        if reason == "SOURCE_STALE" or reason == "BAD_RESPONSE" or reason == "RESPONSE_MISMATCH" or reason == "TIMEOUT" then
+            requestInventoryRefresh(0.15, botName)
+        end
     end
 end
 
@@ -1066,6 +1070,11 @@ function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, res
             inventoryItemL("inventory.item_action.failed", "%s failed."),
             actionLabel
         ))
+    end
+
+    if (action == "BANK_DEPOSIT" or action == "GBANK_DEPOSIT")
+        and (reason == "SOURCE_STALE" or reason == "BAD_RESPONSE" or reason == "RESPONSE_MISMATCH" or reason == "TIMEOUT") then
+        requestInventoryRefresh(0.15, botName)
     end
 end
 
