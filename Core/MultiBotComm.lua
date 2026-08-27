@@ -4030,6 +4030,15 @@ local function handleQuestAbandonResponse(payload, state)
       or type(pending) ~= "table"
       or pending.questId ~= questId then
     state.lastError = "QUEST_ABANDON_BAD_RESPONSE"
+    if type(pending) == "table" then
+      finishQuestAbandonCommand(token, {
+        status = "error",
+        reason = "BAD_RESPONSE",
+        matched = 0,
+        abandoned = 0,
+        questId = pending.questId,
+      })
+    end
     return true
   end
 
