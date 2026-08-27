@@ -12,18 +12,16 @@ local LOOT_COMMANDS = {
     { key = "all", command = "ll all", icon = "inv_misc_bag_10", tip = "tips.loot.all", fallback = "Loot profile: All" },
     { key = "normal", command = "ll normal", icon = "inv_misc_bag_11", tip = "tips.loot.normal", fallback = "Loot profile: Normal" },
     { key = "gray", command = "ll gray", icon = "inv_misc_coin_01", tip = "tips.loot.gray", fallback = "Loot profile: Gray" },
-    { key = "quest", command = "ll quest", icon = "inv_misc_note_05", tip = "tips.loot.quest", fallback = "Loot profile: Quest" },
-    { key = "skill", command = "ll skill", icon = "inv_misc_book_07", tip = "tips.loot.skill", fallback = "Loot profile: Skill" },
+    { key = "disenchant", command = "ll disenchant", icon = "inv_misc_book_07", tip = "tips.loot.disenchant", fallback = "Loot profile: Disenchant" },
     { key = "additem", action = "ADD", icon = "inv_misc_bag_10", tip = "loot.item.add", fallback = "Always loot: add item" },
     { key = "removeitem", action = "REMOVE", icon = "inv_misc_bag_07", tip = "loot.item.remove", fallback = "Always loot: remove item" },
 }
 
-local LOOT_PROFILE_KEYS = {
-    all = true,
-    normal = true,
-    gray = true,
-    quest = true,
-    skill = true,
+local LOOT_PROFILE_ENTRIES = {
+    all = LOOT_COMMANDS[3],
+    normal = LOOT_COMMANDS[4],
+    gray = LOOT_COMMANDS[5],
+    disenchant = LOOT_COMMANDS[6],
 }
 
 local lootVisualState = {
@@ -196,6 +194,21 @@ function MultiBot.BuildLootUI(tLeft)
         if lootVisualState.profile and menuButtonsByKey[lootVisualState.profile] then
             menuButtonsByKey[lootVisualState.profile].setEnable()
         end
+
+        if button then
+            local profileEntry = lootVisualState.profile and LOOT_PROFILE_ENTRIES[lootVisualState.profile] or nil
+            if profileEntry then
+                button.setButton(profileEntry.icon, L(profileEntry.tip, profileEntry.fallback))
+            else
+                button.setButton("inv_misc_bag_10", L("tips.loot.main", "Loot rules"))
+            end
+
+            if lootVisualState.enabled == true then
+                button.setEnable(false)
+            else
+                button.setDisable(false)
+            end
+        end
     end
 
     MultiBot.OnLootCommandApplied = function(command, executed)
@@ -210,10 +223,9 @@ function MultiBot.BuildLootUI(tLeft)
             lootVisualState.enabled = true
         elseif command == "nc -loot" then
             lootVisualState.enabled = false
-            lootVisualState.profile = nil
         else
             local profile = command:match("^ll%s+([%w_%-]+)$")
-            if profile and LOOT_PROFILE_KEYS[profile] then
+            if profile and LOOT_PROFILE_ENTRIES[profile] then
                 lootVisualState.profile = profile
             end
         end
@@ -230,13 +242,6 @@ function MultiBot.BuildLootUI(tLeft)
             end
         end
 
-        if button then
-            if shown then
-                button.setEnable()
-            else
-                button.setDisable()
-            end
-        end
 
         updateClickBlocker()
     end

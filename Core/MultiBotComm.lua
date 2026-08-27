@@ -9078,8 +9078,7 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
         all = L("loot.profile.all", "All"),
         normal = L("loot.profile.normal", "Normal"),
         gray = L("loot.profile.gray", "Gray"),
-        quest = L("loot.profile.quest", "Quest"),
-        skill = L("loot.profile.skill", "Skill"),
+        disenchant = L("loot.profile.disenchant", "Disenchant"),
       })[profile] or profile
 
       systemMessage(string.format(L("loot.confirm.profile", "Loot profile set to %s for %d bot(s)."), profileName, executed))

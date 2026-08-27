@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
-Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 26 août 2026 après clôture de P3A `ITEM_DEPOSIT_EXACT_V1` puis de `LOOT_RULE_ITEM_V1`. Le lot fonctionnel courant des branches `jellypowered-chatless-integration-v2` est terminé. Les PR Addon #73 et Bridge #32 sont ouvertes vers `main` ; aucun nouveau développement fonctionnel ne doit être ajouté à ces branches avant leur clôture/merge. Après merge, la roadmap reprendra sur de nouvelles branches créées depuis les `main` mis à jour.
-Dernière mise à jour : 27/08/2026 — `LOOT_RULE_ITEM_V1` est terminé, validé en jeu, audité, archivé, commité et poussé après P3A `ITEM_DEPOSIT_EXACT_V1`. ADD/REMOVE modifie l'`always loot list` vérifiée dans Playerbots pour un `itemId` exact, avec résultats structurés, idempotence, persistance des seuls bots modifiés, budget global de 128 sauvegardes/10 s et rejet pré-mutation `PERSISTENCE_BUSY` lorsque le budget est insuffisant. La persistance a été validée après reconnexion et restart worldserver, le prompt et les résultats sont localisés dans les huit locales présentes, et aucun spam chat/whisper n'a été observé. P3B/P3C, `SOURCE_STALE` UI, SELL_GREY, Firestone/Spellstone et LuaLint restent différés. `TODO.md` reste séparé et inchangé. Le prochain chantier normal est la décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes.
+Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 27 août 2026 après clôture de P3A `ITEM_DEPOSIT_EXACT_V1`, de `LOOT_RULE_ITEM_V1` et de la décision Quest/Skill versus Disenchant. Le lot `jellypowered-chatless-integration-v2` est désormais une baseline historique. Le chantier courant est `feature/loot-disenchant-mainbar` dans l'Addon et le Bridge. `disenchant` est le profil Playerbots retenu ; `Quest` et `Skill` ne sont pas traités comme profils de loot validés. Le prochain chantier normal est l'audit des ordres collectifs `follow`, `attack`, `stay`.
+Dernière mise à jour : 27/08/2026 — le commit Addon `9e5d28ba0d20c68924e1adaec22fd20dd8f9c895` remplace les profils UI `Quest`/`Skill` par `Disenchant` et synchronise l'état visuel MainBar ; le commit Bridge `c2c48b604a10b619d08f27c39cc5ecf6e3f174a6` remplace la whitelist `Quest`/`Skill` par `Disenchant`. L'audit Playerbots en lecture seule confirme `DisenchantLootStrategy`, `GetName() == "disenchant"` et les alias `d`, `e`, `disenchant`, `enchant`. Le prochain chantier normal est l'audit ciblé des sélecteurs Playerbots pour `follow`, `attack`, `stay`. P3B/P3C, `SOURCE_STALE` UI, `BAG_MOVE`, SELL_GREY, Firestone/Spellstone et LuaLint restent différés ; `TODO.md` reste séparé et inchangé.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -224,7 +224,7 @@ Aucune fonction Extended ne doit être marquée comme intégrée avant validatio
   `Design inspired by the Jellypowered bridge contribution.` ;
 - les crédits sont ajoutés uniquement pour les parties réellement intégrées et validées.
 
-Statut : **audit Extended validé ; reprise sélective prioritaire avant la roadmap normale ; merge direct du fork interdit.** L'ancienne branche `feature/jellypowered-chatless-integration` est conservée ici comme référence historique. Le travail courant de clôture est porté par `jellypowered-chatless-integration-v2` dans l'Addon et le Bridge. Les PR Addon #73 et Bridge #32 sont ouvertes vers `main` ; aucun nouveau développement fonctionnel ne doit être ajouté à ces branches avant leur clôture/merge. Après merge, la reprise se fera sur de nouvelles branches créées depuis les `main` mis à jour.
+Statut : **audit Extended validé ; reprise sélective réalisée et historique conservé ; merge direct du fork toujours interdit.** L'ancienne branche `feature/jellypowered-chatless-integration` et la ligne `jellypowered-chatless-integration-v2` restent des références historiques. Le développement courant audité est `feature/loot-disenchant-mainbar`, créé depuis les `main` mis à jour et à un commit devant `origin/main` dans l'Addon et le Bridge au pré-patch V1c du 27/08/2026.
 
 
 ## Phase 0 — Assainissement documentaire — TERMINÉE
@@ -540,7 +540,7 @@ Ces fonctions doivent rester séparées des patches de correction et de sécurit
 Critère de sortie : version stabilisée, documentée et reproductible du projet Multibot Chatless + Bridge.
 
 <!-- MULTIBOT_JELLYPOWERED_PROGRESS_SYNC_2026-08-17 -->
-<!-- NORMAL_ROADMAP_NEXT=LOOT_RULE_QUEST_SKILL_DISENCHANT_DECISION -->
+<!-- NORMAL_ROADMAP_NEXT=COLLECTIVE_FOLLOW_ATTACK_STAY -->
 
 ## État consolidé Jellypowered / inventaire — 20/08/2026
 
@@ -604,7 +604,7 @@ Toutes ces intégrations conservent `mod-playerbots` en **lecture seule stricte*
 - **Résiduel UI basse priorité, non bloquant :** `SOURCE_STALE` utilise encore le libellé générique d'erreur d'action d'objet.
 - **Résiduel basse priorité, non bloquant :** `BAG_MOVE` concerne uniquement le déplacement/rééquipement des **sacs équipés eux-mêmes**. Les déplacements d'items entre Backpack / sacs 1..4 / Keyring sont déjà terminés via `ITEM_MOVE_V1`.
 
-Le lot banque/GBANK prioritaire est clos pour la roadmap courante. Le chantier suivant, `LOOT_RULE_ITEM_V1`, est lui aussi désormais clos et validé ; la roadmap normale passe à la décision Quest/Skill versus Disenchant.
+Le lot banque/GBANK prioritaire est clos pour la roadmap courante. `LOOT_RULE_ITEM_V1` est lui aussi clos et validé. La décision Quest/Skill versus Disenchant est désormais résolue à partir du code Playerbots audité : `disenchant` est retenu ; `Quest` et `Skill` ne sont pas exposés comme profils de loot validés. La roadmap normale passe à l'audit des ordres collectifs `follow`, `attack`, `stay`.
 
 ### Clôture règles de loot exactes — `LOOT_RULE_ITEM_V1` validé le 24/08/2026
 
@@ -616,7 +616,7 @@ Le lot banque/GBANK prioritaire est clos pour la roadmap courante. Le chantier s
 - Sémantique idempotente validée : `ADDED`, `REMOVED`, `ALREADY_PRESENT`, `ALREADY_ABSENT`, avec `PARTIAL` prévu pour les résultats mixtes et erreurs structurées côté Bridge.
 - Runtime validé : ADD/REMOVE et répétitions, itemId numérique, Shift+clic lien d'objet, entrée locale invalide sans envoi Bridge, item serveur invalide, persistance déconnexion/reconnexion, persistance après restart worldserver, nettoyage final de l'item de test 6948.
 - UI/i18n validée : prompt cliquable/éditable corrigé localement sans modifier AceGUI global, `/reload` sans erreur Lua, boutons/résultats localisés dans les huit locales présentes (`deDE`, `enGB`, `enUS`, `esES`, `frFR`, `koKR`, `ruRU`, `zhCN`), aucun spam chat/whisper observé.
-- Divergence documentaire conservée comme décision séparée : l'audit du build Playerbots courant ne permet pas de traiter `Quest`/`Skill` comme capacités validées sur la seule foi du wiki ; la prochaine étape doit trancher Quest/Skill versus Disenchant à partir du code réellement présent.
+- **Décision Quest/Skill versus Disenchant — TERMINÉE / VALIDÉE** : l'audit du build Playerbots courant confirme une vraie `DisenchantLootStrategy` nommée `disenchant` avec alias `d`, `e`, `disenchant`, `enchant`. L'Addon expose donc `Disenchant` à la place des anciens profils UI `Quest`/`Skill`, et le Bridge n'autorise plus ces anciens libellés dans sa whitelist loot. `mod-playerbots` reste strictement en lecture seule.
 
 ### Stabilisation de clôture PR Addon #73 — 27/08/2026
 
@@ -649,6 +649,6 @@ Ces points sont **préexistants ou hors objectif fonctionnel de la PR #73**. Ils
 
 ### Reprise de la roadmap normale
 
-Le **prochain chantier fonctionnel** est : **décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes**. Aucun endpoint, mode ou stratégie ne doit être conçu avant l'audit ciblé de ce point.
+Le **prochain chantier fonctionnel** est : **audit ciblé des ordres collectifs `follow`, `attack`, `stay` et de leurs sélecteurs Playerbots exacts**. Aucun endpoint générique `RUN~ORDER` ne doit être conçu ; les API/actions/sélecteurs réellement présents doivent être vérifiés en lecture seule avant toute proposition.
 
-Le lot fonctionnel courant de `jellypowered-chatless-integration-v2` est terminé avec `LOOT_RULE_ITEM_V1` et la stabilisation de clôture de la PR Addon #73. Les PR Addon #73 et Bridge #32 sont ouvertes vers `main`; aucun nouveau développement fonctionnel ne doit être empilé sur ces branches avant leur clôture/merge. Après merge et mise à jour des `main`, la roadmap normale reprendra sur de nouvelles branches créées depuis ces baselines. P3B/P3C, le libellé `SOURCE_STALE`, `BAG_MOVE`, `SELL_GREY`, Firestone/Spellstone TEMP_ENCHANT, LuaLint et les reliquats techniques explicitement différés ci-dessus restent hors du prochain chantier.
+Le lot fonctionnel `jellypowered-chatless-integration-v2` reste une baseline historique terminée. Le développement courant est `feature/loot-disenchant-mainbar` dans l'Addon et le Bridge ; il clôt la décision Quest/Skill versus Disenchant et la synchronisation MainBar associée. La roadmap normale reprend maintenant avec l'audit de `follow`, `attack`, `stay`. P3B/P3C, le libellé `SOURCE_STALE`, `BAG_MOVE`, `SELL_GREY`, Firestone/Spellstone TEMP_ENCHANT, LuaLint et les reliquats techniques explicitement différés ci-dessus restent hors du prochain chantier.
