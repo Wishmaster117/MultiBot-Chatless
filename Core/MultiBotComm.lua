@@ -74,6 +74,8 @@ local TALENT_APPLY_TIMEOUT_SECONDS = 5.0
 local TALENT_SPEC_APPLY_TIMEOUT_SECONDS = 5.0
 local CRAFT_RECIPE_TARGET_TIMEOUT_SECONDS = 5.0
 local CRAFT_RECIPE_TARGET_MAX_ACTIVE = 8
+local PROFESSION_RECIPE_CRAFT_TIMEOUT_SECONDS = 5.0
+local PROFESSION_RECIPE_CRAFT_MAX_ACTIVE = 8
 local LOOT_RULE_ITEM_TIMEOUT_SECONDS = 5.0
 local LOOT_RULE_ITEM_MAX_ACTIVE = 32
 local INVENTORY_ITEM_MOVE_TIMEOUT_SECONDS = 5.0
@@ -3397,6 +3399,51 @@ function Comm.RunEnchantTrade(name, spellId)
   return token
 end
 
+local function finishProfessionRecipeCraftCommand(token, status, reason, responseItemId)
+  local state = ensureBridgeState()
+  local pending = state.professionRecipeCrafts[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.professionRecipeCrafts[token] = nil
+  status = status == "OK" and "OK" or "ERR"
+  reason = trim(reason or "")
+  if reason == "" then
+    reason = status == "OK" and "OK" or "FAILED"
+  end
+
+  responseItemId = tonumber(responseItemId)
+  if responseItemId == nil
+      or responseItemId < 0
+      or responseItemId > 4294967295
+      or math.floor(responseItemId) ~= responseItemId then
+    responseItemId = pending.itemId
+  end
+
+  pending.result = status
+  pending.reason = reason
+  pending.responseItemId = responseItemId
+
+  if status == "OK" then
+    state.lastError = nil
+  else
+    state.lastError = "PROFESSION_RECIPE_CRAFT_" .. reason
+  end
+
+  if MultiBot.OnBridgeProfessionRecipeCraftResult then
+    MultiBot.OnBridgeProfessionRecipeCraftResult(
+      pending.botName, pending.skillId, pending.spellId, responseItemId,
+      status, reason, pending
+    )
+  end
+
+  debugPrint(
+    "ADDON:RX", "PROFESSION_RECIPE_CRAFT",
+    pending.botName, pending.skillId, pending.spellId, status, reason
+  )
+  return true
+end
 function Comm.RunProfessionRecipeCraft(name, skillId, spellId, itemId)
   local state = ensureBridgeState()
   name = trim(name)
@@ -3404,6 +3451,11 @@ function Comm.RunProfessionRecipeCraft(name, skillId, spellId, itemId)
   spellId = tonumber(spellId or 0) or 0
   itemId = tonumber(itemId or 0) or 0
   if name == "" or skillId <= 0 or spellId <= 0 or itemId < 0 or not state.connected then
+    return false
+  end
+
+  if countTableEntries(state.professionRecipeCrafts) >= PROFESSION_RECIPE_CRAFT_MAX_ACTIVE then
+    state.lastError = "PROFESSION_RECIPE_CRAFT_TOO_MANY_REQUESTS"
     return false
   end
 
@@ -3420,8 +3472,19 @@ function Comm.RunProfessionRecipeCraft(name, skillId, spellId, itemId)
 
   if not Comm.Send("RUN", "CRAFT_RECIPE~" .. name .. "~" .. token .. "~" .. skillId .. "~" .. spellId .. "~" .. itemId) then
     state.professionRecipeCrafts[token] = nil
+    state.lastError = "PROFESSION_RECIPE_CRAFT_SEND_FAILED"
     return false
   end
+
+  safeDelay(PROFESSION_RECIPE_CRAFT_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    local pending = bridge.professionRecipeCrafts[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    finishProfessionRecipeCraftCommand(token, "ERR", "TIMEOUT", pending.itemId)
+  end)
 
   return token
 end
@@ -4314,6 +4377,14 @@ function Comm.MarkDisconnected(reason)
   state.botReputationActive = nil
   state.botEmblemActive = nil
   state.professionRecipeActive = nil
+  local pendingProfessionRecipeCraftTokens = {}
+  for token in pairs(state.professionRecipeCrafts or {}) do
+    pendingProfessionRecipeCraftTokens[#pendingProfessionRecipeCraftTokens + 1] = token
+  end
+  for _, token in ipairs(pendingProfessionRecipeCraftTokens) do
+    local pending = state.professionRecipeCrafts[token]
+    finishProfessionRecipeCraftCommand(token, "ERR", "DISCONNECTED", pending and pending.itemId or 0)
+  end
   state.professionRecipeCrafts = {}
   for _, command in pairs(state.professionRecipeTargetCommands or {}) do
     if MultiBot.OnBridgeProfessionRecipeTargetResult then
@@ -5699,41 +5770,48 @@ function Comm.ApplyTrainerLearnPayload(payload)
 end
 
 function Comm.ApplyProfessionRecipeCraftPayload(payload)
-  local botName, rest = splitOnce(payload or "", "~")
-  local token, rest2 = splitOnce(rest or "", "~")
-  local skillId, rest3 = splitOnce(rest2 or "", "~")
-  local spellId, rest4 = splitOnce(rest3 or "", "~")
-  local itemId, rest5 = splitOnce(rest4 or "", "~")
-  local result, reason = splitOnce(rest5 or "", "~")
-
-  botName = trim(urlDecodeField(botName))
-  token = trim(token)
-  skillId = tonumber(skillId or "0") or 0
-  spellId = tonumber(spellId or "0") or 0
-  itemId = tonumber(itemId or "0") or 0
-  result = trim(result)
-  reason = trim(urlDecodeField(reason))
-
   local state = ensureBridgeState()
-  local command = state.professionRecipeCrafts and state.professionRecipeCrafts[token] or nil
-  if not command then
-    return false
+  local fields = splitFields(payload or "")
+  local token = trim(fields[2] or "")
+  local pending = isValidStateToken(token) and state.professionRecipeCrafts[token] or nil
+
+  if #fields ~= 7 then
+    state.lastError = "PROFESSION_RECIPE_CRAFT_BAD_FIELD_COUNT"
+    if type(pending) == "table" then
+      finishProfessionRecipeCraftCommand(token, "ERR", "BAD_RESPONSE", pending.itemId)
+    end
+    return true
   end
 
-  command.botName = botName ~= "" and botName or command.botName
-  command.botNameKey = string.lower(command.botName or "")
-  command.skillId = skillId > 0 and skillId or command.skillId
-  command.spellId = spellId > 0 and spellId or command.spellId
-  command.itemId = itemId >= 0 and itemId or command.itemId
-  command.result = result
-  command.reason = reason
+  local botName = urlDecodeFieldStrict(fields[1], 64, false)
+  local skillId = parseBoundedInteger(fields[3], 1, 4294967295)
+  local spellId = parseBoundedInteger(fields[4], 1, 4294967295)
+  local itemId = parseBoundedInteger(fields[5], 0, 4294967295)
+  local status = string.upper(trim(fields[6]))
+  local reason = urlDecodeFieldStrict(fields[7], 64, false)
 
-  if MultiBot.OnBridgeProfessionRecipeCraftResult then
-    MultiBot.OnBridgeProfessionRecipeCraftResult(command.botName, command.skillId, command.spellId, command.itemId, result, reason, command)
+  local valid = isValidStateToken(token)
+      and botName ~= nil
+      and skillId ~= nil
+      and spellId ~= nil
+      and itemId ~= nil
+      and (status == "OK" or status == "ERR")
+      and reason ~= nil
+      and type(pending) == "table"
+      and string.lower(botName) == pending.botNameKey
+      and skillId == pending.skillId
+      and spellId == pending.spellId
+
+  if not valid then
+    state.lastError = "PROFESSION_RECIPE_CRAFT_BAD_RESPONSE"
+    if type(pending) == "table" then
+      finishProfessionRecipeCraftCommand(token, "ERR", "BAD_RESPONSE", pending.itemId)
+    end
+    return true
   end
 
-  state.professionRecipeCrafts[token] = nil
-  debugPrint("ADDON:RX", "PROFESSION_RECIPE_CRAFT", command.botName, command.skillId, command.spellId, result, reason)
+  state.connected = true
+  finishProfessionRecipeCraftCommand(token, status, reason, itemId)
   return true
 end
 
@@ -9105,8 +9183,6 @@ state.selfActionCapable = false
   state.talentSpecApplyCapable = false
   state.craftRecipeTargetCapable = false
   state.selfBotCapable = false
-  state.strategyMutationCommands = {}
-  state.lootRuleItemCommands = {}
   state.details = {}
   state.stats = {}
   state.pvpStats = {}
@@ -9131,7 +9207,6 @@ state.selfActionCapable = false
   state.botEmblemActive = nil
   state.professionRecipes = {}
   state.professionRecipeActive = nil
-  state.professionRecipeCrafts = {}
   state.outfitActive = nil
   state.outfitCommands = {}
   state.trainerActive = nil
