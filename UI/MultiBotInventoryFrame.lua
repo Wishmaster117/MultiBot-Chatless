@@ -1615,6 +1615,10 @@ local function runInventoryInstantAction(botName, command, options)
             return false
         end
 
+        if MultiBot.allowLegacyChatFallback ~= true then
+            return false
+        end
+
         local inventory = MultiBot.inventory
         local itemsFrame = inventory and inventory.frames and inventory.frames.Items
         local itemButtons = itemsFrame and itemsFrame.buttons

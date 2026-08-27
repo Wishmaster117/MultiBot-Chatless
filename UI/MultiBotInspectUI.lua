@@ -169,11 +169,26 @@ local function showRightClickHint(self)
 end
 
 local function onInspectSlotClick(self, mouseButton)
+    local botName = getInspectedBotName()
+
+    -- MB_CRAFT_RECIPE_TARGET_V1_INSPECT_BEGIN
+    if mouseButton == "LeftButton" then
+        local itemLink = getSlotItemLink(self)
+        local inspectSlotId = getInspectSlotId(self)
+        local itemId = getItemIdFromLink(itemLink)
+        if inspectSlotId and MultiBot.TryProfessionRecipeTargetEquipmentItem then
+            local serverSlot = inspectSlotId - 1
+            if MultiBot.TryProfessionRecipeTargetEquipmentItem(botName, serverSlot, itemId) then
+                return
+            end
+        end
+        return
+    end
+    -- MB_CRAFT_RECIPE_TARGET_V1_INSPECT_END
+
     if mouseButton ~= "RightButton" then
         return
     end
-
-    local botName = getInspectedBotName()
     if not canUnequipInspectedBot(botName) then
         return
     end

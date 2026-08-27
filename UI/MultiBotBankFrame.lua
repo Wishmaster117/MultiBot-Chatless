@@ -451,7 +451,10 @@ function MultiBot.RefreshBotBank(botName, delay)
     end
 
     local function refresh()
-        if frame and frame.IsShown and frame:IsShown() and MultiBot.Comm and MultiBot.Comm.RequestBank then
+        if frame and frame.IsShown and frame:IsShown()
+            and frame.mode == "bank"
+            and string.lower(tostring(frame.botName or "")) == string.lower(botName)
+            and MultiBot.Comm and MultiBot.Comm.RequestBank then
             MultiBot.Comm.RequestBank(botName)
         end
     end
@@ -473,7 +476,10 @@ function MultiBot.RefreshBotGuildBank(botName, delay)
     end
 
     local function refresh()
-        if frame and frame.IsShown and frame:IsShown() and MultiBot.Comm and MultiBot.Comm.RequestGuildBank then
+        if frame and frame.IsShown and frame:IsShown()
+            and frame.mode == "gbank"
+            and string.lower(tostring(frame.botName or "")) == string.lower(botName)
+            and MultiBot.Comm and MultiBot.Comm.RequestGuildBank then
             MultiBot.Comm.RequestGuildBank(botName)
         end
     end

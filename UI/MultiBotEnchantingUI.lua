@@ -276,7 +276,7 @@ function EnchantUI:Render()
                 row.selection:Hide()
             end
             if tonumber(entry.available or 0) ~= 0 then
-                row.name:SetTextColor(1, 1, 1)
+                row.name:SetTextColor(0, 1, 0)
                 row.materials:SetTextColor(0.8, 0.8, 0.8)
             else
                 row.name:SetTextColor(0.55, 0.55, 0.55)

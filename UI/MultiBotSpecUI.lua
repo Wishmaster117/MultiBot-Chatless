@@ -438,29 +438,30 @@ function Spec:RequestList(bot, wrapper)
         wrapper = wrapper,
         specs   = {},
         builds  = {},
+        indices = {},
     }
     self.activeWrapper = wrapper
 
-    -- On garde volontairement la réponse legacy de la spé courante :
-    -- "My current talent spec is: ...".
-    -- Les lignes d'aide inutiles renvoyées par cette commande sont masquées côté chat.
-    suppressNextTalentUsageLines(bot)
-    SendChatMessage("talents", "WHISPER", nil, bot)
+    local comm = MultiBot.Comm or nil
+    local bridgeApplyCapable = comm
+        and comm.IsTalentSpecApplyCapable
+        and comm.IsTalentSpecApplyCapable()
 
-    -- La liste complète des modèles disponibles est maintenant demandée en bridge-first
-    -- pour éviter le spam "talents spec list" dans le chat
-    MultiBot.TimerAfter(0.2, function()
-        if Spec.pending and Spec.pending.bot == bot then
-            local comm = MultiBot.Comm or nil
-            if comm and comm.RequestTalentSpecList and comm.RequestTalentSpecList(bot) then
-                return
-            end
+    -- The current active slot/build is returned by TALENT_SPEC_CURRENT on a
+    -- TALENT_SPEC_APPLY_V1 bridge. Keep the old "talents" whisper only as an
+    -- explicitly enabled legacy fallback.
+    if not bridgeApplyCapable and MultiBot.allowLegacyChatFallback == true then
+        suppressNextTalentUsageLines(bot)
+        SendChatMessage("talents", "WHISPER", nil, bot)
+    end
 
-            if MultiBot.allowLegacyChatFallback == true then
-                SendChatMessage("talents spec list", "WHISPER", nil, bot)
-            end
-        end
-    end)
+    if comm and comm.RequestTalentSpecList and comm.RequestTalentSpecList(bot) then
+        return
+    end
+
+    if MultiBot.allowLegacyChatFallback == true then
+        SendChatMessage("talents spec list", "WHISPER", nil, bot)
+    end
 end
 
 
@@ -690,6 +691,7 @@ function MultiBot.ApplyBridgeTalentSpecBegin(botName, token)
     pending.bridgeToken = token
     pending.specs = {}
     pending.builds = {}
+    pending.indices = {}
     return true
 end
 
@@ -709,10 +711,35 @@ function MultiBot.ApplyBridgeTalentSpecItem(botName, token, entry)
 
     tinsert(pending.specs, strtrim(entry.name))
     tinsert(pending.builds, strtrim(entry.build or ""))
+    tinsert(pending.indices, tonumber(entry.index) or -1)
     return true
 end
 
+function MultiBot.ApplyBridgeTalentSpecCurrent(botName, token, slot, tree0, tree1, tree2)
+    local pending = Spec.pending
+    if not pending or short(botName) ~= short(pending.bot) then
+        return false
+    end
+
+    if pending.bridgeToken and token and pending.bridgeToken ~= token then
+        return false
+    end
+
+    slot = tonumber(slot)
+    tree0 = tonumber(tree0)
+    tree1 = tonumber(tree1)
+    tree2 = tonumber(tree2)
+    if (slot ~= 1 and slot ~= 2) or not tree0 or not tree1 or not tree2 then
+        return false
+    end
+
+    Spec.currentBuild[short(botName):lower()] =
+        tostring(tree0) .. "-" .. tostring(tree1) .. "-" .. tostring(tree2)
+    pending.currentSlot = slot
+    return true
+end
 function MultiBot.ApplyBridgeTalentSpecEnd(botName, token)
+
     local pending = Spec.pending
     if not pending or short(botName) ~= short(pending.bot) then
         return false
@@ -850,7 +877,52 @@ local function applyDropdownPosition(frame, anchor, isEmbedded)
     end
 end
 
-local function bindSpecSelection(button, spec, build, tip, bot, className, currentBuild)
+local function refreshSpecTalentInspection(bot, className)
+    local unit = MultiBot.toUnit(bot)
+    if not unit then
+        return
+    end
+
+    if not MultiBot.talent:IsShown() then
+        MultiBot.talent.name = bot
+        MultiBot.talent.class = className
+    end
+
+    MultiBot.TimerAfter(0.2, function()
+        MultiBot.auto.talent = true
+        InspectUnit(unit)
+
+        if InspectFrame then
+            HideUIPanel(InspectFrame)
+        end
+
+        MultiBot.TimerAfter(0.1, function()
+            if MultiBot.talent:IsShown() then
+                MultiBot.talent:Hide()
+            end
+        end)
+    end)
+end
+
+local function runLegacySpecSelection(bot, slot, spec, className)
+    SendChatMessage("stopcasting", "WHISPER", nil, bot)
+    SendChatMessage("talents switch " .. slot, "WHISPER", nil, bot)
+
+    MultiBot.TimerAfter(0.4, function()
+        SendChatMessage("talents spec " .. spec, "WHISPER", nil, bot)
+    end)
+
+    Spec.pendingRefresh = bot
+    MultiBot.TimerAfter(1.3, function()
+        if Spec.pendingRefresh and Spec.pendingRefresh == bot then
+            refreshSpecTalentInspection(bot, className)
+            Spec.pendingRefresh = nil
+            Spec.busy = false
+        end
+    end)
+end
+
+local function bindSpecSelection(button, spec, specIndex, build, tip, bot, className, currentBuild)
     if build == currentBuild then
         button:SetAlpha(0.4)
         local tex = button:GetNormalTexture()
@@ -866,48 +938,66 @@ local function bindSpecSelection(button, spec, build, tip, bot, className, curre
             end
             Spec.busy = true
 
-            SendChatMessage("stopcasting", "WHISPER", nil, bot)
-
             local slot = (btn == "RightButton") and 2 or 1
-            SendChatMessage("talents switch " .. slot, "WHISPER", nil, bot)
+            local comm = MultiBot.Comm or nil
+            local request
 
-            MultiBot.TimerAfter(0.4, function()
-                SendChatMessage("talents spec " .. spec, "WHISPER", nil, bot)
-            end)
-
-            Spec.pendingRefresh = bot
-            Spec:HideDropdown()
-
-            MultiBot.TimerAfter(1.3, function()
-                if Spec.pendingRefresh and Spec.pendingRefresh == bot then
-                    local unit = MultiBot.toUnit(bot)
-
-                    if unit then
-                        if not MultiBot.talent:IsShown() then
-                            MultiBot.talent.name = bot
-                            MultiBot.talent.class = className
-                        end
-
-                        MultiBot.TimerAfter(0.6, function()
-                            MultiBot.auto.talent = true
-                            InspectUnit(unit)
-
-                            if InspectFrame then
-                                HideUIPanel(InspectFrame)
-                            end
-
-                            MultiBot.TimerAfter(0.1, function()
-                                if MultiBot.talent:IsShown() then
-                                    MultiBot.talent:Hide()
-                                end
-                            end)
-                        end)
+            if comm and comm.RunTalentSpecApply then
+                request = comm.RunTalentSpecApply(bot, slot, specIndex, spec, function(result)
+                    Spec.busy = false
+                    if type(result) ~= "table" then
+                        return
                     end
 
-                    Spec.pendingRefresh = nil
-                    Spec.busy = false
-                end
-            end)
+                    if result.status == "ok" then
+                        local points = result.treePoints or {}
+                        if points[1] ~= nil and points[2] ~= nil and points[3] ~= nil then
+                            Spec.currentBuild[short(bot):lower()] =
+                                tostring(points[1]) .. "-" .. tostring(points[2]) .. "-" .. tostring(points[3])
+                        end
+
+                        if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                            DEFAULT_CHAT_FRAME:AddMessage(
+                                string.format(MultiBot.L("talent.spec.apply.success"), result.specName or spec, bot),
+                                1, 1, 1
+                            )
+                        end
+                        refreshSpecTalentInspection(bot, className)
+                    else
+                        if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                            DEFAULT_CHAT_FRAME:AddMessage(
+                                string.format(
+                                    MultiBot.L("talent.spec.apply.failed"),
+                                    result.specName or spec,
+                                    bot,
+                                    tostring(result.reason or "UNKNOWN")
+                                ),
+                                1, 0.2, 0.2
+                            )
+                        end
+                    end
+                end)
+            end
+
+            Spec:HideDropdown()
+
+            if request then
+                return
+            end
+
+            if MultiBot.allowLegacyChatFallback == true then
+                runLegacySpecSelection(bot, slot, spec, className)
+                return
+            end
+
+            Spec.busy = false
+            if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                local reason = comm and MultiBot.bridge and MultiBot.bridge.lastError or "BRIDGE_UNAVAILABLE"
+                DEFAULT_CHAT_FRAME:AddMessage(
+                    string.format(MultiBot.L("talent.spec.apply.failed"), spec, bot, tostring(reason or "UNKNOWN")),
+                    1, 0.2, 0.2
+                )
+            end
         end)
     end
 
@@ -1026,6 +1116,7 @@ function Spec:BuildDropdown()
     for index, button in ipairs(self.buttons) do
         if index <= needed then
             local specName = pending.specs[index]
+            local specIndex = pending.indices[index]
             local build = pending.builds[index]
 
             button:ClearAllPoints()
@@ -1049,9 +1140,9 @@ function Spec:BuildDropdown()
 
             if (not alreadyMarked) and build == currentBuild then
                 alreadyMarked = true
-                bindSpecSelection(button, specName, build, tip, pending.bot, className, currentBuild)
+                bindSpecSelection(button, specName, specIndex, build, tip, pending.bot, className, currentBuild)
             else
-                bindSpecSelection(button, specName, build, tip, pending.bot, className, nil)
+                bindSpecSelection(button, specName, specIndex, build, tip, pending.bot, className, nil)
             end
         else
             button:Hide()

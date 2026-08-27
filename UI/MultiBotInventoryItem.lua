@@ -473,6 +473,37 @@ local function runBridgeInventoryItemAction(action, button, botName, options)
     return true
 end
 
+local function runBridgeInventoryItemDepositExact(action, button, botName)
+    if not action or action == "" or not button or not button.item or not botName or botName == "" then
+        return false
+    end
+
+    local item = button.item
+    if item.exactLocation ~= true then
+        return false
+    end
+
+    local srcBag = tonumber(item.bag)
+    local srcSlot = tonumber(item.slot)
+    local srcItemId = tonumber(item.id or 0) or 0
+    local srcCount = tonumber(item._serverCount or item.count or 1) or 1
+    if srcBag == nil or srcSlot == nil or srcItemId <= 0 or srcCount < 1 then
+        return false
+    end
+
+    if not MultiBot.Comm
+        or not MultiBot.Comm.IsInventoryItemDepositExactCapable
+        or not MultiBot.Comm.IsInventoryItemDepositExactCapable()
+        or not MultiBot.Comm.RunInventoryItemDepositExact then
+        return false
+    end
+
+    local token = MultiBot.Comm.RunInventoryItemDepositExact(
+        botName, action, srcBag, srcSlot, srcItemId, srcCount
+    )
+    return token and true or false
+end
+
 -- MB_ITEM_SELL_SINGLE_V1_HELPER_BEGIN
 local function runBridgeInventoryItemSell(button, botName)
     if not button or not button.item or not botName or botName == "" then
@@ -502,6 +533,34 @@ local function runBridgeInventoryItemSell(button, botName)
     return token and true or false
 end
 -- MB_ITEM_SELL_SINGLE_V1_HELPER_END
+
+local function runBridgeInventoryItemTrade(button, botName)
+    if not button or not button.item or not botName or botName == "" then
+        return false
+    end
+
+    local item = button.item
+    if item.exactLocation ~= true then
+        return false
+    end
+
+    local srcBag = tonumber(item.bag)
+    local srcSlot = tonumber(item.slot)
+    local itemId = tonumber(item.id or 0) or 0
+    local count = tonumber(item._serverCount or item.count or 1) or 1
+    if srcBag == nil or srcSlot == nil or itemId <= 0 or count < 1 then
+        return false
+    end
+
+    if not MultiBot.Comm or not MultiBot.Comm.RunInventoryItemTrade then
+        return false
+    end
+
+    local token = MultiBot.Comm.RunInventoryItemTrade(
+        botName, srcBag, srcSlot, itemId, count
+    )
+    return token and true or false
+end
 
 local function runBridgeInventoryItemUse(button, botName)
     if not button or not button.item or not botName or botName == "" then
@@ -587,10 +646,33 @@ MultiBot.OnBridgeInventoryItemDestroyResult = function(botName, _, reason)
 
     requestInventoryRefresh(0.15, botName)
 end
-local function handleInventoryItemClick(button)
-    local action, botName = getInventoryItemActionState()
-    local item = button and button.item or nil
+MultiBot.OnBridgeInventoryItemTradeResult = function(botName, status, reason)
+    if reason == "DISCONNECTED" then
+        return
+    end
 
+    if status ~= "OK" then
+        addInventorySystemMessage(
+            inventoryItemL("inventory.item_trade.failed", "The item could not be added to the trade.")
+                .. " [" .. tostring(reason or "FAILED") .. "]"
+        )
+
+        if reason == "SOURCE_STALE" or reason == "BAD_RESPONSE" or reason == "RESPONSE_MISMATCH" or reason == "TIMEOUT" then
+            requestInventoryRefresh(0.15, botName)
+        end
+    end
+end
+
+local function handleInventoryItemClick(button)
+    local item = button and button.item or nil
+    local inventoryBotName = MultiBot.inventory and MultiBot.inventory.name or nil
+    if item
+        and MultiBot.TryProfessionRecipeTargetInventoryItem
+        and MultiBot.TryProfessionRecipeTargetInventoryItem(inventoryBotName, item) then
+        return
+    end
+
+    local action, botName = getInventoryItemActionState()
     if action == "" then
         sendInventoryFeedback("action", "Choose an action first")
         return
@@ -661,33 +743,94 @@ local function handleInventoryItemClick(button)
     end
 
     if action == "give" then
-        sendInventoryItemCommand(action, button, botName)
+        local bridgeCapable = MultiBot.Comm
+            and MultiBot.Comm.IsInventoryItemTradeCapable
+            and MultiBot.Comm.IsInventoryItemTradeCapable()
+
+        if bridgeCapable then
+            if runBridgeInventoryItemTrade(button, botName) then
+                return
+            end
+
+            addInventorySystemMessage(inventoryItemL(
+                "inventory.item_trade.send_failed",
+                "The item-trade request could not be sent."
+            ))
+            return
+        end
+
+        if MultiBot.allowLegacyChatFallback == true then
+            sendInventoryItemCommand(action, button, botName)
+        else
+            addInventorySystemMessage(inventoryItemL(
+                "inventory.item_trade.unavailable",
+                "Item trading via the bridge is unavailable."
+            ))
+        end
         return
     end
 
     if action == "bank" then
+        local exactDepositCapable = item.exactLocation == true
+            and MultiBot.Comm
+            and MultiBot.Comm.IsInventoryItemDepositExactCapable
+            and MultiBot.Comm.IsInventoryItemDepositExactCapable()
+
+        if exactDepositCapable then
+            if runBridgeInventoryItemDepositExact("BANK_DEPOSIT", button, botName) then
+                return
+            end
+
+            addInventorySystemMessage(inventoryItemL(
+                "inventory.item_deposit_exact.send_failed",
+                "The exact deposit request could not be sent."
+            ))
+            return
+        end
+
         if runBridgeInventoryItemAction("BANK_DEPOSIT", button, botName) then
             return
         end
 
-        sendInventoryItemCommand("bank", button, botName, {
-            postActionRefresh = true,
-            refreshDelay = 0.45,
-            followupRefreshDelay = 1.20,
-        })
+        if MultiBot.allowLegacyChatFallback == true then
+            sendInventoryItemCommand("bank", button, botName, {
+                postActionRefresh = true,
+                refreshDelay = 0.45,
+                followupRefreshDelay = 1.20,
+            })
+        end
         return
     end
 
     if action == "gb" then
+        local exactDepositCapable = item.exactLocation == true
+            and MultiBot.Comm
+            and MultiBot.Comm.IsInventoryItemDepositExactCapable
+            and MultiBot.Comm.IsInventoryItemDepositExactCapable()
+
+        if exactDepositCapable then
+            if runBridgeInventoryItemDepositExact("GBANK_DEPOSIT", button, botName) then
+                return
+            end
+
+            addInventorySystemMessage(inventoryItemL(
+                "inventory.item_deposit_exact.send_failed",
+                "The exact deposit request could not be sent."
+            ))
+            return
+        end
+
         if runBridgeInventoryItemAction("GBANK_DEPOSIT", button, botName) then
             return
         end
 
-        sendInventoryItemCommand("gb", button, botName, {
-            postActionRefresh = true,
-            refreshDelay = 0.45,
-            followupRefreshDelay = 1.20,
-        })
+        if MultiBot.allowLegacyChatFallback == true then
+            sendInventoryItemCommand("gb", button, botName, {
+                postActionRefresh = true,
+                refreshDelay = 0.45,
+                followupRefreshDelay = 1.20,
+            })
+        end
         return
     end
 
@@ -696,11 +839,13 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        sendInventoryItemCommand("b", button, botName, {
-            postActionRefresh = true,
-            refreshDelay = 0.45,
-            followupRefreshDelay = 1.20,
-        })
+        if MultiBot.allowLegacyChatFallback == true then
+            sendInventoryItemCommand("b", button, botName, {
+                postActionRefresh = true,
+                refreshDelay = 0.45,
+                followupRefreshDelay = 1.20,
+            })
+        end
         return
     end
 
@@ -925,6 +1070,11 @@ function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, res
             inventoryItemL("inventory.item_action.failed", "%s failed."),
             actionLabel
         ))
+    end
+
+    if (action == "BANK_DEPOSIT" or action == "GBANK_DEPOSIT")
+        and (reason == "SOURCE_STALE" or reason == "BAD_RESPONSE" or reason == "RESPONSE_MISMATCH" or reason == "TIMEOUT") then
+        requestInventoryRefresh(0.15, botName)
     end
 end
 

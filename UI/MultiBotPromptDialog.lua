@@ -72,6 +72,25 @@ function ShowPrompt(title, onOk, defaultText, anchorFrame)
         end
         window:AddChild(edit)
 
+        -- The bundled AceGUI EditBox binds OnMouseDown to drag handling. Preserve
+        -- that handler for item/spell cursor payloads, but avoid calling it for a
+        -- normal click because it clears focus even when there is no payload.
+        local nativeEditBox = edit.editbox
+        if nativeEditBox and nativeEditBox.SetScript then
+            local originalOnMouseDown = nativeEditBox.GetScript and nativeEditBox:GetScript("OnMouseDown") or nil
+            nativeEditBox:SetScript("OnMouseDown", function(frame, ...)
+                local cursorType = GetCursorInfo and GetCursorInfo() or nil
+                if (cursorType == "item" or cursorType == "spell") and originalOnMouseDown then
+                    originalOnMouseDown(frame, ...)
+                    return
+                end
+
+                if frame and frame.SetFocus then
+                    frame:SetFocus()
+                end
+            end)
+        end
+
         local okButton = aceGUI:Create("Button")
         okButton:SetText(OKAY)
         okButton:SetWidth(PROMPT_OK_BUTTON_WIDTH)
@@ -95,6 +114,9 @@ function ShowPrompt(title, onOk, defaultText, anchorFrame)
     local editBox = PROMPT.edit and PROMPT.edit.editbox
     if editBox and editBox.SetFocus then
         editBox:SetFocus()
+        if defaultText and defaultText ~= "" and editBox.HighlightText then
+            editBox:HighlightText()
+        end
     end
 
     PROMPT.okButton:SetCallback("OnClick", function()
