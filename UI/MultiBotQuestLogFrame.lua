@@ -63,6 +63,27 @@ local function showQuestTooltip(questIndex, questLink, owner)
     GameTooltip:Show()
 end
 
+local function showQuestAbandonFailure(result)
+    if type(result) ~= "table" or result.status == "ok" then
+        return
+    end
+
+    local reason = tostring(result.reason or "FAILED")
+    local matched = tonumber(result.matched) or 0
+    local abandoned = tonumber(result.abandoned) or 0
+    local template = MultiBot.L
+        and MultiBot.L("quest.abandon.failed", "Quest abandon failed: %s")
+        or "Quest abandon failed: %s"
+    local message = string.format(template, reason)
+
+    if matched > 0 then
+        message = message .. " (" .. tostring(abandoned) .. "/" .. tostring(matched) .. ")"
+    end
+
+    if UIErrorsFrame and UIErrorsFrame.AddMessage then
+        UIErrorsFrame:AddMessage(message, 1, 0.2, 0.2, 1)
+    end
+end
 local function handleQuestClick(questID, button)
     if not questID then
         return
@@ -80,7 +101,15 @@ local function handleQuestClick(questID, button)
                     and MultiBot.Comm.IsQuestAbandonCapable
                     and MultiBot.Comm.IsQuestAbandonCapable()
                     and MultiBot.Comm.RunQuestAbandon then
-                    bridgeHandled = MultiBot.Comm.RunQuestAbandon(questID) and true or false
+                    bridgeHandled = MultiBot.Comm.RunQuestAbandon(questID, showQuestAbandonFailure) and true or false
+                end
+
+                if not bridgeHandled
+                    and MultiBot.Comm
+                    and MultiBot.Comm.IsQuestAbandonCapable
+                    and MultiBot.Comm.IsQuestAbandonCapable()
+                    and MultiBot.allowLegacyChatFallback ~= true then
+                    showQuestAbandonFailure({ status = "error", reason = "SEND_FAILED" })
                 end
 
                 if not bridgeHandled and MultiBot.allowLegacyChatFallback == true then
