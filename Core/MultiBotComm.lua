@@ -3727,19 +3727,28 @@ end
 
 local function handleTalentApplyResponse(payload, state)
   local fields = splitFields(payload or "")
+  local token = trim(fields[1] or "")
+  local pending = isValidStateToken(token) and state.talentApplyCommands[token] or nil
   if #fields ~= 7 then
     state.lastError = "TALENT_APPLY_BAD_FIELD_COUNT"
+    if type(pending) == "table" then
+      finishTalentApplyCommand(token, {
+        status = "error",
+        reason = "BAD_RESPONSE",
+        botName = pending.botName,
+        build = pending.build,
+        treePoints = {0, 0, 0},
+      })
+    end
     return true
   end
 
-  local token = trim(fields[1])
   local botName = urlDecodeFieldStrict(fields[2], 64, false)
   local status = string.upper(trim(fields[3]))
   local reason = urlDecodeFieldStrict(fields[4], 64, false)
   local tree0 = parseBoundedInteger(fields[5], 0, 255)
   local tree1 = parseBoundedInteger(fields[6], 0, 255)
   local tree2 = parseBoundedInteger(fields[7], 0, 255)
-  local pending = state.talentApplyCommands[token]
 
   local valid = isValidStateToken(token)
       and botName ~= nil
@@ -3872,12 +3881,24 @@ end
 
 local function handleTalentSpecApplyResponse(payload, state)
   local fields = splitFields(payload or "")
+  local token = trim(fields[1] or "")
+  local pending = isValidStateToken(token) and state.talentSpecApplyCommands[token] or nil
   if #fields ~= 9 then
     state.lastError = "TALENT_SPEC_APPLY_BAD_FIELD_COUNT"
+    if type(pending) == "table" then
+      finishTalentSpecApplyCommand(token, {
+        status = "error",
+        reason = "BAD_RESPONSE",
+        botName = pending.botName,
+        slot = pending.slot,
+        specIndex = pending.specIndex,
+        specName = pending.specName,
+        treePoints = {0, 0, 0},
+      })
+    end
     return true
   end
 
-  local token = trim(fields[1])
   local botName = urlDecodeFieldStrict(fields[2], 64, false)
   local status = string.upper(trim(fields[3]))
   local reason = urlDecodeFieldStrict(fields[4], 64, false)
@@ -3886,7 +3907,6 @@ local function handleTalentSpecApplyResponse(payload, state)
   local tree0 = parseBoundedInteger(fields[7], 0, 255)
   local tree1 = parseBoundedInteger(fields[8], 0, 255)
   local tree2 = parseBoundedInteger(fields[9], 0, 255)
-  local pending = state.talentSpecApplyCommands[token]
 
   local valid = isValidStateToken(token)
       and botName ~= nil
@@ -4007,18 +4027,27 @@ end
 
 local function handleQuestAbandonResponse(payload, state)
   local fields = splitFields(payload or "")
+  local token = trim(fields[1] or "")
+  local pending = isValidStateToken(token) and state.questAbandonCommands[token] or nil
   if #fields ~= 6 then
     state.lastError = "QUEST_ABANDON_BAD_FIELD_COUNT"
+    if type(pending) == "table" then
+      finishQuestAbandonCommand(token, {
+        status = "error",
+        reason = "BAD_RESPONSE",
+        matched = 0,
+        abandoned = 0,
+        questId = pending.questId,
+      })
+    end
     return true
   end
 
-  local token = trim(fields[1])
   local questId = parseBoundedInteger(fields[2], 1, 4294967295)
   local status = string.upper(trim(fields[3]))
   local reason = urlDecodeFieldStrict(fields[4], 64, false)
   local matched = parseBoundedInteger(fields[5], 0, 128)
   local abandoned = parseBoundedInteger(fields[6], 0, 128)
-  local pending = state.questAbandonCommands[token]
 
   if not isValidStateToken(token)
       or questId == nil
@@ -6719,13 +6748,23 @@ end
 
 local function handleInventoryItemDepositExactResponse(payload, state)
   local fields = splitFields(payload)
+  local token = trim(fields[2] or "")
+  local command = isValidStateToken(token) and state.inventoryItemDepositExacts and state.inventoryItemDepositExacts[token] or nil
   if #fields ~= 10 then
     state.lastError = "ITEM_DEPOSIT_EXACT_BAD_FIELD_COUNT"
+    if command then
+      state.inventoryItemDepositExacts[token] = nil
+      if MultiBot.OnBridgeInventoryItemActionResult then
+        MultiBot.OnBridgeInventoryItemActionResult(
+          command.botName, command.action, command.srcItemId,
+          "ERR", "BAD_RESPONSE", 0, command
+        )
+      end
+    end
     return true
   end
 
   local botName = urlDecodeFieldStrict(fields[1], 64, false)
-  local token = trim(fields[2])
   local status = string.upper(trim(fields[3]))
   local reason = urlDecodeFieldStrict(fields[4], 64, false)
   local action = string.upper(trim(fields[5]))
@@ -6736,7 +6775,6 @@ local function handleInventoryItemDepositExactResponse(payload, state)
   local movedCount = parseBoundedInteger(fields[10], 0, INVENTORY_ITEM_DEPOSIT_EXACT_MAX_COUNT)
 
   state.connected = true
-  local command = state.inventoryItemDepositExacts and state.inventoryItemDepositExacts[token] or nil
   if not botName
       or not isValidStateToken(token)
       or (status ~= "OK" and status ~= "ERR")
@@ -6803,21 +6841,30 @@ end
 -- MB_LOOT_RULE_ITEM_V1_RX_BEGIN
 local function handleLootRuleItemResponse(payload, state)
   local fields = splitFields(payload or "")
+  local token = trim(fields[3] or "")
+  local pending = isValidStateToken(token) and state.lootRuleItemCommands[token] or nil
   if #fields ~= 9 then
     state.lastError = "LOOT_RULE_ITEM_BAD_FIELD_COUNT"
+    if type(pending) == "table" then
+      state.lootRuleItemCommands[token] = nil
+      if MultiBot.OnLootRuleItemResult then
+        MultiBot.OnLootRuleItemResult(
+          pending.scope, pending.target, pending.action, pending.itemId,
+          "ERR", "BAD_RESPONSE", 0, 0, pending
+        )
+      end
+    end
     return true
   end
 
   local scope = string.upper(trim(fields[1]))
   local target = urlDecodeFieldStrict(fields[2], 64, true)
-  local token = trim(fields[3])
   local action = string.upper(trim(fields[4]))
   local itemId = parseBoundedInteger(fields[5], 1, 4294967295)
   local status = string.upper(trim(fields[6]))
   local reason = urlDecodeFieldStrict(fields[7], 64, false)
   local matched = parseBoundedInteger(fields[8], 0, 128)
   local changed = parseBoundedInteger(fields[9], 0, 128)
-  local pending = state.lootRuleItemCommands[token]
   local validScope = scope == "ALL" or scope == "RAID" or scope == "GROUP"
       or scope == "PARTY" or scope == "BOT"
 
@@ -6885,13 +6932,23 @@ end
 -- MB_LOOT_RULE_ITEM_V1_RX_END
 local function handleInventoryItemTradeResponse(payload, state)
   local fields = splitFields(payload)
+  local token = trim(fields[2] or "")
+  local command = isValidStateToken(token) and state.inventoryItemTrades and state.inventoryItemTrades[token] or nil
   if #fields ~= 9 then
     state.lastError = "ITEM_TRADE_BAD_FIELD_COUNT"
+    if command then
+      state.inventoryItemTrades[token] = nil
+      if MultiBot.OnBridgeInventoryItemTradeResult then
+        MultiBot.OnBridgeInventoryItemTradeResult(
+          command.botName, "ERR", "BAD_RESPONSE",
+          command.srcBag, command.srcSlot, command.srcItemId, command.srcCount, 255, command
+        )
+      end
+    end
     return true
   end
 
   local botName = urlDecodeFieldStrict(fields[1], 64, false)
-  local token = trim(fields[2])
   local status = string.upper(trim(fields[3]))
   local reason = urlDecodeFieldStrict(fields[4], 64, false)
   local srcBag = parseBoundedInteger(fields[5], 0, 255)
@@ -6901,7 +6958,6 @@ local function handleInventoryItemTradeResponse(payload, state)
   local tradeSlot = parseBoundedInteger(fields[9], 0, 255)
 
   state.connected = true
-  local command = state.inventoryItemTrades and state.inventoryItemTrades[token] or nil
   if not botName or not isValidStateToken(token) or (status ~= "OK" and status ~= "ERR") or not reason or
     srcBag == nil or srcSlot == nil or srcItemId == nil or srcCount == nil or tradeSlot == nil then
     state.lastError = "ITEM_TRADE_BAD_RESPONSE"
