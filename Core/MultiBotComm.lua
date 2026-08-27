@@ -9132,7 +9132,6 @@ state.selfActionCapable = false
   state.professionRecipes = {}
   state.professionRecipeActive = nil
   state.professionRecipeCrafts = {}
-  state.professionRecipeTargetCommands = {}
   state.outfitActive = nil
   state.outfitCommands = {}
   state.trainerActive = nil
