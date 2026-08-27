@@ -1,7 +1,7 @@
 # Multibot Chatless + Bridge — Roadmap de reprise
 
 Statut : roadmap active issue de l'audit initial v1c du 1er août 2026, resynchronisée le 26 août 2026 après clôture de P3A `ITEM_DEPOSIT_EXACT_V1` puis de `LOOT_RULE_ITEM_V1`. Le lot fonctionnel courant des branches `jellypowered-chatless-integration-v2` est terminé. Les PR Addon #73 et Bridge #32 sont ouvertes vers `main` ; aucun nouveau développement fonctionnel ne doit être ajouté à ces branches avant leur clôture/merge. Après merge, la roadmap reprendra sur de nouvelles branches créées depuis les `main` mis à jour.
-Dernière mise à jour : 26/08/2026 — `LOOT_RULE_ITEM_V1` est terminé, validé en jeu, audité, archivé, commité et poussé après P3A `ITEM_DEPOSIT_EXACT_V1`. ADD/REMOVE modifie l'`always loot list` vérifiée dans Playerbots pour un `itemId` exact, avec résultats structurés, idempotence, persistance des seuls bots modifiés, budget global de 128 sauvegardes/10 s et rejet pré-mutation `PERSISTENCE_BUSY` lorsque le budget est insuffisant. La persistance a été validée après reconnexion et restart worldserver, le prompt et les résultats sont localisés dans les huit locales présentes, et aucun spam chat/whisper n'a été observé. P3B/P3C, `SOURCE_STALE` UI, SELL_GREY, Firestone/Spellstone et LuaLint restent différés. `TODO.md` reste séparé et inchangé. Le prochain chantier normal est la décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes.
+Dernière mise à jour : 27/08/2026 — `LOOT_RULE_ITEM_V1` est terminé, validé en jeu, audité, archivé, commité et poussé après P3A `ITEM_DEPOSIT_EXACT_V1`. ADD/REMOVE modifie l'`always loot list` vérifiée dans Playerbots pour un `itemId` exact, avec résultats structurés, idempotence, persistance des seuls bots modifiés, budget global de 128 sauvegardes/10 s et rejet pré-mutation `PERSISTENCE_BUSY` lorsque le budget est insuffisant. La persistance a été validée après reconnexion et restart worldserver, le prompt et les résultats sont localisés dans les huit locales présentes, et aucun spam chat/whisper n'a été observé. P3B/P3C, `SOURCE_STALE` UI, SELL_GREY, Firestone/Spellstone et LuaLint restent différés. `TODO.md` reste séparé et inchangé. Le prochain chantier normal est la décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes.
 Cette roadmap est la source de vérité active du projet. `TODO.md` reste un fichier de notes local séparé et est volontairement exclu de cette synchronisation documentaire.
 
 ## Baseline auditée
@@ -618,6 +618,14 @@ Le lot banque/GBANK prioritaire est clos pour la roadmap courante. Le chantier s
 - UI/i18n validée : prompt cliquable/éditable corrigé localement sans modifier AceGUI global, `/reload` sans erreur Lua, boutons/résultats localisés dans les huit locales présentes (`deDE`, `enGB`, `enUS`, `esES`, `frFR`, `koKR`, `ruRU`, `zhCN`), aucun spam chat/whisper observé.
 - Divergence documentaire conservée comme décision séparée : l'audit du build Playerbots courant ne permet pas de traiter `Quest`/`Skill` comme capacités validées sur la seule foi du wiki ; la prochaine étape doit trancher Quest/Skill versus Disenchant à partir du code réellement présent.
 
+### Stabilisation de clôture PR Addon #73 — 27/08/2026
+
+- **Lifecycle structuré Addon durci** — commit `ae5cd9695dfc93b81872d2a95e1ce840b3d1ebfc` : les requêtes `LOOT_RULE_ITEM` et `STRATEGY_MUTATION` ne sont plus effacées avant `MarkDisconnected()` lors de `PLAYER_ENTERING_WORLD`; le craft normal `PROFESSION_RECIPE_CRAFT` possède désormais une limite de **8** requêtes actives, un timeout de **5 s**, une validation stricte de la réponse et une terminaison `DISCONNECTED` déterministe.
+- **Feedback `QUEST_ABANDON` structuré** — commit `bd79fab8636d728401e64690899121a09bdc398d` : les erreurs Bridge, timeout, déconnexion et échec d'envoi sont remontés à l'utilisateur au lieu d'être silencieux.
+- **Resynchronisation inventaire après erreurs exactes** — commit `d3e0d6cd7f7da9775ff37619932fe525969a2732` : `BANK_DEPOSIT`, `GBANK_DEPOSIT` et `ITEM_TRADE` redemandent un snapshot autoritatif sur `SOURCE_STALE`, `BAD_RESPONSE`, `RESPONSE_MISMATCH` ou `TIMEOUT`; les succès et `DISCONNECTED` restent inchangés.
+- **Bridge indisponible pour `QUEST_ABANDON`** — commit `c84441ecabb7b124d4547d17118bc73bf05c69a1` : lorsque `QUEST_ABANDON_V1` n'est pas disponible et que le fallback chat est désactivé, l'Addon signale explicitement `BRIDGE_UNAVAILABLE` au lieu de laisser croire que les bots ont abandonné la quête.
+- Ces correctifs de clôture ne modifient ni `mod-playerbots`, ni le Bridge, ni la politique de fallback legacy. Ils ne nécessitent aucun rebuild C++.
+
 ### Chantiers suspendus — à reprendre seulement après la roadmap normale
 
 À ne pas reprendre pendant la roadmap normale sauf demande explicite :
@@ -630,8 +638,17 @@ Le lot banque/GBANK prioritaire est clos pour la roadmap courante. Le chantier s
 - quatre warnings LuaLint restants dans `Strategies/MultiBotWarlock.lua` ;
 - autres petits reliquats déjà explicitement reportés.
 
+### Reliquats techniques confirmés pendant la revue PR #73 — différés
+
+Ces points sont **préexistants ou hors objectif fonctionnel de la PR #73**. Ils sont enregistrés pour audit/hardening ultérieur et ne modifient pas l'ordre de reprise normal de la roadmap :
+
+- **Lifecycle Trainer** : `RunTrainerLearn` crée un pending `trainerCommands` sans timeout dédié; `MarkDisconnected()` efface actuellement cette table sans livrer de résultat `DISCONNECTED` à `TrainerUI`. Une déconnexion pendant `Learning...` peut donc laisser `TrainerUI.pending` actif jusqu'à une action manuelle. À auditer puis durcir avec timeout borné et terminaison déterministe.
+- **Lifecycle Outfit** : le chemin Bridge verrouille `OutfitUI.commandBusy`, mais le disconnect efface `outfitCommands` sans passer par `HandleBridgeCommandResult`. Une perte de connexion pendant une commande peut laisser le verrou UI actif. À auditer puis durcir avec timeout/résultat de déconnexion.
+- **Lifecycle Formation** : `formationCommands` possède callback et timeout, mais la table est effacée au disconnect et également pendant `PLAYER_ENTERING_WORLD`; un callback pending peut donc être perdu avant son timeout. À auditer avec le même modèle de drain déterministe utilisé pour les commandes structurées récentes.
+- **Idempotence / anti-rejeu du craft normal `PROFESSION_RECIPE_CRAFT`** : l'Addon dispose désormais d'un timeout de 5 s, mais le chemin Bridge normal doit encore être audité pour vérifier/ajouter si nécessaire rate-limit, token replay et sémantique d'idempotence comparables à `CRAFT_RECIPE_TARGET_V1`. Une réponse perdue ne doit pas permettre qu'un retry manuel déclenche ambiguëment un second craft.
+
 ### Reprise de la roadmap normale
 
 Le **prochain chantier fonctionnel** est : **décision Quest/Skill versus Disenchant à partir des capacités Playerbots réellement présentes**. Aucun endpoint, mode ou stratégie ne doit être conçu avant l'audit ciblé de ce point.
 
-Le lot fonctionnel courant de `jellypowered-chatless-integration-v2` est terminé avec `LOOT_RULE_ITEM_V1`. Cette synchronisation documentaire prépare la clôture de la branche : après commit/push des documents, les branches Addon et Bridge doivent être proposées par PR vers `main`. Aucun nouveau développement fonctionnel ne doit être empilé sur ces branches avant les PR. Après merge et mise à jour des `main`, la roadmap normale reprendra sur de nouvelles branches créées depuis ces baselines. P3B/P3C, le libellé `SOURCE_STALE`, `BAG_MOVE`, `SELL_GREY`, Firestone/Spellstone TEMP_ENCHANT, LuaLint et les autres reliquats explicitement différés restent hors du prochain chantier.
+Le lot fonctionnel courant de `jellypowered-chatless-integration-v2` est terminé avec `LOOT_RULE_ITEM_V1` et la stabilisation de clôture de la PR Addon #73. Les PR Addon #73 et Bridge #32 sont ouvertes vers `main`; aucun nouveau développement fonctionnel ne doit être empilé sur ces branches avant leur clôture/merge. Après merge et mise à jour des `main`, la roadmap normale reprendra sur de nouvelles branches créées depuis ces baselines. P3B/P3C, le libellé `SOURCE_STALE`, `BAG_MOVE`, `SELL_GREY`, Firestone/Spellstone TEMP_ENCHANT, LuaLint et les reliquats techniques explicitement différés ci-dessus restent hors du prochain chantier.
