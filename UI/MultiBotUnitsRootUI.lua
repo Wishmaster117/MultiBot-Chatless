@@ -83,6 +83,96 @@ local function mergeLists(primary, secondary)
     return result
 end
 
+-- MB_ADDON_ALT_ROSTER_SECTIONS_V1_BEGIN
+local function getAltLifecycleState(name)
+    if not (MultiBot.GetBridgeAltEntry and type(name) == "string") then
+        return nil
+    end
+
+    local entry = MultiBot.GetBridgeAltEntry(name)
+    if not entry then
+        return nil
+    end
+
+    return string.upper(tostring(entry.state or "OFFLINE"))
+end
+
+local function hasBridgeAltRoster()
+    return MultiBot.bridge
+        and type(MultiBot.bridge.altRoster) == "table"
+        and #MultiBot.bridge.altRoster > 0
+end
+
+local function splitPlayerDisplay(display)
+    local online = {}
+    local offline = {}
+
+    for index = 1, #display do
+        local name = display[index]
+        local state = getAltLifecycleState(name)
+        if state == "OFFLINE" or state == "CONNECTING" then
+            table.insert(offline, name)
+        else
+            table.insert(online, name)
+        end
+    end
+
+    return online, offline
+end
+
+local function layoutPlayerAltSections(
+    unitsButton,
+    unitsFrame,
+    onlineNames,
+    offlineNames,
+    fromIndex,
+    toIndex
+)
+    local effective = {}
+    for index = 1, #onlineNames do
+        table.insert(effective, onlineNames[index])
+    end
+    for index = 1, #offlineNames do
+        table.insert(effective, offlineNames[index])
+    end
+
+    local newVisible = {}
+    local y = 0
+    local rowStep = unitsFrame.size + 2
+
+    for index = fromIndex, toIndex do
+        local name = effective[index]
+        if name then
+            local unitButton = unitsFrame.buttons[name]
+            local unitFrame = unitsFrame.frames[name]
+
+            if unitButton and unitButton.state and MultiBot.EnsureBridgeUnitFrame then
+                unitFrame = MultiBot.EnsureBridgeUnitFrame(name) or unitFrame
+            end
+
+            if unitButton then
+                unitButton.setPoint(0, y)
+                if unitFrame then
+                    unitFrame.setPoint(-34, y + 2)
+                end
+                if unitFrame and unitButton.state then
+                    unitFrame:Show()
+                end
+                unitButton:Show()
+                table.insert(newVisible, name)
+                y = y + rowStep
+            end
+        end
+    end
+
+    unitsButton.from = fromIndex
+    unitsButton.to = toIndex
+    unitsButton._visibleNames = newVisible
+    unitsFrame.frames.Control.setPoint(-2, y)
+    return #effective
+end
+-- MB_ADDON_ALT_ROSTER_SECTIONS_V1_END
+
 local function getUnitsRootObjects(button)
     local unitsFrame = button.parent.frames[UNITS_FRAME_NAME]
     return button.parent, unitsFrame
@@ -130,6 +220,10 @@ local function addRefreshTarget(targets, seen, unitsFrame, name)
     end
 
     if seen[name] or not (unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]) then
+        return
+    end
+
+    if MultiBot.IsBridgeAltUnavailable and MultiBot.IsBridgeAltUnavailable(name) then
         return
     end
 
@@ -234,6 +328,7 @@ local function relayoutUnitsDisplay(unitsButton, unitsFrame)
         return
     end
 
+
     for _, value in pairs(unitsFrame.buttons) do
         value:Hide()
     end
@@ -250,6 +345,41 @@ local function relayoutUnitsDisplay(unitsButton, unitsFrame)
 
     local sourceTable = getUnitsSourceTable(unitsButton)
     local display = getDisplayableUnits(unitsFrame, sourceTable)
+
+    if unitsButton.roster == "players" and hasBridgeAltRoster() then
+        local onlineNames, offlineNames = splitPlayerDisplay(display)
+        local effectiveLimit = #onlineNames + #offlineNames
+
+        unitsButton.limit = effectiveLimit
+        local fromIndex = tonumber(unitsButton.from) or 1
+        if fromIndex < 1 then
+            fromIndex = 1
+        end
+        if effectiveLimit > 0 and fromIndex > effectiveLimit then
+            fromIndex = math.max(1, effectiveLimit - UNITS_PAGE_SIZE + 1)
+        end
+
+        local toIndex = effectiveLimit > 0
+            and math.min(effectiveLimit, fromIndex + UNITS_PAGE_SIZE - 1)
+            or 0
+
+        hideTrackedVisibleUnits(unitsButton, unitsFrame)
+        layoutPlayerAltSections(
+            unitsButton,
+            unitsFrame,
+            onlineNames,
+            offlineNames,
+            fromIndex,
+            toIndex
+        )
+
+        if effectiveLimit < UNITS_PAGE_SIZE + 1 then
+            unitsFrame.frames.Control.buttons["Browse"]:Hide()
+        else
+            unitsFrame.frames.Control.buttons["Browse"]:Show()
+        end
+        return
+    end
 
     unitsButton.limit = #display
     if unitsButton.limit <= 0 then
@@ -315,6 +445,12 @@ local function refreshUnitsDisplay(unitsButton, requestedRoster, requestedFilter
                 end
             elseif MultiBot.Comm and MultiBot.Comm.RequestRoster then
                 MultiBot.Comm.RequestRoster()
+            end
+
+            if MultiBot.bridge.altRosterCapable
+                and MultiBot.Comm
+                and MultiBot.Comm.RequestAltRoster then
+                MultiBot.Comm.RequestAltRoster()
             end
         end
 
@@ -632,6 +768,9 @@ local function requestRosterBootstrap(button)
         end
         if MultiBot.Comm.RequestRoster then
             MultiBot.Comm.RequestRoster()
+        end
+        if MultiBot.Comm.RequestAltRoster then
+            MultiBot.Comm.RequestAltRoster()
         end
         if MultiBot.Comm.RequestStates then
             MultiBot.Comm.RequestStates()

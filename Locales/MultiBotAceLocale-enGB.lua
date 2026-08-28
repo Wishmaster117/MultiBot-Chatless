@@ -554,6 +554,9 @@ local enGBValues = {
   ["tips.unit"] = "",
   ["tips.unit.selfbot"] = "Selfbot\n|cffffffffTurn on or off Bot AI for your character.|r\n\n|cffff0000Left-click to activate Selfbot|r\n|cff999999(Executed by: System)|r",
   ["tips.unit.button"] = "|cffffffff\nAdd/remove NAME to/from your Group.\nThis action will query NAME for their Combat Strategies and Non-Combat Strategies.\nStrategies can be configured with the Button Bars to the left and right.\nThe Button Bars will appear after adding the Bot.|r\n\n|cffff0000Left-click to add NAME|r\n|cff999999(Executed by: System)|r\n\n|cffff0000Right-click to remove NAME|r\n|cff999999(Executed by: System)|r",
+
+
+  ["tips.unit.altbot"] = "Account Alt\n|cffffffffThis character belongs to your account and is controlled through the MultiBot Bridge.|r\n\n|cffff0000Left-click while offline to log in|r\n|cffff0000Left-click while online to open controls|r\n|cffff0000Right-click while online to log out|r\n|cff999999(Executed by: Bridge)|r",
   ["tips.units.master"] = "PlayerBot Main Menu\n|cffffffffContains a master list of PlayerBot controls.\nEach button represents one of your Characters, Guild Members, or Friends.\n|cffff0000Left-click to show or hide the PlayerBot buttons|r\n|cff999999(Executed by: System)|r\n\n|cffff0000Right-click to refresh the Roster|r\n|cff999999(Executed by: System)|r",
   ["tips.units.filter"] = "Class Filters\n|cffffffffFilter PlayerBots by Class.|r\n\n|cffff0000Left-click to show or hide the Options|r\n|cff999999(Executed by: System)|r\n\n|cffff0000Right-click to reset the filters|r\n|cff999999(Executed by: System)|r",
   ["tips.units.deathknight"] = "Filter |cffffffffDeath Knight|r PlayerBots\n\n|cffff0000Left-click to activate.|r\n|cff999999(Executed by: System)|r",

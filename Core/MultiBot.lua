@@ -1917,6 +1917,372 @@ local function BindBridgeSelfBotHandler(button)
 end
 -- MB_ISSUE33_SELF_BOT_V1_UI_END
 
+-- MB_ADDON_ALT_ROSTER_UI_V1_BEGIN
+local function RemoveBridgeAltNameFromList(list, name)
+  if type(list) ~= "table" or type(name) ~= "string" then
+    return false
+  end
+
+  local removed = false
+  for index = #list, 1, -1 do
+    if list[index] == name then
+      table.remove(list, index)
+      removed = true
+    end
+  end
+  return removed
+end
+
+local function IsBridgeMainRosterName(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+
+  local roster = MultiBot.bridge and MultiBot.bridge.roster or nil
+  if type(roster) ~= "table" then
+    return false
+  end
+
+  local key = string.lower(name)
+  for index = 1, #roster do
+    local entry = roster[index]
+    if entry and type(entry.name) == "string"
+        and string.lower(entry.name) == key then
+      return true
+    end
+  end
+  return false
+end
+
+function MultiBot.GetBridgeAltEntry(name)
+  if type(name) ~= "string" or name == "" then
+    return nil
+  end
+
+  local roster = MultiBot.bridge and MultiBot.bridge.altRoster or nil
+  if type(roster) ~= "table" then
+    return nil
+  end
+
+  local key = string.lower(name)
+  for index = 1, #roster do
+    local entry = roster[index]
+    if entry and type(entry.name) == "string"
+        and string.lower(entry.name) == key then
+      return entry
+    end
+  end
+  return nil
+end
+
+function MultiBot.IsBridgeAltUnavailable(name)
+  local entry = MultiBot.GetBridgeAltEntry and MultiBot.GetBridgeAltEntry(name) or nil
+  if not entry then
+    return false
+  end
+  return string.upper(tostring(entry.state or "")) ~= "ONLINE"
+end
+
+local function BuildBridgeAltTooltip(button, entry)
+  local className = button and button.class or GetBridgeRosterClass(entry and entry.classId)
+  className = className or "UNKNOWN"
+
+  local displayClass = className
+  if MultiBot.GetClassDisplay then
+    displayClass = MultiBot.GetClassDisplay(className) or className
+  end
+
+  local level = tonumber(entry and entry.level or 0) or 0
+  local name = entry and entry.name or (button and button.name) or ""
+  local prefix = displayClass .. " - "
+  if level > 0 then
+    prefix = prefix .. tostring(level) .. " - "
+  end
+
+  return prefix .. name .. "\n" .. MultiBot.L(
+    "tips.unit.altbot",
+    "Account alt\nLeft-click while offline to log in.\nLeft-click while online to open controls.\nRight-click while online to log out."
+  )
+end
+
+local function UpdateBridgeAltButton(button, entry)
+  if not button or type(entry) ~= "table" then
+    return false
+  end
+
+  local botClass = GetBridgeRosterClass(entry.classId)
+  button.class = botClass
+  button.classId = tonumber(entry.classId or 0) or 0
+  button.level = tonumber(entry.level or 0) or 0
+  button._mbAltGuid = tonumber(entry.guid)
+  button._mbAltState = string.upper(tostring(entry.state or "OFFLINE"))
+  button._mbAltEntry = entry
+
+  local texture = "Interface\\Icons\\INV_Misc_QuestionMark"
+  if string.lower(botClass or "unknown") ~= "unknown" then
+    texture = "Interface\\AddOns\\MultiBot\\Icons\\class_"
+        .. string.lower(botClass) .. ".blp"
+  end
+
+  local tooltip = BuildBridgeAltTooltip(button, entry)
+  if button.setButton then
+    button.setButton(texture, tooltip)
+  elseif button.icon and button.icon.SetTexture then
+    button.icon:SetTexture(
+      MultiBot.SafeTexturePath and MultiBot.SafeTexturePath(texture) or texture
+    )
+    button.tip = tooltip
+  end
+  return true
+end
+
+local function BindBridgeAltBotHandler(button)
+  if not button or not button._mbAltGuid then
+    return nil
+  end
+
+  button.doLeft = function(unitButton)
+    if unitButton._mbAltLifecyclePending then
+      return
+    end
+
+    local lifecycleState = string.upper(tostring(unitButton._mbAltState or "OFFLINE"))
+    if lifecycleState == "ONLINE" then
+      if unitButton.parent and unitButton.parent.frames
+          and unitButton.parent.frames[unitButton.name] ~= nil then
+        MultiBot.ShowHideSwitch(unitButton.parent.frames[unitButton.name])
+      end
+      return
+    end
+
+    if lifecycleState ~= "OFFLINE" then
+      return
+    end
+
+    local bridge = MultiBot.bridge
+    local comm = MultiBot.Comm
+    if not (bridge and bridge.connected == true
+        and bridge.altRosterCapable == true
+        and bridge.botLifecycleCapable == true
+        and comm and type(comm.RunBotLifecycle) == "function") then
+      return
+    end
+
+    unitButton._mbAltLifecyclePending = true
+    unitButton._mbAltState = "CONNECTING"
+    if unitButton._mbAltEntry then
+      unitButton._mbAltEntry.state = "CONNECTING"
+    end
+    if unitButton.setDisable then
+      unitButton.setDisable()
+    end
+
+    local token = comm.RunBotLifecycle("CONNECT", unitButton._mbAltGuid)
+    if not token then
+      unitButton._mbAltLifecyclePending = false
+      unitButton._mbAltState = "OFFLINE"
+      if unitButton._mbAltEntry then
+        unitButton._mbAltEntry.state = "OFFLINE"
+      end
+    else
+      unitButton._mbAltLifecycleToken = token
+    end
+
+    if MultiBot.RelayoutUnitsDisplay then
+      MultiBot.RelayoutUnitsDisplay()
+    end
+  end
+
+  button.doRight = function(unitButton)
+    if unitButton._mbAltLifecyclePending then
+      return
+    end
+
+    local lifecycleState = string.upper(tostring(unitButton._mbAltState or "OFFLINE"))
+    if lifecycleState ~= "ONLINE" then
+      return
+    end
+
+    local bridge = MultiBot.bridge
+    local comm = MultiBot.Comm
+    if not (bridge and bridge.connected == true
+        and bridge.altRosterCapable == true
+        and bridge.botLifecycleCapable == true
+        and comm and type(comm.RunBotLifecycle) == "function") then
+      return
+    end
+
+    unitButton._mbAltLifecyclePending = true
+    unitButton._mbAltState = "DISCONNECTING"
+    if unitButton._mbAltEntry then
+      unitButton._mbAltEntry.state = "DISCONNECTING"
+    end
+
+    local token = comm.RunBotLifecycle("DISCONNECT", unitButton._mbAltGuid)
+    if not token then
+      unitButton._mbAltLifecyclePending = false
+      unitButton._mbAltState = "ONLINE"
+      if unitButton._mbAltEntry then
+        unitButton._mbAltEntry.state = "ONLINE"
+      end
+    else
+      unitButton._mbAltLifecycleToken = token
+    end
+
+    if MultiBot.RelayoutUnitsDisplay then
+      MultiBot.RelayoutUnitsDisplay()
+    end
+  end
+
+  button._mbAltLifecycleBound = true
+  return button
+end
+
+function MultiBot.OnBridgeAltLifecycleResult(result)
+  if type(result) ~= "table" then
+    return false
+  end
+
+  local guid = tonumber(result.guid)
+  local name = type(result.name) == "string" and result.name or ""
+  local units = MultiBot.frames
+      and MultiBot.frames["MultiBar"]
+      and MultiBot.frames["MultiBar"].frames
+      and MultiBot.frames["MultiBar"].frames["Units"]
+      or nil
+
+  local button = nil
+  if units and units.buttons then
+    if name ~= "" then
+      button = units.buttons[name]
+    end
+
+    if not button and guid then
+      for _, candidate in pairs(units.buttons) do
+        if candidate and tonumber(candidate._mbAltGuid) == guid then
+          button = candidate
+          break
+        end
+      end
+    end
+  end
+
+  local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+  if button and lifecycleState ~= "" then
+    button._mbAltState = lifecycleState
+    if button._mbAltEntry then
+      button._mbAltEntry.state = lifecycleState
+    end
+
+    if result.final == true then
+      button._mbAltLifecyclePending = false
+      button._mbAltLifecycleToken = nil
+    end
+
+    if lifecycleState ~= "ONLINE" and button.setDisable then
+      button.setDisable()
+    end
+
+    if lifecycleState == "OFFLINE" then
+      HideButtonUnitFrame(button)
+    end
+
+    if button._mbAltEntry then
+      UpdateBridgeAltButton(button, button._mbAltEntry)
+    end
+  end
+
+  if MultiBot.RelayoutUnitsDisplay then
+    MultiBot.RelayoutUnitsDisplay()
+  end
+  return true
+end
+
+function MultiBot.ApplyBridgeAltRosterToPlayers(roster, options)
+  if type(roster) ~= "table" then
+    return false
+  end
+
+  if not (MultiBot.frames and MultiBot.frames["MultiBar"]
+          and MultiBot.frames["MultiBar"].frames
+          and MultiBot.frames["MultiBar"].frames["Units"]
+          and MultiBot.addPlayer) then
+    return false
+  end
+
+  local units = MultiBot.frames["MultiBar"].frames["Units"]
+  local buttons = units.buttons or {}
+  local frames = units.frames or {}
+  local newAltNames = {}
+  local previousAltNames = type(MultiBot._bridgeAltNames) == "table"
+      and MultiBot._bridgeAltNames or {}
+
+  for index = 1, #roster do
+    local entry = roster[index]
+    if entry and type(entry.name) == "string" and entry.name ~= "" then
+      newAltNames[string.lower(entry.name)] = entry.name
+    end
+  end
+
+  for oldKey, oldName in pairs(previousAltNames) do
+    if not newAltNames[oldKey] then
+      local oldButton = buttons[oldName]
+      if oldButton and oldButton._mbAltGuid then
+        oldButton._mbAltGuid = nil
+        oldButton._mbAltState = nil
+        oldButton._mbAltEntry = nil
+        oldButton._mbAltLifecyclePending = nil
+        oldButton._mbAltLifecycleToken = nil
+        oldButton._mbAltLifecycleBound = nil
+
+        if not IsBridgeMainRosterName(oldName) then
+          if frames[oldName] then
+            frames[oldName]:Hide()
+          end
+          oldButton:Hide()
+          if oldButton.setDisable then
+            oldButton.setDisable()
+          end
+          RemoveBridgeAltNameFromList(MultiBot.index.players, oldName)
+          for _, classList in pairs(MultiBot.index.classes.players or {}) do
+            RemoveBridgeAltNameFromList(classList, oldName)
+          end
+        end
+      end
+    end
+  end
+
+  MultiBot._bridgeAltNames = newAltNames
+
+  for index = 1, #roster do
+    local entry = roster[index]
+    if entry and type(entry.name) == "string" and entry.name ~= "" then
+      local botClass = GetBridgeRosterClass(entry.classId)
+      local button = MultiBot.addPlayer(botClass, entry.name)
+      if button then
+        button._mbFavoritePlaceholder = nil
+        UpdateBridgeAltButton(button, entry)
+        BindBridgeAltBotHandler(button)
+
+        local lifecycleState = string.upper(tostring(entry.state or "OFFLINE"))
+        if lifecycleState ~= "ONLINE" and button.setDisable then
+          button.setDisable()
+        elseif lifecycleState == "ONLINE"
+            and not IsBridgeMainRosterName(entry.name)
+            and button.setDisable then
+          button.setDisable()
+        end
+      end
+    end
+  end
+
+  if not (options and options.deferRelayout) and MultiBot.RelayoutUnitsDisplay then
+    MultiBot.RelayoutUnitsDisplay()
+  end
+  return true
+end
+-- MB_ADDON_ALT_ROSTER_UI_V1_END
+
 function MultiBot.SyncBridgeRosterToPlayers(roster)
   if type(roster) ~= "table" then
     return false
@@ -2053,6 +2419,15 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
 
   if MultiBot.ProcessPendingAddClassRoster then
     MultiBot.ProcessPendingAddClassRoster(roster)
+  end
+
+  if MultiBot.ApplyBridgeAltRosterToPlayers
+      and MultiBot.bridge
+      and type(MultiBot.bridge.altRoster) == "table" then
+    MultiBot.ApplyBridgeAltRosterToPlayers(
+      MultiBot.bridge.altRoster,
+      { deferRelayout = true }
+    )
   end
 
   if MultiBot.UpdateFavoritesIndex then

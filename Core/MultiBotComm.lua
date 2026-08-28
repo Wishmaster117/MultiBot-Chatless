@@ -34,6 +34,8 @@ local TALENT_APPLY_CAPABILITY = "TALENT_APPLY_V1"
 local TALENT_SPEC_APPLY_CAPABILITY = "TALENT_SPEC_APPLY_V1"
 local CRAFT_RECIPE_TARGET_CAPABILITY = "CRAFT_RECIPE_TARGET_V1"
 local LOOT_RULE_ITEM_CAPABILITY = "LOOT_RULE_ITEM_V1"
+local ALT_ROSTER_CAPABILITY = "ALT_ROSTER_V1"
+local BOT_LIFECYCLE_CAPABILITY = "BOT_LIFECYCLE_V1"
 -- MB_LUA51_UPVALUE_REFACTOR_V1_BEGIN
 -- Keep capability-to-state mapping outside Comm.HandleAddonMessage so each
 -- capability does not consume a separate Lua 5.1 upvalue in that dispatcher.
@@ -63,6 +65,8 @@ local CAPABILITY_STATE_FIELDS = {
   [TALENT_SPEC_APPLY_CAPABILITY] = "talentSpecApplyCapable",
   [CRAFT_RECIPE_TARGET_CAPABILITY] = "craftRecipeTargetCapable",
   [LOOT_RULE_ITEM_CAPABILITY] = "lootRuleItemCapable",
+  [ALT_ROSTER_CAPABILITY] = "altRosterCapable",
+  [BOT_LIFECYCLE_CAPABILITY] = "botLifecycleCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
 -- MB_LUA51_UPVALUE_REFACTOR_V1_END
@@ -115,6 +119,10 @@ local STATE_MAX_TOTAL_BYTES = 32768
 local STATE_CAPABILITY_FALLBACK_SECONDS = 3.0
 local STATE_BOOTSTRAP_RETRY_SECONDS = 1.0
 local STATE_BOOTSTRAP_MAX_AUTO_ATTEMPTS = 3
+local ALT_ROSTER_MAX_ENTRIES = 128
+local BOT_LIFECYCLE_TIMEOUT_SECONDS = 12.0
+local BOT_LIFECYCLE_POLL_SECONDS = 1.0
+local BOT_LIFECYCLE_MAX_ACTIVE = 16
 
 local requestBootstrapStates
 local flushPendingStateRefreshes
@@ -350,6 +358,12 @@ local function ensureBridgeState()
   state.talentSpecApplyCapable = state.talentSpecApplyCapable or false
   state.craftRecipeTargetCapable = state.craftRecipeTargetCapable or false
   state.lootRuleItemCapable = state.lootRuleItemCapable or false
+  state.altRosterCapable = state.altRosterCapable or false
+  state.botLifecycleCapable = state.botLifecycleCapable or false
+  state.altRoster = type(state.altRoster) == "table" and state.altRoster or {}
+  state.altRosterBatch = type(state.altRosterBatch) == "table" and state.altRosterBatch or nil
+  state.botLifecycleSeq = tonumber(state.botLifecycleSeq) or 0
+  state.botLifecycleCommands = type(state.botLifecycleCommands) == "table" and state.botLifecycleCommands or {}
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -691,6 +705,467 @@ end
 function Comm.RequestRoster()
   return Comm.Send("GET", "ROSTER")
 end
+-- MB_ADDON_ALT_ROSTER_LIFECYCLE_V1_BEGIN
+function Comm.RequestAltRoster()
+  local state = ensureBridgeState()
+  if state.connected ~= true or state.altRosterCapable ~= true then
+    return false
+  end
+  return Comm.Send("GET", "ALT_ROSTER")
+end
+
+local function findAltRosterEntryByGuid(state, guid)
+  local roster = state and state.altRoster or nil
+  if type(roster) ~= "table" then
+    return nil
+  end
+
+  guid = tonumber(guid)
+  for index = 1, #roster do
+    local entry = roster[index]
+    if type(entry) == "table" and tonumber(entry.guid) == guid then
+      return entry
+    end
+  end
+  return nil
+end
+
+local function updateAltRosterEntryState(state, guid, lifecycleState)
+  local entry = findAltRosterEntryByGuid(state, guid)
+  if entry and type(lifecycleState) == "string" and lifecycleState ~= "" then
+    entry.state = string.upper(lifecycleState)
+  end
+  return entry
+end
+
+local function notifyAltLifecycleResult(result)
+  if MultiBot and type(MultiBot.OnBridgeAltLifecycleResult) == "function" then
+    MultiBot.OnBridgeAltLifecycleResult(result)
+  end
+end
+
+local function finishBotLifecycleCommand(state, token, result)
+  local command = state.botLifecycleCommands[token]
+  state.botLifecycleCommands[token] = nil
+  notifyAltLifecycleResult(result)
+
+  if type(command) == "table" and type(command.callback) == "function" then
+    command.callback(result)
+  end
+
+  if result and result.final == true then
+    safeDelay(0.10, function()
+      local live = ensureBridgeState()
+      if live.connected and Comm.RequestRoster then
+        Comm.RequestRoster()
+      end
+    end)
+    safeDelay(0.20, function()
+      local live = ensureBridgeState()
+      if live.connected and live.altRosterCapable and Comm.RequestAltRoster then
+        Comm.RequestAltRoster()
+      end
+    end)
+  end
+end
+
+local function nextBotLifecycleToken(state, action)
+  state.botLifecycleSeq = (tonumber(state.botLifecycleSeq) or 0) + 1
+  if state.botLifecycleSeq > 1000000000 then
+    state.botLifecycleSeq = 1
+  end
+  local prefix = action == "DISCONNECT" and "bd" or "bc"
+  return string.format("%s%d%d", prefix, state.botLifecycleSeq, math.floor(safeNow() * 1000))
+end
+
+local function countBotLifecycleCommands(state)
+  local count = 0
+  for _ in pairs(state.botLifecycleCommands or {}) do
+    count = count + 1
+  end
+  return count
+end
+
+local function pollBotLifecycleCommand(token)
+  safeDelay(BOT_LIFECYCLE_POLL_SECONDS, function()
+    local state = ensureBridgeState()
+    local command = state.botLifecycleCommands[token]
+    if type(command) ~= "table" then
+      return
+    end
+
+    if state.connected ~= true then
+      finishBotLifecycleCommand(state, token, {
+        token = token,
+        guid = command.guid,
+        action = command.action,
+        status = "ERR",
+        reason = "BRIDGE_DISCONNECTED",
+        lifecycleState = command.action == "CONNECT" and "OFFLINE" or "ONLINE",
+        final = true,
+      })
+      return
+    end
+
+    if safeNow() - (tonumber(command.startedAt) or 0) >= BOT_LIFECYCLE_TIMEOUT_SECONDS then
+      local lifecycleState = command.action == "CONNECT" and "OFFLINE" or "ONLINE"
+      updateAltRosterEntryState(state, command.guid, lifecycleState)
+      finishBotLifecycleCommand(state, token, {
+        token = token,
+        guid = command.guid,
+        action = command.action,
+        status = "ERR",
+        reason = "CLIENT_TIMEOUT",
+        lifecycleState = lifecycleState,
+        final = true,
+      })
+      return
+    end
+
+    Comm.Send("GET", "BOT_LIFECYCLE_STATE~" .. tostring(command.guid) .. "~" .. token)
+    pollBotLifecycleCommand(token)
+  end)
+end
+
+function Comm.RunBotLifecycle(action, guid, callback)
+  local state = ensureBridgeState()
+  if state.connected ~= true
+      or state.altRosterCapable ~= true
+      or state.botLifecycleCapable ~= true then
+    return nil
+  end
+
+  action = string.upper(trim(action))
+  if action ~= "CONNECT" and action ~= "DISCONNECT" then
+    return nil
+  end
+
+  guid = parseBoundedInteger(tostring(guid or ""), 1, 4294967295)
+  if not guid or countBotLifecycleCommands(state) >= BOT_LIFECYCLE_MAX_ACTIVE then
+    return nil
+  end
+
+  local token = nextBotLifecycleToken(state, action)
+  if not isValidStateToken(token) then
+    return nil
+  end
+
+  state.botLifecycleCommands[token] = {
+    token = token,
+    guid = guid,
+    action = action,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+    polling = false,
+  }
+
+  local requestType = action == "CONNECT" and "BOT_CONNECT" or "BOT_DISCONNECT"
+  if not Comm.Send("RUN", requestType .. "~" .. tostring(guid) .. "~" .. token) then
+    state.botLifecycleCommands[token] = nil
+    return nil
+  end
+  return token
+end
+
+local function failAltRosterBatch(state, reason)
+  state.altRosterBatch = nil
+  state.lastError = "ALT_ROSTER_" .. tostring(reason or "INVALID")
+  return true
+end
+
+local function handleAltRosterBegin(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 2 then
+    return failAltRosterBatch(state, "BEGIN_BAD_FIELD_COUNT")
+  end
+
+  local expectedCount = parseBoundedInteger(fields[1], 0, ALT_ROSTER_MAX_ENTRIES)
+  local truncated = parseBoundedInteger(fields[2], 0, 1)
+  if expectedCount == nil or truncated == nil then
+    return failAltRosterBatch(state, "BEGIN_BAD_PAYLOAD")
+  end
+
+  state.connected = true
+  state.lastError = nil
+  state.altRosterBatch = {
+    expectedCount = expectedCount,
+    truncated = truncated,
+    items = {},
+    seenGuids = {},
+    seenNames = {},
+  }
+  return true
+end
+
+local function handleAltRosterEntry(payload, state)
+  local batch = state.altRosterBatch
+  if type(batch) ~= "table" then
+    state.lastError = "ALT_ROSTER_ENTRY_WITHOUT_BEGIN"
+    return true
+  end
+
+  local fields = splitFields(payload or "")
+  if #fields ~= 5 then
+    return failAltRosterBatch(state, "ENTRY_BAD_FIELD_COUNT")
+  end
+
+  local guid = parseBoundedInteger(fields[1], 1, 4294967295)
+  local name = urlDecodeFieldStrict(fields[2], 64, false)
+  local classId = parseBoundedInteger(fields[3], 1, 11)
+  local level = parseBoundedInteger(fields[4], 1, 255)
+  local lifecycleState = string.upper(trim(fields[5]))
+
+  if guid == nil
+      or name == nil
+      or classId == nil
+      or level == nil
+      or (lifecycleState ~= "ONLINE" and lifecycleState ~= "OFFLINE") then
+    return failAltRosterBatch(state, "ENTRY_BAD_PAYLOAD")
+  end
+
+  local nameKey = string.lower(name)
+  if batch.seenGuids[guid] or batch.seenNames[nameKey] then
+    return failAltRosterBatch(state, "ENTRY_DUPLICATE")
+  end
+
+  if #batch.items >= ALT_ROSTER_MAX_ENTRIES or #batch.items >= batch.expectedCount then
+    return failAltRosterBatch(state, "ENTRY_OVERFLOW")
+  end
+
+  batch.seenGuids[guid] = true
+  batch.seenNames[nameKey] = true
+  batch.items[#batch.items + 1] = {
+    guid = guid,
+    name = name,
+    classId = classId,
+    level = level,
+    state = lifecycleState,
+  }
+  return true
+end
+
+local function handleAltRosterEnd(payload, state)
+  local batch = state.altRosterBatch
+  if type(batch) ~= "table" then
+    state.lastError = "ALT_ROSTER_END_WITHOUT_BEGIN"
+    return true
+  end
+
+  local fields = splitFields(payload or "")
+  if #fields ~= 2 then
+    return failAltRosterBatch(state, "END_BAD_FIELD_COUNT")
+  end
+
+  local count = parseBoundedInteger(fields[1], 0, ALT_ROSTER_MAX_ENTRIES)
+  local truncated = parseBoundedInteger(fields[2], 0, 1)
+  if count == nil
+      or truncated == nil
+      or count ~= batch.expectedCount
+      or count ~= #batch.items
+      or truncated ~= batch.truncated then
+    return failAltRosterBatch(state, "END_MISMATCH")
+  end
+
+  state.altRoster = batch.items
+  state.altRosterBatch = nil
+  state.connected = true
+  state.lastError = nil
+
+  if MultiBot and type(MultiBot.ApplyBridgeAltRosterToPlayers) == "function" then
+    MultiBot.ApplyBridgeAltRosterToPlayers(state.altRoster)
+  end
+  return true
+end
+
+local function handleBotLifecycleResult(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 6 then
+    state.lastError = "BOT_LIFECYCLE_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local guid = parseBoundedInteger(fields[2], 1, 4294967295)
+  local name = urlDecodeFieldStrict(fields[3], 64, true)
+  local action = string.upper(trim(fields[4]))
+  local status = string.upper(trim(fields[5]))
+  local reason = urlDecodeFieldStrict(fields[6], 64, false)
+
+  if not isValidStateToken(token)
+      or guid == nil
+      or name == nil
+      or (action ~= "CONNECT" and action ~= "DISCONNECT")
+      or (status ~= "OK" and status ~= "PENDING" and status ~= "ERR")
+      or reason == nil then
+    state.lastError = "BOT_LIFECYCLE_BAD_PAYLOAD"
+    return true
+  end
+
+  local command = state.botLifecycleCommands[token]
+  if type(command) ~= "table" then
+    return true
+  end
+
+  if command.guid ~= guid or command.action ~= action then
+    state.lastError = "BOT_LIFECYCLE_RESPONSE_MISMATCH"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "ERR" and ("BOT_LIFECYCLE_" .. reason) or nil
+
+  local lifecycleState
+  if action == "CONNECT" then
+    lifecycleState = status == "PENDING" and "CONNECTING"
+        or (status == "OK" and "ONLINE" or "OFFLINE")
+  else
+    lifecycleState = status == "OK" and "OFFLINE"
+        or (status == "PENDING" and "DISCONNECTING" or "ONLINE")
+  end
+
+  updateAltRosterEntryState(state, guid, lifecycleState)
+  local result = {
+    token = token,
+    guid = guid,
+    name = name,
+    action = action,
+    status = status,
+    reason = reason,
+    lifecycleState = lifecycleState,
+    final = status ~= "PENDING",
+  }
+
+  if status == "PENDING" then
+    notifyAltLifecycleResult(result)
+    if command.polling ~= true then
+      command.polling = true
+      pollBotLifecycleCommand(token)
+    end
+    return true
+  end
+
+  finishBotLifecycleCommand(state, token, result)
+  return true
+end
+
+local function handleBotLifecycleState(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 5 then
+    state.lastError = "BOT_LIFECYCLE_STATE_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local guid = parseBoundedInteger(fields[2], 1, 4294967295)
+  local name = urlDecodeFieldStrict(fields[3], 64, true)
+  local lifecycleState = string.upper(trim(fields[4]))
+  local reason = urlDecodeFieldStrict(fields[5], 64, false)
+
+  if not isValidStateToken(token)
+      or guid == nil
+      or name == nil
+      or (lifecycleState ~= "ONLINE"
+          and lifecycleState ~= "CONNECTING"
+          and lifecycleState ~= "OFFLINE")
+      or reason == nil then
+    state.lastError = "BOT_LIFECYCLE_STATE_BAD_PAYLOAD"
+    return true
+  end
+
+  local command = state.botLifecycleCommands[token]
+  if type(command) == "table" and command.guid ~= guid then
+    state.lastError = "BOT_LIFECYCLE_STATE_MISMATCH"
+    return true
+  end
+
+  state.connected = true
+  updateAltRosterEntryState(state, guid, lifecycleState)
+
+  local result = {
+    token = token,
+    guid = guid,
+    name = name,
+    action = type(command) == "table" and command.action or nil,
+    status = lifecycleState == "CONNECTING" and "PENDING" or "OK",
+    reason = reason,
+    lifecycleState = lifecycleState,
+    final = lifecycleState ~= "CONNECTING",
+  }
+
+  if type(command) ~= "table" then
+    notifyAltLifecycleResult(result)
+    return true
+  end
+
+  if lifecycleState == "CONNECTING" then
+    notifyAltLifecycleResult(result)
+    return true
+  end
+
+  if command.action == "CONNECT" and lifecycleState ~= "ONLINE" then
+    result.status = "ERR"
+  elseif command.action == "DISCONNECT" and lifecycleState ~= "OFFLINE" then
+    result.status = "ERR"
+  end
+
+  finishBotLifecycleCommand(state, token, result)
+  return true
+end
+
+function Comm.HandleAltBotLifecycleAddonMessage(opcode, payload, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+
+  if opcode == "ALT_ROSTER_BEGIN" then
+    return handleAltRosterBegin(payload, state)
+  elseif opcode == "ALT_ROSTER_ENTRY" then
+    return handleAltRosterEntry(payload, state)
+  elseif opcode == "ALT_ROSTER_END" then
+    return handleAltRosterEnd(payload, state)
+  elseif opcode == "BOT_LIFECYCLE" then
+    return handleBotLifecycleResult(payload, state)
+  elseif opcode == "BOT_LIFECYCLE_STATE" then
+    return handleBotLifecycleState(payload, state)
+  end
+  return false
+end
+
+function Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, state)
+  requestType = string.upper(trim(requestType))
+  if requestType ~= "BOT_CONNECT"
+      and requestType ~= "BOT_DISCONNECT"
+      and requestType ~= "BOT_LIFECYCLE_STATE" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(token)
+  reason = reason or "PROTOCOL_ERROR"
+
+  local command = state.botLifecycleCommands[token]
+  if type(command) ~= "table" then
+    return true
+  end
+
+  if requestType == "BOT_LIFECYCLE_STATE" and reason == "RATE_LIMIT" then
+    return true
+  end
+
+  local lifecycleState = command.action == "CONNECT" and "OFFLINE" or "ONLINE"
+  updateAltRosterEntryState(state, command.guid, lifecycleState)
+  state.lastError = "BOT_LIFECYCLE_" .. reason
+
+  finishBotLifecycleCommand(state, token, {
+    token = token,
+    guid = command.guid,
+    action = command.action,
+    status = "ERR",
+    reason = reason,
+    lifecycleState = lifecycleState,
+    final = true,
+  })
+  return true
+end
+-- MB_ADDON_ALT_ROSTER_LIFECYCLE_V1_END
 
 local function queuePendingStateRefresh(state, name, isGlobal)
   if isGlobal then
@@ -6697,6 +7172,9 @@ local function finishCapabilityResolution(state, debugOpcode, payload)
   if state.selfBotCapable == true and type(Comm.RequestSelfBotState) == "function" then
     Comm.RequestSelfBotState()
   end
+  if state.altRosterCapable == true and type(Comm.RequestAltRoster) == "function" then
+    Comm.RequestAltRoster()
+  end
   if MultiBot.RefreshEnchantingEveryButtons then
     MultiBot.RefreshEnchantingEveryButtons()
   end
@@ -7157,6 +7635,12 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
   -- MB_SELFBOT_STRATEGY_V1_RX_END
+
+  -- MB_ADDON_ALT_ROSTER_LIFECYCLE_V1_RX_BEGIN
+  if Comm.HandleAltBotLifecycleAddonMessage(opcode, payload, state) then
+    return true
+  end
+  -- MB_ADDON_ALT_ROSTER_LIFECYCLE_V1_RX_END
 
   if opcode == "ROSTER" then
     state.connected = true
@@ -9151,6 +9635,8 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
           return true
         elseif Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state) then
           return true
+        elseif Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, state) then
+          return true
         elseif requestType == "LOOT_RULE_ITEM" and state.lootRuleItemCommands[token] then
           local pending = state.lootRuleItemCommands[token]
           state.lootRuleItemCommands[token] = nil
@@ -9246,6 +9732,11 @@ state.selfActionCapable = false
   state.talentApplyCapable = false
   state.talentSpecApplyCapable = false
   state.craftRecipeTargetCapable = false
+  state.altRosterCapable = false
+  state.botLifecycleCapable = false
+  state.altRoster = {}
+  state.altRosterBatch = nil
+  state.botLifecycleCommands = {}
   state.selfBotCapable = false
   state.details = {}
   state.stats = {}
