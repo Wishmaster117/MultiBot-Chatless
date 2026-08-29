@@ -3689,19 +3689,7 @@ local function MarkBridgeUnitFrameBuilt(unitFrame, button, combat, normal)
   unitFrame._mbBridgeNormal = normal
 end
 
-local function EnsureBridgeActiveIndex(button, name)
-  if not button or not button.class or button.class == "" then
-    return
-  end
 
-  if not IsBridgeRosterBotActive(name) then
-    return
-  end
-
-  MultiBot.index.classes.actives[button.class] = MultiBot.index.classes.actives[button.class] or {}
-  InsertBridgeNameUnique(MultiBot.index.classes.actives[button.class], name)
-  InsertBridgeNameUnique(MultiBot.index.actives, name)
-end
 
 local function IsBridgeUnitDisplayedNow(name)
   if type(name) ~= "string" or name == "" then

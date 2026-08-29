@@ -833,17 +833,7 @@ local function getCurrentUnitsRoster()
     return unitsButton and unitsButton.roster or nil
 end
 
-local function getSocialRosterPresenceForButton(button, roster)
-    local presence = ensureSocialRosterPresence()
-    local bucket = presence and presence[roster]
-    if button and bucket and bucket[button.name] then
-        return bucket[button.name]
-    end
-    if button and button._mbSocialRoster == roster then
-        return button._mbRosterPresence
-    end
-    return nil
-end
+
 
 local function hideGuildUnitFrame(button)
     local frames = button and button.parent and button.parent.frames
