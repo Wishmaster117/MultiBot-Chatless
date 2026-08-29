@@ -109,6 +109,165 @@ local function addBotCombatButton(parent, name, x, y, icon, tip, enableCommand, 
   return button
 end
 
+-- D3.1 dynamic group action state.
+local function IsEveryGroupActive(name)
+	if type(name) ~= "string" or name == "" then
+		return false
+	end
+
+	local actives = MultiBot.index and MultiBot.index.actives or nil
+	if type(actives) ~= "table" then
+		return false
+	end
+
+	local normalizedName = string.lower(name)
+	for _, activeName in pairs(actives) do
+		if type(activeName) == "string" and string.lower(activeName) == normalizedName then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function GetEveryUnitButton(pFrame, name)
+	local parent = pFrame and pFrame.parent or nil
+	local buttons = parent and parent.buttons or nil
+	return buttons and name and buttons[name] or nil
+end
+
+local function RestoreEveryGroupCompactButtons(pFrame)
+	local snapshot = pFrame and pFrame._mbGroupCompactButtonShown or nil
+	if type(snapshot) ~= "table" or type(pFrame.buttons) ~= "table" then
+		return
+	end
+
+	for key, button in pairs(pFrame.buttons) do
+		if button then
+			if snapshot[key] == true and button.Show then
+				button:Show()
+			elseif button.Hide then
+				button:Hide()
+			end
+		end
+	end
+
+	pFrame._mbGroupCompactButtonShown = nil
+end
+
+local function EnterEveryGroupCompactMode(pFrame, inviteButton, unitButton)
+	if pFrame._mbGroupCompact ~= true then
+		local snapshot = {}
+		for key, button in pairs(pFrame.buttons or {}) do
+			snapshot[key] = button and button.IsShown and button:IsShown() and true or false
+		end
+		pFrame._mbGroupCompactButtonShown = snapshot
+	end
+
+	pFrame._mbGroupCompact = true
+	if unitButton then
+		unitButton._mbGroupRejoinCollapsed = false
+	end
+
+	for _, button in pairs(pFrame.buttons or {}) do
+		if button and button.Hide then
+			button:Hide()
+		end
+	end
+	for _, childFrame in pairs(pFrame.frames or {}) do
+		if childFrame and childFrame.Hide then
+			childFrame:Hide()
+		end
+	end
+
+	if inviteButton and inviteButton.Show then
+		inviteButton:Show()
+	end
+end
+
+local function LeaveEveryGroupCompactMode(pFrame, unitButton, collapseAfterRejoin)
+	if pFrame._mbGroupCompact == true then
+		RestoreEveryGroupCompactButtons(pFrame)
+	end
+	pFrame._mbGroupCompact = false
+
+	if unitButton then
+		unitButton._mbGroupRejoinCollapsed = false
+	end
+end
+
+function MultiBot.RefreshEveryGroupActionFrame(pFrame)
+	if not pFrame or type(pFrame.getButton) ~= "function" or type(pFrame.getName) ~= "function" then
+		return false
+	end
+
+	local uninviteButton = pFrame.getButton("Uninvite")
+	local inviteButton = pFrame.getButton("Invite")
+	if not uninviteButton or not inviteButton then
+		return false
+	end
+
+	local name = pFrame.getName()
+	if type(name) ~= "string" or name == "" then
+		return false
+	end
+
+	local unitButton = GetEveryUnitButton(pFrame, name)
+	local isOnline = unitButton and (
+		(MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(unitButton, name))
+		or (not MultiBot.IsUnitBotOnline and unitButton.state == true)
+	)
+	local isActive = IsEveryGroupActive(name)
+
+	if isActive then
+		LeaveEveryGroupCompactMode(pFrame, unitButton, false)
+		uninviteButton.doShow()
+		inviteButton.doHide()
+		if isOnline and pFrame.Show then
+			pFrame:Show()
+		elseif pFrame.Hide then
+			pFrame:Hide()
+		end
+	elseif isOnline then
+		EnterEveryGroupCompactMode(pFrame, inviteButton, unitButton)
+		if pFrame.Show then
+			pFrame:Show()
+		end
+	else
+		if unitButton then
+			unitButton._mbGroupRejoinCollapsed = false
+		end
+		LeaveEveryGroupCompactMode(pFrame, unitButton, false)
+		uninviteButton.doHide()
+		inviteButton.doShow()
+		if pFrame.Hide then
+			pFrame:Hide()
+		end
+	end
+
+	return true
+end
+
+function MultiBot.RefreshEveryGroupActions()
+	local units = MultiBot.frames
+		and MultiBot.frames["MultiBar"]
+		and MultiBot.frames["MultiBar"].frames
+		and MultiBot.frames["MultiBar"].frames["Units"]
+
+	if not units or type(units.frames) ~= "table" then
+		return 0
+	end
+
+	local refreshed = 0
+	for _, unitFrame in pairs(units.frames) do
+		if MultiBot.RefreshEveryGroupActionFrame(unitFrame) then
+			refreshed = refreshed + 1
+		end
+	end
+
+	return refreshed
+end
+
 MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 
     local isSelfBot = (pFrame.getName() == UnitName("player"))
@@ -215,16 +374,13 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 		pFrame.addButton("Uninvite", 124, 0, "inv_misc_grouplooking", MultiBot.L("tips.every.uninvite")).doShow()
 		.doLeft = function(pButton)
 			MultiBot.doSlash("/uninvite", pButton.getName())
-			pButton.getButton("Invite").doShow()
-			pButton.doHide()
 		end
 
 		pFrame.addButton("Invite", 124, 0, "inv_misc_groupneedmore", MultiBot.L("tips.every.invite")).doHide()
 		.doLeft = function(pButton)
 			MultiBot.doSlash("/invite", pButton.getName())
-			pButton.getButton("Uninvite").doShow()
-			pButton.doHide()
 		end
+
 	end
 
 	local everyActionStartX = isSelfBot and 94 or 154
@@ -449,6 +605,9 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
     end
 
 -- STRATEGIES --
+	if not isSelfBot then
+		MultiBot.RefreshEveryGroupActionFrame(pFrame)
+	end
 end
 
 local function sendCommonCombatStrategy(pButton, command)

@@ -2539,24 +2539,49 @@ local function MB_InsertUnique(pTable, pValue)
   table.insert(pTable, pValue)
 end
 
+-- MB_ADDON_ROSTER_COHERENCE_D1_ENGINE_BEGIN
+-- A unit button can belong to several rosters. MultiBot.index.* is the
+-- membership authority; button.roster remains legacy display metadata only.
+-- MB_ADDON_ROSTER_COHERENCE_D1_ENGINE_END
+
 MultiBot.addMember = function(pClass, pLevel, pName)
   local tUnits = MultiBot.frames["MultiBar"].frames["Units"]
   local tButton = tUnits.buttons[pName]
   local tClass = MultiBot.toClass(pClass)
-  local tTexture = "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tClass) .. ".blp"
+  local tLevel = tonumber(pLevel) or 0
+  local tClassKnown = type(tClass) == "string" and tClass ~= "" and tClass ~= "Unknown"
+  local tLevelKnown = tLevel > 0
+  local tEffectiveClass = tClass
+
+  if(not tClassKnown and tButton ~= nil
+      and type(tButton.class) == "string"
+      and tButton.class ~= ""
+      and tButton.class ~= "Unknown") then
+    tEffectiveClass = tButton.class
+  end
+
+  local tTexture = "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tEffectiveClass) .. ".blp"
   if(tButton == nil) then
-    tButton = tUnits.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tClass, pLevel, pName))
+    tButton = tUnits.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tEffectiveClass, tLevel, pName))
     tButton:Hide()
+    if(tClassKnown and tLevelKnown) then
+      tButton._mbIdentityLevel = tLevel
+    end
   else
-    if(tButton.setButton ~= nil) then
-      tButton.setButton(tTexture, MultiBot.toTip(tClass, pLevel, pName))
+    -- WoW 3.3.5 social APIs can report offline characters as Unknown / level 0.
+    -- Never overwrite an already-known identity with those degraded values.
+    if(tClassKnown and tLevelKnown and tButton.setButton ~= nil) then
+      tButton.setButton(tTexture, MultiBot.toTip(tEffectiveClass, tLevel, pName))
+      tButton._mbIdentityLevel = tLevel
     end
   end
-  if(MultiBot.index.classes.members[tClass] == nil) then MultiBot.index.classes.members[tClass] = {} end
-  MB_InsertUnique(MultiBot.index.classes.members[tClass], pName)
+  if(MultiBot.index.classes.members[tEffectiveClass] == nil) then MultiBot.index.classes.members[tEffectiveClass] = {} end
+  MB_InsertUnique(MultiBot.index.classes.members[tEffectiveClass], pName)
   MB_InsertUnique(MultiBot.index.members, pName)
-  tButton.roster = "members"
-  tButton.class = tClass
+  if(tButton.roster ~= "players") then tButton.roster = "members" end
+  if(tClassKnown or tButton.class == nil or tButton.class == "Unknown") then
+    tButton.class = tEffectiveClass
+  end
   tButton.name = pName
   return tButton
 end
@@ -2565,20 +2590,40 @@ MultiBot.addFriend = function(pClass, pLevel, pName)
   local tUnits = MultiBot.frames["MultiBar"].frames["Units"]
   local tButton = tUnits.buttons[pName]
   local tClass = MultiBot.toClass(pClass)
-  local tTexture = "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tClass) .. ".blp"
+  local tLevel = tonumber(pLevel) or 0
+  local tClassKnown = type(tClass) == "string" and tClass ~= "" and tClass ~= "Unknown"
+  local tLevelKnown = tLevel > 0
+  local tEffectiveClass = tClass
+
+  if(not tClassKnown and tButton ~= nil
+      and type(tButton.class) == "string"
+      and tButton.class ~= ""
+      and tButton.class ~= "Unknown") then
+    tEffectiveClass = tButton.class
+  end
+
+  local tTexture = "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tEffectiveClass) .. ".blp"
   if(tButton == nil) then
-    tButton = tUnits.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tClass, pLevel, pName))
+    tButton = tUnits.addButton(pName, 0, 0, tTexture, MultiBot.toTip(tEffectiveClass, tLevel, pName))
     tButton:Hide()
+    if(tClassKnown and tLevelKnown) then
+      tButton._mbIdentityLevel = tLevel
+    end
   else
-    if(tButton.setButton ~= nil) then
-      tButton.setButton(tTexture, MultiBot.toTip(tClass, pLevel, pName))
+    -- WoW 3.3.5 social APIs can report offline characters as Unknown / level 0.
+    -- Never overwrite an already-known identity with those degraded values.
+    if(tClassKnown and tLevelKnown and tButton.setButton ~= nil) then
+      tButton.setButton(tTexture, MultiBot.toTip(tEffectiveClass, tLevel, pName))
+      tButton._mbIdentityLevel = tLevel
     end
   end
-  if(MultiBot.index.classes.friends[tClass] == nil) then MultiBot.index.classes.friends[tClass] = {} end
-  MB_InsertUnique(MultiBot.index.classes.friends[tClass], pName)
+  if(MultiBot.index.classes.friends[tEffectiveClass] == nil) then MultiBot.index.classes.friends[tEffectiveClass] = {} end
+  MB_InsertUnique(MultiBot.index.classes.friends[tEffectiveClass], pName)
   MB_InsertUnique(MultiBot.index.friends, pName)
-  tButton.roster = "friends"
-  tButton.class = tClass
+  if(tButton.roster == nil) then tButton.roster = "friends" end
+  if(tClassKnown or tButton.class == nil or tButton.class == "Unknown") then
+    tButton.class = tEffectiveClass
+  end
   tButton.name = pName
   return tButton
 end
@@ -2596,7 +2641,7 @@ MultiBot.addActive = function(pClass, pLevel, pName)
 		tButton.setButton(tTexture, MultiBot.toTip(tClass, pLevel, pName))
 	end
 
-	tButton.roster = "actives"
+	if(tButton.roster == nil) then tButton.roster = "actives" end
 	tButton.class = tClass
 	tButton.name = pName
 	return tButton

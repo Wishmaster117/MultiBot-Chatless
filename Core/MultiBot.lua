@@ -1331,6 +1331,41 @@ local function IsBridgeRosterBotActive(botName)
   return false
 end
 
+MultiBot.IsBridgeRosterBotActive = IsBridgeRosterBotActive
+
+local function GetCurrentBridgeGroupMemberNames()
+  local result = {}
+  local seen = {}
+  local playerName = type(UnitName) == "function" and UnitName("player") or nil
+
+  local function addUnit(unit)
+    local name = type(UnitName) == "function" and UnitName(unit) or nil
+    if type(name) == "string" and name ~= "" and name ~= playerName
+        and seen[string.lower(name)] ~= true then
+      seen[string.lower(name)] = true
+      table.insert(result, name)
+    end
+  end
+
+  if type(IsInRaid) == "function" and IsInRaid() then
+    local raidCount = type(GetNumGroupMembers) == "function"
+        and (GetNumGroupMembers() or 0)
+        or (type(GetNumRaidMembers) == "function" and (GetNumRaidMembers() or 0) or 0)
+    for index = 1, raidCount do
+      addUnit("raid" .. index)
+    end
+    return result
+  end
+
+  local partyCount = type(GetNumSubgroupMembers) == "function"
+      and (GetNumSubgroupMembers() or 0)
+      or (type(GetNumPartyMembers) == "function" and (GetNumPartyMembers() or 0) or 0)
+  for index = 1, partyCount do
+    addUnit("party" .. index)
+  end
+  return result
+end
+
 -- HOTFIX FAVORITES METADATA + ROSTER SYNC V1 START
 local FAVORITE_ROSTER_REFRESH_DELAYS = { 0, 0.8, 1.8, 3.2, 5.0, 7.5, 9.5 }
 local FAVORITE_ROSTER_REFRESH_TTL = 10.0
@@ -1806,6 +1841,438 @@ local function HideButtonUnitFrame(button)
   end
 end
 
+-- MB_GROUP_OFFLINE_RECONNECT_V1_BEGIN
+local function IsCurrentUnitsRoster(roster)
+  local multiBar = MultiBot.frames and MultiBot.frames["MultiBar"]
+  local unitsButton = multiBar and multiBar.buttons and multiBar.buttons["Units"]
+  return unitsButton and unitsButton.roster == roster
+end
+
+local function HasStructuredGroupLifecycle()
+  local bridge = MultiBot.bridge
+  return bridge
+      and bridge.connected == true
+      and bridge.botLifecycleCapable == true
+      and bridge.botTargetResolveCapable == true
+      and MultiBot.Comm
+      and type(MultiBot.Comm.ResolveBotTarget) == "function"
+      and type(MultiBot.Comm.RunBotLifecycle) == "function"
+end
+
+local function RefreshGroupReconnectState(button)
+  if MultiBot.Comm then
+    if type(MultiBot.Comm.RequestRoster) == "function" then
+      MultiBot.Comm.RequestRoster()
+    end
+    if button and type(MultiBot.Comm.RequestState) == "function" then
+      MultiBot.Comm.RequestState(button.name)
+    end
+  end
+
+  if MultiBot.TimerAfter then
+    MultiBot.TimerAfter(0.35, function()
+      if MultiBot.Comm and type(MultiBot.Comm.RequestRoster) == "function" then
+        MultiBot.Comm.RequestRoster()
+      end
+      if button and MultiBot.Comm and type(MultiBot.Comm.RequestState) == "function" then
+        MultiBot.Comm.RequestState(button.name)
+      end
+      if MultiBot.RelayoutUnitsDisplay then
+        MultiBot.RelayoutUnitsDisplay()
+      end
+    end)
+  elseif MultiBot.RelayoutUnitsDisplay then
+    MultiBot.RelayoutUnitsDisplay()
+  end
+end
+
+function MultiBot.IsUnitBotOnline(button, name)
+  if not button then
+    return false
+  end
+
+  if button._mbBridgeOnline ~= nil then
+    return button._mbBridgeOnline == true
+  end
+
+  local altState = string.upper(tostring(button._mbAltState or ""))
+  if altState ~= "" then
+    return altState == "ONLINE"
+  end
+
+  local rosterPresence = string.upper(tostring(button._mbRosterPresence or ""))
+  if rosterPresence ~= "" then
+    return rosterPresence == "ONLINE"
+  end
+
+  return button.state == true
+end
+
+function MultiBot.SetBridgeBotOnlineState(buttonOrName, online)
+  local button = buttonOrName
+
+  if type(buttonOrName) == "string" then
+    local units = MultiBot.frames
+        and MultiBot.frames["MultiBar"]
+        and MultiBot.frames["MultiBar"].frames
+        and MultiBot.frames["MultiBar"].frames["Units"]
+        or nil
+    button = units and units.buttons and units.buttons[buttonOrName] or nil
+  end
+
+  if not button then
+    return false
+  end
+
+  button._mbBridgeOnline = online == true
+
+  if button._mbBridgeOnline then
+    if IsBridgeRosterBotActive(button.name) and button.setEnable then
+      button.setEnable()
+    end
+  else
+    if button.setDisable then
+      button.setDisable()
+    end
+    HideButtonUnitFrame(button)
+  end
+
+  if MultiBot.RefreshEveryGroupActions then
+    MultiBot.RefreshEveryGroupActions()
+  end
+  if MultiBot.RelayoutUnitsDisplay then
+    MultiBot.RelayoutUnitsDisplay()
+  end
+
+  return true
+end
+
+function MultiBot.TryStructuredGroupReconnect(button)
+  if not button or type(button.name) ~= "string" or button.name == "" then
+    return false
+  end
+  if not HasStructuredGroupLifecycle() then
+    return false
+  end
+
+  if button._mbGroupDisconnectPending == true then
+    return true
+  end
+
+  -- Structured mode owns this click. Never fall through to chat.
+  if not IsBridgeRosterBotActive(button.name) then
+    RefreshGroupReconnectState(button)
+    return true
+  end
+
+  if button._mbGroupLifecyclePhase == "RESOLVING"
+      or button._mbGroupLifecyclePhase == "CONNECTING" then
+    return true
+  end
+
+  button._mbGroupLifecyclePhase = "RESOLVING"
+  local resolveToken = MultiBot.Comm.ResolveBotTarget(button.name, function(result)
+    button._mbGroupLifecyclePhase = nil
+
+    if not result or result.status ~= "OK" then
+      RefreshGroupReconnectState(button)
+      return
+    end
+
+    local guid = tonumber(result.guid)
+    if not guid or guid <= 0 then
+      RefreshGroupReconnectState(button)
+      return
+    end
+
+    button._mbGroupResolvedGuid = guid
+
+    if result.lifecycleState == "ONLINE" then
+      if MultiBot.SetBridgeBotOnlineState then
+        MultiBot.SetBridgeBotOnlineState(button, true)
+      elseif button.setEnable then
+        button.setEnable()
+      end
+      RefreshGroupReconnectState(button)
+      return
+    end
+
+    if result.lifecycleState ~= "OFFLINE" or result.reason == "IN_USE" then
+      RefreshGroupReconnectState(button)
+      return
+    end
+
+    button._mbGroupLifecyclePhase = "CONNECTING"
+    local lifecycleToken = MultiBot.Comm.RunBotLifecycle("CONNECT", guid, function(lifecycleResult)
+      button._mbGroupLifecyclePhase = nil
+      if lifecycleResult and lifecycleResult.status == "OK"
+          and lifecycleResult.lifecycleState == "ONLINE" then
+        if MultiBot.SetBridgeBotOnlineState then
+          MultiBot.SetBridgeBotOnlineState(button, true)
+        elseif button.setEnable then
+          button.setEnable()
+        end
+      end
+      RefreshGroupReconnectState(button)
+    end)
+
+    if not lifecycleToken then
+      button._mbGroupLifecyclePhase = nil
+      RefreshGroupReconnectState(button)
+    end
+  end)
+
+  if not resolveToken then
+    button._mbGroupLifecyclePhase = nil
+    RefreshGroupReconnectState(button)
+  end
+
+  return true
+end
+
+function MultiBot.TryStructuredGroupDisconnect(button)
+  if not button or type(button.name) ~= "string" or button.name == "" then
+    return false
+  end
+  if not HasStructuredGroupLifecycle() then
+    return false
+  end
+
+  -- Structured mode owns this click. Keep the row OFFLINE while the
+  -- disconnect is resolving so an intermediate ROSTER cannot reopen it.
+  if button._mbGroupDisconnectPending == true then
+    return true
+  end
+
+  button._mbGroupDisconnectPending = true
+  button._mbGroupLifecyclePhase = "DISCONNECT_RESOLVING"
+
+  if MultiBot.SetBridgeBotOnlineState then
+    MultiBot.SetBridgeBotOnlineState(button, false)
+  else
+    HideButtonUnitFrame(button)
+    if button.setDisable then
+      button.setDisable()
+    end
+  end
+
+  local function failDisconnect()
+    button._mbGroupDisconnectPending = nil
+    button._mbGroupLifecyclePhase = nil
+    RefreshGroupReconnectState(button)
+  end
+
+  local resolveToken = MultiBot.Comm.ResolveBotTarget(button.name, function(result)
+    if button._mbGroupDisconnectPending ~= true then
+      return
+    end
+
+    if not result or result.status ~= "OK" then
+      failDisconnect()
+      return
+    end
+
+    local guid = tonumber(result.guid)
+    if not guid or guid <= 0 then
+      failDisconnect()
+      return
+    end
+
+    button._mbGroupResolvedGuid = guid
+
+    if result.lifecycleState == "OFFLINE" then
+      button._mbGroupLifecyclePhase = nil
+      if MultiBot.SetBridgeBotOnlineState then
+        MultiBot.SetBridgeBotOnlineState(button, false)
+      end
+      RefreshGroupReconnectState(button)
+      return
+    end
+
+    if result.lifecycleState ~= "ONLINE" then
+      failDisconnect()
+      return
+    end
+
+    button._mbGroupLifecyclePhase = "DISCONNECTING"
+    local lifecycleToken = MultiBot.Comm.RunBotLifecycle("DISCONNECT", guid, function(lifecycleResult)
+      button._mbGroupLifecyclePhase = nil
+
+      if lifecycleResult and lifecycleResult.status == "OK"
+          and lifecycleResult.lifecycleState == "OFFLINE" then
+        if MultiBot.SetBridgeBotOnlineState then
+          MultiBot.SetBridgeBotOnlineState(button, false)
+        end
+        RefreshGroupReconnectState(button)
+        return
+      end
+
+      button._mbGroupDisconnectPending = nil
+      RefreshGroupReconnectState(button)
+    end)
+
+    if not lifecycleToken then
+      failDisconnect()
+    end
+  end)
+
+  if not resolveToken then
+    failDisconnect()
+  end
+
+  return true
+end
+-- MB_GROUP_OFFLINE_RECONNECT_V1_END
+-- MB_STRUCTURED_GROUP_AUTORECONNECT_V1_BEGIN
+local function RefreshStructuredGroupAutoReconnectState()
+  if MultiBot.Comm then
+    if type(MultiBot.Comm.RequestRoster) == "function" then
+      MultiBot.Comm.RequestRoster()
+    end
+    if type(MultiBot.Comm.RequestStates) == "function" then
+      MultiBot.Comm.RequestStates()
+    end
+  end
+
+  if MultiBot.RelayoutUnitsDisplay then
+    MultiBot.RelayoutUnitsDisplay()
+  end
+end
+
+local function IsStructuredGroupAutoReconnectMember(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+
+  local key = string.lower(name)
+  for _, currentName in ipairs(GetCurrentBridgeGroupMemberNames()) do
+    if type(currentName) == "string" and string.lower(currentName) == key then
+      return true
+    end
+  end
+  return false
+end
+
+function MultiBot.AutoStructuredGroupReconnect()
+  if not HasStructuredGroupLifecycle() then
+    return false
+  end
+
+  local names = GetCurrentBridgeGroupMemberNames()
+  if #names <= 0 then
+    return false
+  end
+
+  if type(MultiBot._structuredGroupAutoReconnect) ~= "table" then
+    MultiBot._structuredGroupAutoReconnect = {}
+  end
+
+  local state = MultiBot._structuredGroupAutoReconnect
+  state.pending = type(state.pending) == "table" and state.pending or {}
+
+  local entries = {}
+  for _, name in ipairs(names) do
+    if type(name) == "string" and name ~= "" then
+      local key = string.lower(name)
+      if state.pending[key] == nil then
+        local entry = {
+          key = key,
+          name = name,
+          phase = "QUEUED",
+        }
+        state.pending[key] = entry
+        table.insert(entries, entry)
+      end
+    end
+  end
+
+  if #entries <= 0 then
+    return false
+  end
+
+  local batch = {
+    remaining = #entries,
+    refreshDone = false,
+  }
+
+  local function finishEntry(entry)
+    if entry.finished == true then
+      return
+    end
+    entry.finished = true
+
+    if state.pending[entry.key] == entry then
+      state.pending[entry.key] = nil
+    end
+
+    if batch.remaining > 0 then
+      batch.remaining = batch.remaining - 1
+    end
+
+    if batch.remaining <= 0 and batch.refreshDone ~= true then
+      batch.refreshDone = true
+      RefreshStructuredGroupAutoReconnectState()
+    end
+  end
+
+  for _, entry in ipairs(entries) do
+    local currentEntry = entry
+    currentEntry.phase = "RESOLVING"
+
+    local resolveToken = MultiBot.Comm.ResolveBotTarget(currentEntry.name, function(result)
+      if state.pending[currentEntry.key] ~= currentEntry
+          or currentEntry.phase ~= "RESOLVING" then
+        return
+      end
+
+      if not result or result.status ~= "OK" then
+        finishEntry(currentEntry)
+        return
+      end
+
+      local guid = tonumber(result.guid)
+      local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+      if not guid or guid <= 0 then
+        finishEntry(currentEntry)
+        return
+      end
+
+      if lifecycleState == "ONLINE" or lifecycleState == "CONNECTING" then
+        finishEntry(currentEntry)
+        return
+      end
+
+      if lifecycleState ~= "OFFLINE" or result.reason == "IN_USE" then
+        finishEntry(currentEntry)
+        return
+      end
+
+      if not IsStructuredGroupAutoReconnectMember(currentEntry.name) then
+        finishEntry(currentEntry)
+        return
+      end
+
+      currentEntry.phase = "CONNECTING"
+      local lifecycleToken = MultiBot.Comm.RunBotLifecycle("CONNECT", guid, function()
+        if state.pending[currentEntry.key] == currentEntry then
+          finishEntry(currentEntry)
+        end
+      end)
+
+      if not lifecycleToken then
+        finishEntry(currentEntry)
+      end
+    end)
+
+    if not resolveToken then
+      finishEntry(currentEntry)
+    end
+  end
+
+  return true
+end
+-- MB_STRUCTURED_GROUP_AUTORECONNECT_V1_END
+
 function MultiBot.BindUnitToggleHandlers(button, options)
   if not button then
     return nil
@@ -1818,16 +2285,37 @@ function MultiBot.BindUnitToggleHandlers(button, options)
       return
     end
 
+    if IsCurrentUnitsRoster("actives")
+        and IsBridgeRosterBotActive(unitButton.name)
+        and MultiBot.TryStructuredGroupDisconnect
+        and MultiBot.TryStructuredGroupDisconnect(unitButton) then
+      return
+    end
+
     SendChatMessage(".playerbot bot remove " .. unitButton.name, "SAY")
-    HideButtonUnitFrame(unitButton)
-    unitButton.setDisable()
+    if MultiBot.SetBridgeBotOnlineState and unitButton.bridge ~= nil then
+      MultiBot.SetBridgeBotOnlineState(unitButton, false)
+    else
+      HideButtonUnitFrame(unitButton)
+      unitButton.setDisable()
+    end
   end
 
   button.doLeft = function(unitButton)
     if unitButton.state then
       if unitButton.parent and unitButton.parent.frames and unitButton.parent.frames[unitButton.name] ~= nil then
+        if unitButton._mbGroupRejoinCollapsed == true then
+          unitButton._mbGroupRejoinCollapsed = false
+        end
         MultiBot.ShowHideSwitch(unitButton.parent.frames[unitButton.name])
       end
+      return
+    end
+
+    if IsCurrentUnitsRoster("actives")
+        and IsBridgeRosterBotActive(unitButton.name)
+        and MultiBot.TryStructuredGroupReconnect
+        and MultiBot.TryStructuredGroupReconnect(unitButton) then
       return
     end
 
@@ -2050,6 +2538,9 @@ local function BindBridgeAltBotHandler(button)
     if lifecycleState == "ONLINE" then
       if unitButton.parent and unitButton.parent.frames
           and unitButton.parent.frames[unitButton.name] ~= nil then
+        if unitButton._mbGroupRejoinCollapsed == true then
+          unitButton._mbGroupRejoinCollapsed = false
+        end
         MultiBot.ShowHideSwitch(unitButton.parent.frames[unitButton.name])
       end
       return
@@ -2305,6 +2796,16 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
   local frames = units.frames or {}
   local visibleNames = {}
   local previousActive = {}
+  local actualGroupMembers = GetCurrentBridgeGroupMemberNames()
+
+  -- Loaded main-bot presence is authoritative for connection truth.
+  -- Reset only buttons previously identified by a Bridge main ROSTER;
+  -- current entries are marked ONLINE again below.
+  for _, existingButton in pairs(buttons) do
+    if existingButton and existingButton.bridge ~= nil then
+      existingButton._mbBridgeOnline = false
+    end
+  end
 
   for _, activeName in ipairs(MultiBot.index.actives or {}) do
     if type(activeName) == "string" and activeName ~= "" then
@@ -2373,6 +2874,8 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
       local button = MultiBot.addPlayer(botClass, entry.name)
       if button then
         button._mbFavoritePlaceholder = nil
+        local disconnectPending = button._mbGroupDisconnectPending == true
+        button._mbBridgeOnline = not disconnectPending
         local isActive = IsBridgeRosterBotActive(entry.name)
 
         button.class = botClass
@@ -2395,7 +2898,12 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
           end
           table.insert(MultiBot.index.classes.actives[botClass], entry.name)
           table.insert(MultiBot.index.actives, entry.name)
-          if button.setEnable then
+          if disconnectPending then
+            if button.setDisable then
+              button.setDisable()
+            end
+            HideButtonUnitFrame(button)
+          elseif button.setEnable then
             button.setEnable()
           end
 
@@ -2412,6 +2920,39 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
           if button.setDisable then
             button.setDisable()
           end
+        end
+      end
+    end
+  end
+
+  local activeSeen = {}
+  for _, activeName in ipairs(MultiBot.index.actives or {}) do
+    if type(activeName) == "string" and activeName ~= "" then
+      activeSeen[string.lower(activeName)] = true
+    end
+  end
+
+  for _, groupName in ipairs(actualGroupMembers) do
+    local key = string.lower(groupName)
+    if activeSeen[key] ~= true then
+      local button = buttons[groupName]
+      if button then
+        local botClass = MultiBot.toClass(button.class or "UNKNOWN")
+        if MultiBot.index.classes.actives[botClass] == nil then
+          MultiBot.index.classes.actives[botClass] = {}
+        end
+        table.insert(MultiBot.index.classes.actives[botClass], groupName)
+        table.insert(MultiBot.index.actives, groupName)
+        activeSeen[key] = true
+
+        -- A real group member missing from the Bridge loaded-bot roster is
+        -- retained as an offline reconnectable row, not as a stale member.
+        -- Absence from the authoritative ROSTER also confirms any pending
+        -- structured group disconnect.
+        button._mbGroupDisconnectPending = nil
+        button._mbBridgeOnline = false
+        if button.setDisable then
+          button.setDisable()
         end
       end
     end
@@ -2436,6 +2977,10 @@ function MultiBot.SyncBridgeRosterToPlayers(roster)
 
   if MultiBot.ApplyAllBridgeStates then
     MultiBot.ApplyAllBridgeStates()
+  end
+
+  if MultiBot.RefreshEveryGroupActions then
+    MultiBot.RefreshEveryGroupActions()
   end
 
    if MultiBot.RelayoutUnitsDisplay then
@@ -2670,6 +3215,10 @@ local function EnsureBridgeActiveIndex(button, name)
     return
   end
 
+  if not IsBridgeRosterBotActive(name) then
+    return
+  end
+
   MultiBot.index.classes.actives[button.class] = MultiBot.index.classes.actives[button.class] or {}
   InsertBridgeNameUnique(MultiBot.index.classes.actives[button.class], name)
   InsertBridgeNameUnique(MultiBot.index.actives, name)
@@ -2748,7 +3297,11 @@ function MultiBot.EnsureBridgeUnitFrame(name)
 
   local units = MultiBot.frames["MultiBar"].frames["Units"]
   local button = units.buttons and units.buttons[name] or nil
-  if not button or not button.state or not button.class or button.class == "" then
+  local isOnline = button and (
+      (MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(button, name))
+      or (not MultiBot.IsUnitBotOnline and button.state == true)
+  )
+  if not button or not isOnline or not button.class or button.class == "" then
     return nil
   end
 
@@ -2791,29 +3344,20 @@ function MultiBot.ApplyBridgeBotState(name, combat, normal)
   button.waitFor = ""
 
   if not button.class or button.class == "" then
-    if button.setEnable then
-      button.setEnable()
-    end
-    return true
-  end
-
-  if not shouldRebuildFrame then
-    EnsureBridgeActiveIndex(button, name)
-    if button.setEnable then
-      button.setEnable()
-    end
-
     RequestBridgeUnitsRelayout()
     return true
   end
 
-  EnsureBridgeActiveIndex(button, name)
-
-  if button.setEnable then
-    button.setEnable()
+  if not shouldRebuildFrame then
+    RequestBridgeUnitsRelayout()
+    return true
   end
 
-  if existingFrame or IsBridgeUnitDisplayedNow(name) then
+  local isOnline = MultiBot.IsUnitBotOnline
+      and MultiBot.IsUnitBotOnline(button, name)
+      or button.state == true
+
+  if isOnline and (existingFrame or IsBridgeUnitDisplayedNow(name)) then
     BuildBridgeUnitFrame(units, button, name, button.combat, button.normal, true)
   end
 

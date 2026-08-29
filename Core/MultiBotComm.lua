@@ -36,6 +36,7 @@ local CRAFT_RECIPE_TARGET_CAPABILITY = "CRAFT_RECIPE_TARGET_V1"
 local LOOT_RULE_ITEM_CAPABILITY = "LOOT_RULE_ITEM_V1"
 local ALT_ROSTER_CAPABILITY = "ALT_ROSTER_V1"
 local BOT_LIFECYCLE_CAPABILITY = "BOT_LIFECYCLE_V1"
+local BOT_TARGET_RESOLVE_CAPABILITY = "BOT_TARGET_RESOLVE_V1"
 -- MB_LUA51_UPVALUE_REFACTOR_V1_BEGIN
 -- Keep capability-to-state mapping outside Comm.HandleAddonMessage so each
 -- capability does not consume a separate Lua 5.1 upvalue in that dispatcher.
@@ -67,6 +68,7 @@ local CAPABILITY_STATE_FIELDS = {
   [LOOT_RULE_ITEM_CAPABILITY] = "lootRuleItemCapable",
   [ALT_ROSTER_CAPABILITY] = "altRosterCapable",
   [BOT_LIFECYCLE_CAPABILITY] = "botLifecycleCapable",
+  [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
 -- MB_LUA51_UPVALUE_REFACTOR_V1_END
@@ -120,9 +122,11 @@ local STATE_CAPABILITY_FALLBACK_SECONDS = 3.0
 local STATE_BOOTSTRAP_RETRY_SECONDS = 1.0
 local STATE_BOOTSTRAP_MAX_AUTO_ATTEMPTS = 3
 local ALT_ROSTER_MAX_ENTRIES = 128
+local BOT_TARGET_RESOLVE_TIMEOUT_SECONDS = 5.0
+local BOT_TARGET_RESOLVE_MAX_ACTIVE = 64
 local BOT_LIFECYCLE_TIMEOUT_SECONDS = 12.0
 local BOT_LIFECYCLE_POLL_SECONDS = 1.0
-local BOT_LIFECYCLE_MAX_ACTIVE = 16
+local BOT_LIFECYCLE_MAX_ACTIVE = 64
 
 local requestBootstrapStates
 local flushPendingStateRefreshes
@@ -360,6 +364,9 @@ local function ensureBridgeState()
   state.lootRuleItemCapable = state.lootRuleItemCapable or false
   state.altRosterCapable = state.altRosterCapable or false
   state.botLifecycleCapable = state.botLifecycleCapable or false
+  state.botTargetResolveCapable = state.botTargetResolveCapable or false
+  state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
+  state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
   state.altRoster = type(state.altRoster) == "table" and state.altRoster or {}
   state.altRosterBatch = type(state.altRosterBatch) == "table" and state.altRosterBatch or nil
   state.botLifecycleSeq = tonumber(state.botLifecycleSeq) or 0
@@ -827,10 +834,173 @@ local function pollBotLifecycleCommand(token)
   end)
 end
 
+-- MB_D2B_GUILD_TARGET_RESOLVE_V1_BEGIN
+local function nextBotTargetResolveToken(state)
+  state.botTargetResolveSeq = (tonumber(state.botTargetResolveSeq) or 0) + 1
+  if state.botTargetResolveSeq > 1000000000 then
+    state.botTargetResolveSeq = 1
+  end
+  return string.format("br%d%d", state.botTargetResolveSeq, math.floor(safeNow() * 1000))
+end
+
+local function countBotTargetResolveCommands(state)
+  local count = 0
+  for _ in pairs(state.botTargetResolveCommands or {}) do
+    count = count + 1
+  end
+  return count
+end
+
+local function finishBotTargetResolveCommand(state, token, result)
+  local command = state.botTargetResolveCommands[token]
+  state.botTargetResolveCommands[token] = nil
+
+  if type(command) == "table" and type(command.callback) == "function" then
+    command.callback(result)
+  end
+end
+
+function Comm.ResolveBotTarget(name, callback)
+  local state = ensureBridgeState()
+  if state.connected ~= true or state.botTargetResolveCapable ~= true then
+    return nil
+  end
+
+  name = trim(name)
+  if name == "" or #name > 64 then
+    return nil
+  end
+  if countBotTargetResolveCommands(state) >= BOT_TARGET_RESOLVE_MAX_ACTIVE then
+    return nil
+  end
+
+  local token = nextBotTargetResolveToken(state)
+  if not isValidStateToken(token) then
+    return nil
+  end
+
+  state.botTargetResolveCommands[token] = {
+    token = token,
+    requestedName = name,
+    requestedNameKey = string.lower(name),
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("GET", "BOT_TARGET_RESOLVE~" .. urlEncodeField(name) .. "~" .. token) then
+    state.botTargetResolveCommands[token] = nil
+    return nil
+  end
+
+  safeDelay(BOT_TARGET_RESOLVE_TIMEOUT_SECONDS, function()
+    local live = ensureBridgeState()
+    local pending = live.botTargetResolveCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    local timeoutReason = live.connected == true and "CLIENT_TIMEOUT" or "BRIDGE_DISCONNECTED"
+    live.lastError = "BOT_TARGET_RESOLVE_" .. timeoutReason
+    finishBotTargetResolveCommand(live, token, {
+      token = token,
+      status = "ERR",
+      reason = timeoutReason,
+      name = "",
+      guid = 0,
+      lifecycleState = "UNKNOWN",
+      final = true,
+    })
+  end)
+
+  return token
+end
+
+local function handleBotTargetResolve(payload, state)
+  local fields = splitFields(payload or "")
+  if #fields ~= 6 then
+    state.lastError = "BOT_TARGET_RESOLVE_BAD_FIELD_COUNT"
+    local possibleToken = trim(fields[1] or "")
+    if isValidStateToken(possibleToken)
+        and type(state.botTargetResolveCommands[possibleToken]) == "table" then
+      finishBotTargetResolveCommand(state, possibleToken, {
+        token = possibleToken,
+        status = "ERR",
+        reason = "BAD_RESPONSE",
+        name = "",
+        guid = 0,
+        lifecycleState = "UNKNOWN",
+        final = true,
+      })
+    end
+    return true
+  end
+
+  local token = trim(fields[1])
+  local status = string.upper(trim(fields[2]))
+  local reason = trim(fields[3])
+  local canonicalName = urlDecodeFieldStrict(fields[4], 64, true)
+  local guid = parseBoundedInteger(fields[5], 0, 4294967295)
+  local lifecycleState = string.upper(trim(fields[6]))
+
+  if not isValidStateToken(token) then
+    state.lastError = "BOT_TARGET_RESOLVE_BAD_TOKEN"
+    return true
+  end
+
+  local command = state.botTargetResolveCommands[token]
+  if type(command) ~= "table" then
+    return true
+  end
+
+  local commonValid = canonicalName ~= nil
+      and guid ~= nil
+      and reason ~= ""
+      and #reason <= 64
+  local okValid = status == "OK"
+      and commonValid
+      and guid > 0
+      and canonicalName ~= ""
+      and string.lower(canonicalName) == command.requestedNameKey
+      and (lifecycleState == "ONLINE"
+          or lifecycleState == "CONNECTING"
+          or lifecycleState == "OFFLINE")
+  local errValid = status == "ERR"
+      and commonValid
+      and guid == 0
+      and canonicalName == ""
+      and lifecycleState == "UNKNOWN"
+
+  if not okValid and not errValid then
+    state.lastError = "BOT_TARGET_RESOLVE_BAD_RESPONSE"
+    finishBotTargetResolveCommand(state, token, {
+      token = token,
+      status = "ERR",
+      reason = "BAD_RESPONSE",
+      name = "",
+      guid = 0,
+      lifecycleState = "UNKNOWN",
+      final = true,
+    })
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("BOT_TARGET_RESOLVE_" .. reason)
+  finishBotTargetResolveCommand(state, token, {
+    token = token,
+    status = status,
+    reason = reason,
+    name = canonicalName,
+    guid = guid,
+    lifecycleState = lifecycleState,
+    final = true,
+  })
+  return true
+end
+-- MB_D2B_GUILD_TARGET_RESOLVE_V1_END
 function Comm.RunBotLifecycle(action, guid, callback)
   local state = ensureBridgeState()
   if state.connected ~= true
-      or state.altRosterCapable ~= true
       or state.botLifecycleCapable ~= true then
     return nil
   end
@@ -1121,6 +1291,8 @@ function Comm.HandleAltBotLifecycleAddonMessage(opcode, payload, state)
     return handleAltRosterEntry(payload, state)
   elseif opcode == "ALT_ROSTER_END" then
     return handleAltRosterEnd(payload, state)
+  elseif opcode == "BOT_TARGET_RESOLVE" then
+    return handleBotTargetResolve(payload, state)
   elseif opcode == "BOT_LIFECYCLE" then
     return handleBotLifecycleResult(payload, state)
   elseif opcode == "BOT_LIFECYCLE_STATE" then
@@ -1131,6 +1303,30 @@ end
 
 function Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, state)
   requestType = string.upper(trim(requestType))
+  if requestType == "BOT_TARGET_RESOLVE" then
+    state = type(state) == "table" and state or ensureBridgeState()
+    token = trim(token)
+    reason = trim(reason)
+    if reason == "" then
+      reason = "PROTOCOL_ERROR"
+    end
+
+    local command = state.botTargetResolveCommands[token]
+    if type(command) == "table" then
+      state.lastError = "BOT_TARGET_RESOLVE_" .. reason
+      finishBotTargetResolveCommand(state, token, {
+        token = token,
+        status = "ERR",
+        reason = reason,
+        name = "",
+        guid = 0,
+        lifecycleState = "UNKNOWN",
+        final = true,
+      })
+    end
+    return true
+  end
+
   if requestType ~= "BOT_CONNECT"
       and requestType ~= "BOT_DISCONNECT"
       and requestType ~= "BOT_LIFECYCLE_STATE" then
@@ -7175,6 +7371,11 @@ local function finishCapabilityResolution(state, debugOpcode, payload)
   if state.altRosterCapable == true and type(Comm.RequestAltRoster) == "function" then
     Comm.RequestAltRoster()
   end
+  if state.botLifecycleCapable == true
+      and state.botTargetResolveCapable == true
+      and type(MultiBot.AutoStructuredGroupReconnect) == "function" then
+    MultiBot.AutoStructuredGroupReconnect()
+  end
   if MultiBot.RefreshEnchantingEveryButtons then
     MultiBot.RefreshEnchantingEveryButtons()
   end
@@ -9734,6 +9935,8 @@ state.selfActionCapable = false
   state.craftRecipeTargetCapable = false
   state.altRosterCapable = false
   state.botLifecycleCapable = false
+  state.botTargetResolveCapable = false
+  state.botTargetResolveCommands = {}
   state.altRoster = {}
   state.altRosterBatch = nil
   state.botLifecycleCommands = {}

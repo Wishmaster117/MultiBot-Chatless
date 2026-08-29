@@ -66,6 +66,15 @@ local function RequestBridgeSnapshotAfterGroupReconnect()
 end
 
 local function ReconnectExistingGroupBots(reason)
+	local bridge = MultiBot and MultiBot.bridge
+	if bridge and bridge.connected == true
+		and bridge.botLifecycleCapable == true
+		and bridge.botTargetResolveCapable == true then
+		-- Structured lifecycle mode: group reconnect is explicit from the
+		-- roster row and must never auto-send ".playerbot bot add".
+		return false
+	end
+
 	if MultiBot._groupReconnectDone then
 		return false
 	end
@@ -1441,11 +1450,22 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 
 		if event ~= "PLAYER_ENTERING_WORLD" then
 			if event ~= "UNIT_PET" then
+				local function refreshGroupRosterIndexes()
+					local bridge = MultiBot and MultiBot.bridge
+					if bridge and bridge.connected == true
+						and type(bridge.roster) == "table"
+						and MultiBot.SyncBridgeRosterToPlayers then
+						MultiBot.SyncBridgeRosterToPlayers(bridge.roster)
+					end
+				end
+
 				if MultiBot.TimerAfter then
 					MultiBot.TimerAfter(0.8, function()
+						refreshGroupRosterIndexes()
 						ReconnectExistingGroupBots(event)
 					end)
 				else
+					refreshGroupRosterIndexes()
 					ReconnectExistingGroupBots(event)
 				end
 			end
@@ -1995,7 +2015,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				bindUnitToggleHandlers(tButton, { requireEnabledStateOnRight = false })
 			elseif(tButton == nil) then return end
 
-		if(MultiBot.isInside(arg1, "Hello", "你好") and tButton.class == "Unknown" and tButton.roster == "friends") then
+		if(MultiBot.isInside(arg1, "Hello", "你好") and tButton.class == "Unknown" and MultiBot.isRoster("friends", arg2)) then
 			local tName = ""
 			local tLevel = ""
 			local tClass = ""
@@ -2012,7 +2032,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			end
 
 			tClass = MultiBot.toClass(tClass)
-			local tTable = MultiBot.index.classes[tButton.roster][tButton.class]
+			local tTable = MultiBot.index.classes.friends[tButton.class] or {}
 			local tIndex = 0
 
 			for i = 1, #tTable do
@@ -2023,9 +2043,9 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			end
 
 			if(tIndex > 0) then
-				if(MultiBot.index.classes[tButton.roster][tClass] == nil) then MultiBot.index.classes[tButton.roster][tClass] = {} end
-				table.remove(MultiBot.index.classes[tButton.roster][tButton.class], tIndex)
-				table.insert(MultiBot.index.classes[tButton.roster][tClass], tName)
+				if(MultiBot.index.classes.friends[tClass] == nil) then MultiBot.index.classes.friends[tClass] = {} end
+				table.remove(MultiBot.index.classes.friends[tButton.class], tIndex)
+				table.insert(MultiBot.index.classes.friends[tClass], tName)
 			end
 
 			tButton.setTexture("Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tClass) .. ".blp")
