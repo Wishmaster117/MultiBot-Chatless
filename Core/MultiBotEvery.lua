@@ -213,10 +213,23 @@ function MultiBot.RefreshEveryGroupActionFrame(pFrame)
 	end
 
 	local unitButton = GetEveryUnitButton(pFrame, name)
-	local isOnline = unitButton and (
-		(MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(unitButton, name))
-		or (not MultiBot.IsUnitBotOnline and unitButton.state == true)
-	)
+	local unitsButton = MultiBot.frames
+		and MultiBot.frames["MultiBar"]
+		and MultiBot.frames["MultiBar"].buttons
+		and MultiBot.frames["MultiBar"].buttons["Units"]
+	local currentRoster = unitsButton and unitsButton.roster or nil
+	local isOnline = false
+
+	if unitButton then
+		if currentRoster == "players" and MultiBot.IsBridgePlayerRosterBotOnline then
+			isOnline = MultiBot.IsBridgePlayerRosterBotOnline(unitButton, name)
+		else
+			isOnline = (
+				(MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(unitButton, name))
+				or (not MultiBot.IsUnitBotOnline and unitButton.state == true)
+			)
+		end
+	end
 	local isActive = IsEveryGroupActive(name)
 
 	if isActive then

@@ -227,17 +227,46 @@ local function hasBridgeAltRoster()
         and #MultiBot.bridge.altRoster > 0
 end
 
-local function splitPlayerDisplay(display)
+local function getPlayerRosterOnlineState(name, unitButton)
+    if not unitButton then
+        return false
+    end
+
+    if MultiBot.IsBridgePlayerRosterBotOnline then
+        return MultiBot.IsBridgePlayerRosterBotOnline(unitButton, name)
+    end
+
+    local state = getAltLifecycleState(name)
+    if state then
+        return state == "ONLINE"
+    end
+
+    if MultiBot.IsUnitBotOnline then
+        return MultiBot.IsUnitBotOnline(unitButton, name)
+    end
+
+    return unitButton.state == true
+end
+
+local function splitPlayerDisplay(display, unitsFrame)
     local online = {}
     local offline = {}
+    local playerName = type(UnitName) == "function" and UnitName("player") or nil
 
     for index = 1, #display do
         local name = display[index]
-        local state = getAltLifecycleState(name)
-        if state == "OFFLINE" or state == "CONNECTING" then
-            table.insert(offline, name)
-        else
+        local unitButton = unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]
+
+        -- Preserve the existing SelfBot placement. Its own state/handler stays
+        -- authoritative; this patch does not change SelfBot behavior.
+        if type(playerName) == "string" and playerName ~= ""
+            and type(name) == "string"
+            and string.lower(name) == string.lower(playerName) then
             table.insert(online, name)
+        elseif getPlayerRosterOnlineState(name, unitButton) then
+            table.insert(online, name)
+        else
+            table.insert(offline, name)
         end
     end
 
@@ -263,14 +292,29 @@ local function layoutPlayerAltSections(
     local newVisible = {}
     local y = 0
     local rowStep = unitsFrame.size + 2
+    local playerName = type(UnitName) == "function" and UnitName("player") or nil
 
     for index = fromIndex, toIndex do
         local name = effective[index]
         if name then
             local unitButton = unitsFrame.buttons[name]
             local unitFrame = unitsFrame.frames[name]
+            local isOnline = getPlayerRosterOnlineState(name, unitButton)
+            local isSelf = type(playerName) == "string" and playerName ~= ""
+                and type(name) == "string"
+                and string.lower(name) == string.lower(playerName)
 
-            if unitButton and unitButton.state and MultiBot.EnsureBridgeUnitFrame then
+            if unitButton and not isSelf then
+                if isOnline then
+                    if unitButton.setEnable then
+                        unitButton.setEnable()
+                    end
+                elseif unitButton.setDisable then
+                    unitButton.setDisable()
+                end
+            end
+
+            if isOnline and unitButton and MultiBot.EnsureBridgeUnitFrame then
                 unitFrame = MultiBot.EnsureBridgeUnitFrame(name) or unitFrame
             end
 
@@ -278,9 +322,11 @@ local function layoutPlayerAltSections(
                 unitButton.setPoint(0, y)
                 if unitFrame then
                     unitFrame.setPoint(-34, y + 2)
-                end
-                if unitFrame and unitButton.state then
-                    unitFrame:Show()
+                    if isOnline then
+                        unitFrame:Show()
+                    else
+                        unitFrame:Hide()
+                    end
                 end
                 unitButton:Show()
                 table.insert(newVisible, name)
@@ -336,7 +382,7 @@ local function getDisplayableUnits(unitsFrame, sourceTable)
     return display
 end
 
-local function addRefreshTarget(targets, seen, unitsFrame, name)
+local function addRefreshTarget(targets, seen, unitsFrame, name, roster)
     if type(name) ~= "string" or name == "" or name == UnitName("player") then
         return
     end
@@ -346,7 +392,8 @@ local function addRefreshTarget(targets, seen, unitsFrame, name)
     end
 
     local unitButton = unitsFrame.buttons[name]
-    if unitButton and unitButton._mbRosterPresence == "OFFLINE" then
+    if (roster == "members" or roster == "friends")
+        and unitButton and unitButton._mbRosterPresence == "OFFLINE" then
         return
     end
 
@@ -369,7 +416,7 @@ local function getVisibleRefreshTargets(unitsButton, unitsFrame)
     local visibleNames = unitsButton._visibleNames
     if type(visibleNames) == "table" and #visibleNames > 0 then
         for index = 1, #visibleNames do
-            addRefreshTarget(targets, seen, unitsFrame, visibleNames[index])
+            addRefreshTarget(targets, seen, unitsFrame, visibleNames[index], unitsButton.roster)
         end
 
         return targets
@@ -388,7 +435,7 @@ local function getVisibleRefreshTargets(unitsButton, unitsFrame)
     end
 
     for index = fromIndex, math.min(toIndex, #display) do
-        addRefreshTarget(targets, seen, unitsFrame, display[index])
+        addRefreshTarget(targets, seen, unitsFrame, display[index], unitsButton.roster)
     end
 
     return targets
@@ -485,7 +532,7 @@ local function relayoutUnitsDisplay(unitsButton, unitsFrame)
     end
 
     if unitsButton.roster == "players" and hasBridgeAltRoster() then
-        local onlineNames, offlineNames = splitPlayerDisplay(display)
+        local onlineNames, offlineNames = splitPlayerDisplay(display, unitsFrame)
         local effectiveLimit = #onlineNames + #offlineNames
 
         unitsButton.limit = effectiveLimit
@@ -920,6 +967,13 @@ local function addRosterMemberButton(member, socialRoster)
     member.doRight = function(button)
         local currentRoster = getCurrentUnitsRoster()
 
+        if currentRoster == "players" then
+            if MultiBot.TryBridgePlayerRosterRightClick then
+                MultiBot.TryBridgePlayerRosterRightClick(button)
+            end
+            return
+        end
+
         if currentRoster == "actives" then
             if not isSharedRosterButtonOnline(button) then
                 return
@@ -968,6 +1022,13 @@ local function addRosterMemberButton(member, socialRoster)
 
     member.doLeft = function(button)
         local currentRoster = getCurrentUnitsRoster()
+
+        if currentRoster == "players" then
+            if MultiBot.TryBridgePlayerRosterLeftClick then
+                MultiBot.TryBridgePlayerRosterLeftClick(button)
+            end
+            return
+        end
 
         if currentRoster == "actives" then
             if isSharedRosterButtonOnline(button) then
