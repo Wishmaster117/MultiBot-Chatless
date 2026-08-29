@@ -984,9 +984,23 @@ MultiBot.RestoreCollapsedUnitBarsFromDropdown = function(targetFrame)
 		return
 	end
 
+	local unitsButton = MultiBot.frames
+		and MultiBot.frames["MultiBar"]
+		and MultiBot.frames["MultiBar"].buttons
+		and MultiBot.frames["MultiBar"].buttons["Units"]
+	local guildRosterVisible = unitsButton and unitsButton.roster == "members"
+
 	for index = 1, #collapsedBars do
 		local frame = collapsedBars[index]
-		if frame and frame.Show then
+		local guildRefreshHandled = false
+
+		if guildRosterVisible
+			and frame
+			and MultiBot.RefreshEveryGroupActionFrame then
+			guildRefreshHandled = MultiBot.RefreshEveryGroupActionFrame(frame) == true
+		end
+
+		if not guildRefreshHandled and frame and frame.Show then
 			frame:Show()
 		end
 	end

@@ -1908,6 +1908,118 @@ function MultiBot.IsUnitBotOnline(button, name)
   return button.state == true
 end
 
+local function GetGuildManualOfflineSuppression()
+  if type(MultiBot._guildManualOfflineSuppression) ~= "table" then
+    MultiBot._guildManualOfflineSuppression = {}
+  end
+  return MultiBot._guildManualOfflineSuppression
+end
+
+local function GetUnitsButtonByName(name)
+  if type(name) ~= "string" or name == "" then
+    return nil
+  end
+
+  local units = MultiBot.frames
+      and MultiBot.frames["MultiBar"]
+      and MultiBot.frames["MultiBar"].frames
+      and MultiBot.frames["MultiBar"].frames["Units"]
+      or nil
+  local buttons = units and units.buttons
+  if type(buttons) ~= "table" then
+    return nil
+  end
+
+  if buttons[name] then
+    return buttons[name]
+  end
+
+  local key = string.lower(name)
+  for buttonName, button in pairs(buttons) do
+    if type(buttonName) == "string" and string.lower(buttonName) == key then
+      return button
+    end
+  end
+  return nil
+end
+
+function MultiBot.SetGuildRosterManualOffline(buttonOrName, offline)
+  local button = type(buttonOrName) == "table" and buttonOrName or nil
+  local name = button and button.name or buttonOrName
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+
+  if not button then
+    button = GetUnitsButtonByName(name)
+  end
+
+  local key = string.lower(name)
+  local suppression = GetGuildManualOfflineSuppression()
+  if offline == true then
+    suppression[key] = true
+    if button then
+      button._mbGuildManualOffline = true
+    end
+  else
+    suppression[key] = nil
+    if button then
+      button._mbGuildManualOffline = nil
+    end
+  end
+
+  return true
+end
+
+function MultiBot.IsGuildStructuredAutoReconnectSuppressed(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+
+  local key = string.lower(name)
+  local suppression = GetGuildManualOfflineSuppression()
+  if suppression[key] == true then
+    return true
+  end
+
+  local button = GetUnitsButtonByName(name)
+  return button and button._mbGuildManualOffline == true or false
+end
+
+function MultiBot.IsGuildRosterBotOnline(button, name)
+  if not button then
+    return false
+  end
+
+  -- BOT_TARGET_RESOLVE / BOT_LIFECYCLE is only a temporary authority while a
+  -- Guild connect/disconnect is converging. Manual-offline suppression is not
+  -- a visual state: it only vetoes structured Group auto-reconnect.
+  local guildState = string.upper(tostring(button._mbGuildBridgeState or ""))
+  if guildState == "ONLINE" then
+    return true
+  end
+  if guildState == "OFFLINE"
+      or guildState == "CONNECTING"
+      or guildState == "DISCONNECTING" then
+    return false
+  end
+
+  -- Once lifecycle convergence is complete, GuildRoster presence owns the
+  -- orange Guild row. The shared Bridge/ALT/Group button state must not
+  -- override a known GuildRoster ONLINE/OFFLINE value.
+  local rosterPresence = string.upper(tostring(button._mbRosterPresence or ""))
+  if button._mbSocialRoster == "members" and rosterPresence ~= "" then
+    return rosterPresence == "ONLINE"
+  end
+
+  -- Fallback only before a Guild social snapshot has populated this button.
+  if button._mbBridgeOnline ~= nil then
+    return button._mbBridgeOnline == true
+  end
+
+  return button.state == true
+end
+
 function MultiBot.SetBridgeBotOnlineState(buttonOrName, online)
   local button = buttonOrName
 
@@ -2174,7 +2286,9 @@ function MultiBot.AutoStructuredGroupReconnect()
   for _, name in ipairs(names) do
     if type(name) == "string" and name ~= "" then
       local key = string.lower(name)
-      if state.pending[key] == nil then
+      local guildSuppressed = MultiBot.IsGuildStructuredAutoReconnectSuppressed
+          and MultiBot.IsGuildStructuredAutoReconnectSuppressed(name)
+      if state.pending[key] == nil and not guildSuppressed then
         local entry = {
           key = key,
           name = name,
@@ -2252,6 +2366,12 @@ function MultiBot.AutoStructuredGroupReconnect()
         return
       end
 
+      if MultiBot.IsGuildStructuredAutoReconnectSuppressed
+          and MultiBot.IsGuildStructuredAutoReconnectSuppressed(currentEntry.name) then
+        finishEntry(currentEntry)
+        return
+      end
+
       currentEntry.phase = "CONNECTING"
       local lifecycleToken = MultiBot.Comm.RunBotLifecycle("CONNECT", guid, function()
         if state.pending[currentEntry.key] == currentEntry then
@@ -2287,6 +2407,16 @@ function MultiBot.BindUnitToggleHandlers(button, options)
       return
     end
 
+    -- Named unit buttons are shared across rosters and may be rebound by
+    -- Bridge ROSTER/ALT_ROSTER refreshes. Dispatch Guild at click time and
+    -- consume the click before the legacy chat fallback.
+    if IsCurrentUnitsRoster("members") then
+      if MultiBot.TryGuildRosterRightClick then
+        MultiBot.TryGuildRosterRightClick(unitButton)
+      end
+      return
+    end
+
     if requireEnabledStateOnRight and unitButton.state == false then
       return
     end
@@ -2311,6 +2441,15 @@ function MultiBot.BindUnitToggleHandlers(button, options)
     if IsCurrentUnitsRoster("players")
         and MultiBot.TryBridgePlayerRosterLeftClick
         and MultiBot.TryBridgePlayerRosterLeftClick(unitButton) then
+      return
+    end
+
+    -- Same invariant for Guild left-click even if another roster rebound
+    -- this shared button after the Guild roster was rendered.
+    if IsCurrentUnitsRoster("members") then
+      if MultiBot.TryGuildRosterLeftClick then
+        MultiBot.TryGuildRosterLeftClick(unitButton)
+      end
       return
     end
 
@@ -2748,6 +2887,15 @@ local function BindBridgeAltBotHandler(button)
   end
 
   button.doLeft = function(unitButton)
+    -- ALT_ROSTER can rebind the same named button object. Guild retains
+    -- click-time ownership when the displayed roster is "members".
+    if IsCurrentUnitsRoster("members") then
+      if MultiBot.TryGuildRosterLeftClick then
+        MultiBot.TryGuildRosterLeftClick(unitButton)
+      end
+      return
+    end
+
     if IsCurrentUnitsRoster("actives") then
       local isOnline = MultiBot.IsUnitBotOnline
           and MultiBot.IsUnitBotOnline(unitButton, unitButton.name)
@@ -2767,6 +2915,14 @@ local function BindBridgeAltBotHandler(button)
   end
 
   button.doRight = function(unitButton)
+    -- Never allow a Guild right-click to inherit ALT/Group ownership.
+    if IsCurrentUnitsRoster("members") then
+      if MultiBot.TryGuildRosterRightClick then
+        MultiBot.TryGuildRosterRightClick(unitButton)
+      end
+      return
+    end
+
     if IsCurrentUnitsRoster("actives") then
       local isOnline = MultiBot.IsUnitBotOnline
           and MultiBot.IsUnitBotOnline(unitButton, unitButton.name)
@@ -2808,7 +2964,9 @@ function MultiBot.OnBridgeAltLifecycleResult(result)
 
     if not button and guid then
       for _, candidate in pairs(units.buttons) do
-        if candidate and tonumber(candidate._mbAltGuid) == guid then
+        if candidate
+            and (tonumber(candidate._mbAltGuid) == guid
+                or tonumber(candidate._mbGuildResolvedGuid) == guid) then
           button = candidate
           break
         end
@@ -2817,6 +2975,9 @@ function MultiBot.OnBridgeAltLifecycleResult(result)
   end
 
   local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+  local lifecycleStatus = string.upper(tostring(result.status or ""))
+  local lifecycleConfirmed = lifecycleStatus == "OK" or lifecycleStatus == "PENDING"
+
   if button and lifecycleState ~= "" then
     button._mbAltState = lifecycleState
     if button._mbAltEntry then
@@ -2832,6 +2993,26 @@ function MultiBot.OnBridgeAltLifecycleResult(result)
       UpdateBridgeAltButton(button, button._mbAltEntry)
     end
     ApplyBridgePlayerRosterAltVisual(button, lifecycleState)
+
+    -- Persist only confirmed Bridge lifecycle evidence for the shared bot
+    -- object. ERR fallback states are synthetic and are not authoritative.
+    if lifecycleConfirmed
+        and (lifecycleState == "ONLINE"
+            or lifecycleState == "OFFLINE"
+            or lifecycleState == "CONNECTING"
+            or lifecycleState == "DISCONNECTING") then
+      if guid and guid > 0 then
+        button._mbGuildResolvedGuid = guid
+      end
+      button._mbGuildBridgeState = lifecycleState
+
+      -- Only confirmed ONLINE Bridge evidence can release a prior manual
+      -- Guild OFFLINE intent. GuildRoster ONLINE is not sufficient.
+      if lifecycleState == "ONLINE"
+          and MultiBot.SetGuildRosterManualOffline then
+        MultiBot.SetGuildRosterManualOffline(button, false)
+      end
+    end
   end
 
   if MultiBot.RelayoutUnitsDisplay then
