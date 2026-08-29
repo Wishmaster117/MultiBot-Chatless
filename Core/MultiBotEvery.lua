@@ -225,6 +225,10 @@ function MultiBot.RefreshEveryGroupActionFrame(pFrame)
 			isOnline = MultiBot.IsBridgePlayerRosterBotOnline(unitButton, name)
 		elseif currentRoster == "members" and MultiBot.IsGuildRosterBotOnline then
 			isOnline = MultiBot.IsGuildRosterBotOnline(unitButton, name)
+		elseif currentRoster == "friends" and MultiBot.IsFriendRosterBotOnline then
+			isOnline = MultiBot.IsFriendRosterBotOnline(unitButton, name)
+		elseif currentRoster == "favorites" and MultiBot.IsFavoriteRosterBotOnline then
+			isOnline = MultiBot.IsFavoriteRosterBotOnline(unitButton, name)
 		else
 			isOnline = (
 				(MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(unitButton, name))

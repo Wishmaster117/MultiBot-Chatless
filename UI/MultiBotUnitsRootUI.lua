@@ -209,10 +209,35 @@ local function applySocialRosterPresence(button, roster, name, online)
         end
     end
 
+    if roster == "friends" and button._mbFriendBridgeState ~= nil then
+        local bridgeState = string.upper(tostring(button._mbFriendBridgeState or ""))
+        local bridgeKnown = bridgeState == "ONLINE"
+            or bridgeState == "OFFLINE"
+            or bridgeState == "CONNECTING"
+            or bridgeState == "DISCONNECTING"
+
+        if bridgeKnown then
+            local bridgeOnline = bridgeState == "ONLINE"
+            button._mbSocialForceCollapsed = not bridgeOnline
+            if bridgeOnline then
+                if button.setEnable then
+                    button.setEnable()
+                end
+                setSocialRosterVisual(button, "ONLINE")
+            else
+                if button.setDisable then
+                    button.setDisable()
+                end
+                setSocialRosterVisual(button, "OFFLINE")
+            end
+            return
+        end
+    end
+
     -- Until Bridge lifecycle authority exists, social presence remains the
     -- fallback display state. It never clears manual Guild OFFLINE intent.
     button._mbSocialForceCollapsed = state == "OFFLINE"
-    if roster == "members" then
+    if roster == "members" or roster == "friends" then
         if state == "ONLINE" then
             if button.setEnable then
                 button.setEnable()
@@ -509,6 +534,8 @@ local function layoutVisibleUnits(unitsButton, unitsFrame, display, fromIndex, t
 
     local newVisible = {}
     local guildRosterVisible = unitsButton and unitsButton.roster == "members"
+    local friendRosterVisible = unitsButton and unitsButton.roster == "friends"
+    local favoriteRosterVisible = unitsButton and unitsButton.roster == "favorites"
 
     for index = startIndex, endIndex do
         local name = display[index]
@@ -519,8 +546,12 @@ local function layoutVisibleUnits(unitsButton, unitsFrame, display, fromIndex, t
         if unitButton then
             if guildRosterVisible and MultiBot.IsGuildRosterBotOnline then
                 isOnline = MultiBot.IsGuildRosterBotOnline(unitButton, name)
+            elseif friendRosterVisible and MultiBot.IsFriendRosterBotOnline then
+                isOnline = MultiBot.IsFriendRosterBotOnline(unitButton, name)
+            elseif favoriteRosterVisible and MultiBot.IsFavoriteRosterBotOnline then
+                isOnline = MultiBot.IsFavoriteRosterBotOnline(unitButton, name)
             else
-                -- All non-Guild rosters retain the pre-v1d resolver unchanged.
+                -- All other rosters retain the existing resolver unchanged.
                 isOnline = (
                     (MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(unitButton, name))
                     or (not MultiBot.IsUnitBotOnline and unitButton.state == true)
@@ -543,6 +574,29 @@ local function layoutVisibleUnits(unitsButton, unitsFrame, display, fromIndex, t
                     unitButton.setDisable()
                 end
                 setSocialRosterVisual(unitButton, "OFFLINE")
+            end
+        elseif unitButton and friendRosterVisible then
+            unitButton._mbSocialForceCollapsed = not isOnline
+            if isOnline then
+                if unitButton.setEnable then
+                    unitButton.setEnable()
+                end
+                setSocialRosterVisual(unitButton, "ONLINE")
+            else
+                if unitButton.setDisable then
+                    unitButton.setDisable()
+                end
+                setSocialRosterVisual(unitButton, "OFFLINE")
+            end
+        elseif unitButton and favoriteRosterVisible then
+            if isOnline then
+                if unitButton.setEnable then
+                    unitButton.setEnable()
+                end
+            else
+                if unitButton.setDisable then
+                    unitButton.setDisable()
+                end
             end
         end
 
@@ -1142,6 +1196,634 @@ end
 
 -- MB_D2B_GUILD_STRUCTURED_LIFECYCLE_V2_END
 
+-- MB_FRIEND_STRUCTURED_LIFECYCLE_V1_BEGIN
+local function requestFriendRosterRefresh()
+    if type(ShowFriends) == "function" then
+        ShowFriends()
+    end
+    MultiBot.TimerAfter(UNITS_GUILD_RETRY_DELAY, function()
+        if type(ShowFriends) == "function" then
+            ShowFriends()
+        end
+    end)
+end
+
+local function isFriendLifecyclePending(button)
+    local phase = button and button._mbFriendLifecyclePhase
+    return phase == "RESOLVING"
+        or phase == "CONNECTING"
+        or phase == "DISCONNECTING"
+end
+
+local function applyFriendBridgeState(button, lifecycleState)
+    if not button then
+        return
+    end
+
+    lifecycleState = string.upper(tostring(lifecycleState or ""))
+    if lifecycleState ~= "ONLINE"
+        and lifecycleState ~= "OFFLINE"
+        and lifecycleState ~= "CONNECTING"
+        and lifecycleState ~= "DISCONNECTING" then
+        return
+    end
+
+    button._mbFriendBridgeState = lifecycleState
+    local online = lifecycleState == "ONLINE"
+
+    if MultiBot.SetBridgeBotOnlineState then
+        MultiBot.SetBridgeBotOnlineState(button, online)
+    elseif online then
+        if button.setEnable then
+            button.setEnable()
+        end
+    else
+        local frames = button.parent and button.parent.frames
+        local unitFrame = frames and frames[button.name]
+        if unitFrame and unitFrame.Hide then
+            unitFrame:Hide()
+        end
+        if button.setDisable then
+            button.setDisable()
+        end
+    end
+
+    if getCurrentUnitsRoster() ~= "friends" then
+        return
+    end
+
+    button._mbSocialForceCollapsed = not online
+    if online then
+        if button.setEnable then
+            button.setEnable()
+        end
+        setSocialRosterVisual(button, "ONLINE")
+    else
+        if button.setDisable then
+            button.setDisable()
+        end
+        setSocialRosterVisual(button, "OFFLINE")
+    end
+end
+
+local function runFriendLifecycleByGuid(button, action, guid)
+    if not button or isFriendLifecyclePending(button) then
+        return false
+    end
+    if not MultiBot.Comm or type(MultiBot.Comm.RunBotLifecycle) ~= "function" then
+        return false
+    end
+
+    button._mbFriendLifecyclePhase = action == "CONNECT" and "CONNECTING" or "DISCONNECTING"
+
+    local token = MultiBot.Comm.RunBotLifecycle(action, guid, function(result)
+        button._mbFriendLifecyclePhase = nil
+
+        if result and result.guid then
+            button._mbFriendResolvedGuid = tonumber(result.guid) or button._mbFriendResolvedGuid
+        end
+
+        local status = result and string.upper(tostring(result.status or "")) or ""
+        local lifecycleState = result and string.upper(tostring(result.lifecycleState or "")) or ""
+
+        if status == "OK"
+            and (lifecycleState == "ONLINE" or lifecycleState == "OFFLINE") then
+            applyFriendBridgeState(button, lifecycleState)
+        else
+            button._mbFriendBridgeState = nil
+        end
+
+        requestFriendRosterRefresh()
+    end)
+
+    if not token then
+        button._mbFriendLifecyclePhase = nil
+        button._mbFriendBridgeState = nil
+        requestFriendRosterRefresh()
+        return false
+    end
+
+    applyFriendBridgeState(button, action == "CONNECT" and "CONNECTING" or "DISCONNECTING")
+    return true
+end
+
+local function resolveAndRunFriendLifecycle(button, action)
+    if not button or isFriendLifecyclePending(button) then
+        return
+    end
+    if not MultiBot.Comm or type(MultiBot.Comm.ResolveBotTarget) ~= "function" then
+        return
+    end
+
+    button._mbFriendLifecyclePhase = "RESOLVING"
+    local token = MultiBot.Comm.ResolveBotTarget(button.name, function(result)
+        button._mbFriendLifecyclePhase = nil
+
+        if not result or result.status ~= "OK" then
+            button._mbFriendBridgeState = nil
+            requestFriendRosterRefresh()
+            return
+        end
+
+        local guid = tonumber(result.guid)
+        if not guid or guid <= 0 then
+            button._mbFriendBridgeState = nil
+            requestFriendRosterRefresh()
+            return
+        end
+
+        button._mbFriendResolvedGuid = guid
+        local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+        local reason = string.upper(tostring(result.reason or ""))
+
+        if action == "CONNECT" then
+            if lifecycleState == "ONLINE" then
+                applyFriendBridgeState(button, "ONLINE")
+                requestFriendRosterRefresh()
+                return
+            end
+            if lifecycleState == "CONNECTING" then
+                applyFriendBridgeState(button, "CONNECTING")
+                requestFriendRosterRefresh()
+                return
+            end
+            if lifecycleState ~= "OFFLINE" or reason == "IN_USE" then
+                button._mbFriendBridgeState = nil
+                requestFriendRosterRefresh()
+                return
+            end
+            applyFriendBridgeState(button, "OFFLINE")
+        elseif action == "DISCONNECT" then
+            if lifecycleState == "OFFLINE" then
+                if reason == "IN_USE" then
+                    button._mbFriendBridgeState = nil
+                else
+                    applyFriendBridgeState(button, "OFFLINE")
+                end
+                requestFriendRosterRefresh()
+                return
+            end
+            if lifecycleState == "CONNECTING" then
+                applyFriendBridgeState(button, "CONNECTING")
+                requestFriendRosterRefresh()
+                return
+            end
+            if lifecycleState ~= "ONLINE" then
+                button._mbFriendBridgeState = nil
+                requestFriendRosterRefresh()
+                return
+            end
+            applyFriendBridgeState(button, "ONLINE")
+        else
+            return
+        end
+
+        runFriendLifecycleByGuid(button, action, guid)
+    end)
+
+    if not token then
+        button._mbFriendLifecyclePhase = nil
+        button._mbFriendBridgeState = nil
+    end
+end
+
+local function openFriendEveryBar(button)
+    if not button or isFriendLifecyclePending(button) then
+        return
+    end
+    if not MultiBot.Comm or type(MultiBot.Comm.ResolveBotTarget) ~= "function" then
+        return
+    end
+
+    local function showOrToggle()
+        if getCurrentUnitsRoster() ~= "friends" then
+            return
+        end
+
+        local isOnline = MultiBot.IsFriendRosterBotOnline
+            and MultiBot.IsFriendRosterBotOnline(button, button.name)
+            or (not MultiBot.IsFriendRosterBotOnline
+                and MultiBot.IsUnitBotOnline
+                and MultiBot.IsUnitBotOnline(button, button.name))
+            or (not MultiBot.IsFriendRosterBotOnline
+                and not MultiBot.IsUnitBotOnline
+                and button.state == true)
+
+        if not isOnline then
+            return
+        end
+
+        button._mbFriendLifecyclePhase = nil
+        button._mbSocialForceCollapsed = false
+        if button._mbGroupRejoinCollapsed == true then
+            button._mbGroupRejoinCollapsed = false
+        end
+
+        local frames = button.parent and button.parent.frames
+        local unitFrame = frames and frames[button.name]
+        if not unitFrame and MultiBot.EnsureBridgeUnitFrame then
+            unitFrame = MultiBot.EnsureBridgeUnitFrame(button.name)
+        end
+        if unitFrame then
+            MultiBot.ShowHideSwitch(unitFrame)
+        end
+    end
+
+    button._mbFriendLifecyclePhase = "RESOLVING"
+    local token = MultiBot.Comm.ResolveBotTarget(button.name, function(result)
+        button._mbFriendLifecyclePhase = nil
+
+        if not result or result.status ~= "OK" then
+            button._mbFriendBridgeState = nil
+            requestFriendRosterRefresh()
+            return
+        end
+
+        local guid = tonumber(result.guid)
+        if not guid or guid <= 0 then
+            button._mbFriendBridgeState = nil
+            requestFriendRosterRefresh()
+            return
+        end
+
+        button._mbFriendResolvedGuid = guid
+        local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+        local reason = string.upper(tostring(result.reason or ""))
+
+        if lifecycleState == "ONLINE" then
+            applyFriendBridgeState(button, "ONLINE")
+            if MultiBot.Comm and type(MultiBot.Comm.RequestState) == "function" then
+                MultiBot.Comm.RequestState(button.name)
+            end
+            MultiBot.TimerAfter(0.20, showOrToggle)
+            requestFriendRosterRefresh()
+            return
+        end
+
+        if lifecycleState == "CONNECTING" then
+            applyFriendBridgeState(button, "CONNECTING")
+            requestFriendRosterRefresh()
+            return
+        end
+
+        if lifecycleState == "OFFLINE" and reason ~= "IN_USE" then
+            applyFriendBridgeState(button, "OFFLINE")
+            runFriendLifecycleByGuid(button, "CONNECT", guid)
+            return
+        end
+
+        button._mbFriendBridgeState = nil
+        requestFriendRosterRefresh()
+    end)
+
+    if not token then
+        button._mbFriendLifecyclePhase = nil
+        button._mbFriendBridgeState = nil
+    end
+end
+
+function MultiBot.TryFriendRosterRightClick(button)
+    if getCurrentUnitsRoster() ~= "friends" or not button then
+        return false
+    end
+    resolveAndRunFriendLifecycle(button, "DISCONNECT")
+    return true
+end
+
+function MultiBot.TryFriendRosterLeftClick(button)
+    if getCurrentUnitsRoster() ~= "friends" or not button then
+        return false
+    end
+    openFriendEveryBar(button)
+    return true
+end
+-- MB_FRIEND_STRUCTURED_LIFECYCLE_V1_END
+
+-- MB_FAVORITE_STRUCTURED_LIFECYCLE_V1_BEGIN
+local function requestFavoriteBridgeRefresh(button)
+    if not MultiBot.Comm then
+        return
+    end
+
+    if type(MultiBot.Comm.RequestRoster) == "function" then
+        MultiBot.Comm.RequestRoster()
+    end
+    if type(MultiBot.Comm.RequestAltRoster) == "function" then
+        MultiBot.Comm.RequestAltRoster()
+    end
+
+    if button and type(MultiBot.Comm.RequestState) == "function" then
+        local isOnline = MultiBot.IsFavoriteRosterBotOnline
+            and MultiBot.IsFavoriteRosterBotOnline(button, button.name)
+        if isOnline then
+            MultiBot.Comm.RequestState(button.name)
+        end
+    end
+end
+
+local function isFavoriteLifecyclePending(button)
+    local phase = button and button._mbFavoriteLifecyclePhase
+    return phase == "RESOLVING"
+        or phase == "CONNECTING"
+        or phase == "DISCONNECTING"
+end
+
+local function applyFavoriteBridgeState(button, lifecycleState)
+    if not button then
+        return
+    end
+
+    lifecycleState = string.upper(tostring(lifecycleState or ""))
+    if lifecycleState ~= "ONLINE"
+        and lifecycleState ~= "OFFLINE"
+        and lifecycleState ~= "CONNECTING"
+        and lifecycleState ~= "DISCONNECTING" then
+        return
+    end
+
+    button._mbFavoriteBridgeState = lifecycleState
+
+    -- BOT_TARGET_RESOLVE can be fresher than the last ALT_ROSTER snapshot.
+    -- Synchronize only confirmed final states here; transitional states remain
+    -- local to Favorites until the shared lifecycle handler receives them.
+    if lifecycleState == "ONLINE" or lifecycleState == "OFFLINE" then
+        button._mbAltState = lifecycleState
+        if button._mbAltEntry then
+            button._mbAltEntry.state = lifecycleState
+        end
+    end
+
+    local online = lifecycleState == "ONLINE"
+
+    if MultiBot.SetBridgeBotOnlineState then
+        MultiBot.SetBridgeBotOnlineState(button, online)
+    elseif online then
+        if button.setEnable then
+            button.setEnable()
+        end
+    else
+        local frames = button.parent and button.parent.frames
+        local unitFrame = frames and frames[button.name]
+        if unitFrame and unitFrame.Hide then
+            unitFrame:Hide()
+        end
+        if button.setDisable then
+            button.setDisable()
+        end
+    end
+
+    if getCurrentUnitsRoster() ~= "favorites" then
+        return
+    end
+
+    if online then
+        if button.setEnable then
+            button.setEnable()
+        end
+    else
+        local frames = button.parent and button.parent.frames
+        local unitFrame = frames and frames[button.name]
+        if unitFrame and unitFrame.Hide then
+            unitFrame:Hide()
+        end
+        if button.setDisable then
+            button.setDisable()
+        end
+    end
+end
+
+local function runFavoriteLifecycleByGuid(button, action, guid)
+    if not button or isFavoriteLifecyclePending(button) then
+        return false
+    end
+    if not MultiBot.Comm or type(MultiBot.Comm.RunBotLifecycle) ~= "function" then
+        return false
+    end
+
+    button._mbFavoriteLifecyclePhase = action == "CONNECT" and "CONNECTING" or "DISCONNECTING"
+
+    local token = MultiBot.Comm.RunBotLifecycle(action, guid, function(result)
+        button._mbFavoriteLifecyclePhase = nil
+
+        if result and result.guid then
+            button._mbFavoriteResolvedGuid = tonumber(result.guid) or button._mbFavoriteResolvedGuid
+        end
+
+        local status = result and string.upper(tostring(result.status or "")) or ""
+        local lifecycleState = result and string.upper(tostring(result.lifecycleState or "")) or ""
+
+        if status == "OK"
+            and (lifecycleState == "ONLINE" or lifecycleState == "OFFLINE") then
+            applyFavoriteBridgeState(button, lifecycleState)
+        else
+            button._mbFavoriteBridgeState = nil
+        end
+
+        requestFavoriteBridgeRefresh(button)
+    end)
+
+    if not token then
+        button._mbFavoriteLifecyclePhase = nil
+        button._mbFavoriteBridgeState = nil
+        requestFavoriteBridgeRefresh(button)
+        return false
+    end
+
+    applyFavoriteBridgeState(button, action == "CONNECT" and "CONNECTING" or "DISCONNECTING")
+    return true
+end
+
+local function resolveAndRunFavoriteLifecycle(button, action)
+    if not button or isFavoriteLifecyclePending(button) then
+        return
+    end
+    if not MultiBot.Comm or type(MultiBot.Comm.ResolveBotTarget) ~= "function" then
+        return
+    end
+
+    button._mbFavoriteLifecyclePhase = "RESOLVING"
+    local token = MultiBot.Comm.ResolveBotTarget(button.name, function(result)
+        button._mbFavoriteLifecyclePhase = nil
+
+        if not result or result.status ~= "OK" then
+            button._mbFavoriteBridgeState = nil
+            requestFavoriteBridgeRefresh(button)
+            return
+        end
+
+        local guid = tonumber(result.guid)
+        if not guid or guid <= 0 then
+            button._mbFavoriteBridgeState = nil
+            requestFavoriteBridgeRefresh(button)
+            return
+        end
+
+        button._mbFavoriteResolvedGuid = guid
+        local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+        local reason = string.upper(tostring(result.reason or ""))
+
+        if action == "CONNECT" then
+            if lifecycleState == "ONLINE" then
+                applyFavoriteBridgeState(button, "ONLINE")
+                requestFavoriteBridgeRefresh(button)
+                return
+            end
+            if lifecycleState == "CONNECTING" then
+                applyFavoriteBridgeState(button, "CONNECTING")
+                requestFavoriteBridgeRefresh(button)
+                return
+            end
+            if lifecycleState ~= "OFFLINE" or reason == "IN_USE" then
+                button._mbFavoriteBridgeState = nil
+                requestFavoriteBridgeRefresh(button)
+                return
+            end
+            applyFavoriteBridgeState(button, "OFFLINE")
+        elseif action == "DISCONNECT" then
+            if lifecycleState == "OFFLINE" then
+                if reason == "IN_USE" then
+                    button._mbFavoriteBridgeState = nil
+                else
+                    applyFavoriteBridgeState(button, "OFFLINE")
+                end
+                requestFavoriteBridgeRefresh(button)
+                return
+            end
+            if lifecycleState == "CONNECTING" then
+                applyFavoriteBridgeState(button, "CONNECTING")
+                requestFavoriteBridgeRefresh(button)
+                return
+            end
+            if lifecycleState ~= "ONLINE" then
+                button._mbFavoriteBridgeState = nil
+                requestFavoriteBridgeRefresh(button)
+                return
+            end
+            applyFavoriteBridgeState(button, "ONLINE")
+        else
+            return
+        end
+
+        runFavoriteLifecycleByGuid(button, action, guid)
+    end)
+
+    if not token then
+        button._mbFavoriteLifecyclePhase = nil
+        button._mbFavoriteBridgeState = nil
+    end
+end
+
+local function openFavoriteEveryBar(button)
+    if not button or isFavoriteLifecyclePending(button) then
+        return
+    end
+    if not MultiBot.Comm or type(MultiBot.Comm.ResolveBotTarget) ~= "function" then
+        return
+    end
+
+    local function showOrToggle()
+        if getCurrentUnitsRoster() ~= "favorites" then
+            return
+        end
+
+        local isOnline = MultiBot.IsFavoriteRosterBotOnline
+            and MultiBot.IsFavoriteRosterBotOnline(button, button.name)
+            or (not MultiBot.IsFavoriteRosterBotOnline
+                and MultiBot.IsUnitBotOnline
+                and MultiBot.IsUnitBotOnline(button, button.name))
+            or (not MultiBot.IsFavoriteRosterBotOnline
+                and not MultiBot.IsUnitBotOnline
+                and button.state == true)
+
+        if not isOnline then
+            return
+        end
+
+        button._mbFavoriteLifecyclePhase = nil
+        if button._mbGroupRejoinCollapsed == true then
+            button._mbGroupRejoinCollapsed = false
+        end
+
+        local frames = button.parent and button.parent.frames
+        local unitFrame = frames and frames[button.name]
+        if not unitFrame and MultiBot.EnsureBridgeUnitFrame then
+            unitFrame = MultiBot.EnsureBridgeUnitFrame(button.name)
+        end
+        if unitFrame then
+            MultiBot.ShowHideSwitch(unitFrame)
+        end
+    end
+
+    button._mbFavoriteLifecyclePhase = "RESOLVING"
+    local token = MultiBot.Comm.ResolveBotTarget(button.name, function(result)
+        button._mbFavoriteLifecyclePhase = nil
+
+        if not result or result.status ~= "OK" then
+            button._mbFavoriteBridgeState = nil
+            requestFavoriteBridgeRefresh(button)
+            return
+        end
+
+        local guid = tonumber(result.guid)
+        if not guid or guid <= 0 then
+            button._mbFavoriteBridgeState = nil
+            requestFavoriteBridgeRefresh(button)
+            return
+        end
+
+        button._mbFavoriteResolvedGuid = guid
+        local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+        local reason = string.upper(tostring(result.reason or ""))
+
+        if lifecycleState == "ONLINE" then
+            applyFavoriteBridgeState(button, "ONLINE")
+            if MultiBot.Comm and type(MultiBot.Comm.RequestState) == "function" then
+                MultiBot.Comm.RequestState(button.name)
+            end
+            MultiBot.TimerAfter(0.20, showOrToggle)
+            requestFavoriteBridgeRefresh(button)
+            return
+        end
+
+        if lifecycleState == "CONNECTING" then
+            applyFavoriteBridgeState(button, "CONNECTING")
+            requestFavoriteBridgeRefresh(button)
+            return
+        end
+
+        if lifecycleState == "OFFLINE" and reason ~= "IN_USE" then
+            applyFavoriteBridgeState(button, "OFFLINE")
+            runFavoriteLifecycleByGuid(button, "CONNECT", guid)
+            return
+        end
+
+        button._mbFavoriteBridgeState = nil
+        requestFavoriteBridgeRefresh(button)
+    end)
+
+    if not token then
+        button._mbFavoriteLifecyclePhase = nil
+        button._mbFavoriteBridgeState = nil
+    end
+end
+
+function MultiBot.TryFavoriteRosterRightClick(button)
+    if getCurrentUnitsRoster() ~= "favorites" or not button then
+        return false
+    end
+    resolveAndRunFavoriteLifecycle(button, "DISCONNECT")
+    return true
+end
+
+function MultiBot.TryFavoriteRosterLeftClick(button)
+    if getCurrentUnitsRoster() ~= "favorites" or not button then
+        return false
+    end
+    openFavoriteEveryBar(button)
+    return true
+end
+-- MB_FAVORITE_STRUCTURED_LIFECYCLE_V1_END
+
 local function isSharedRosterButtonOnline(button)
     if not button then
         return false
@@ -1211,6 +1893,16 @@ local function addRosterMemberButton(member, socialRoster)
             return
         end
 
+        if currentRoster == "friends" then
+            resolveAndRunFriendLifecycle(button, "DISCONNECT")
+            return
+        end
+
+        if currentRoster == "favorites" then
+            resolveAndRunFavoriteLifecycle(button, "DISCONNECT")
+            return
+        end
+
         if button._mbRosterPresence == "OFFLINE" then
             return
         end
@@ -1261,6 +1953,16 @@ local function addRosterMemberButton(member, socialRoster)
 
         if currentRoster == "members" then
             openGuildEveryBar(button)
+            return
+        end
+
+        if currentRoster == "friends" then
+            openFriendEveryBar(button)
+            return
+        end
+
+        if currentRoster == "favorites" then
+            openFavoriteEveryBar(button)
             return
         end
 

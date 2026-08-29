@@ -2020,6 +2020,68 @@ function MultiBot.IsGuildRosterBotOnline(button, name)
   return button.state == true
 end
 
+function MultiBot.IsFriendRosterBotOnline(button, name)
+  if not button then
+    return false
+  end
+
+  local friendState = string.upper(tostring(button._mbFriendBridgeState or ""))
+  if friendState == "ONLINE" then
+    return true
+  end
+  if friendState == "OFFLINE"
+      or friendState == "CONNECTING"
+      or friendState == "DISCONNECTING" then
+    return false
+  end
+
+  local rosterPresence = string.upper(tostring(button._mbRosterPresence or ""))
+  if button._mbSocialRoster == "friends" and rosterPresence ~= "" then
+    return rosterPresence == "ONLINE"
+  end
+
+  if button._mbBridgeOnline ~= nil then
+    return button._mbBridgeOnline == true
+  end
+
+  return button.state == true
+end
+
+-- MB_FAVORITE_ROSTER_ONLINE_AUTHORITY_V1_BEGIN
+function MultiBot.IsFavoriteRosterBotOnline(button, name)
+  if not button then
+    return false
+  end
+
+  -- A local structured mutation owns the visual while it is converging.
+  local favoriteState = string.upper(tostring(button._mbFavoriteBridgeState or ""))
+  if favoriteState == "CONNECTING" or favoriteState == "DISCONNECTING" then
+    return false
+  end
+
+  -- ALT_ROSTER is the durable lifecycle authority for Favorites. Prefer it
+  -- over a completed local Favorite state so a lifecycle change performed
+  -- from another roster cannot leave Favorites stale.
+  local altState = string.upper(tostring(button._mbAltState or ""))
+  if altState == "ONLINE" or altState == "OFFLINE" then
+    return altState == "ONLINE"
+  end
+
+  if favoriteState == "ONLINE" then
+    return true
+  end
+  if favoriteState == "OFFLINE" then
+    return false
+  end
+
+  if button._mbBridgeOnline ~= nil then
+    return button._mbBridgeOnline == true
+  end
+
+  return button.state == true
+end
+-- MB_FAVORITE_ROSTER_ONLINE_AUTHORITY_V1_END
+
 function MultiBot.SetBridgeBotOnlineState(buttonOrName, online)
   local button = buttonOrName
 
@@ -2417,6 +2479,20 @@ function MultiBot.BindUnitToggleHandlers(button, options)
       return
     end
 
+    if IsCurrentUnitsRoster("friends") then
+      if MultiBot.TryFriendRosterRightClick then
+        MultiBot.TryFriendRosterRightClick(unitButton)
+      end
+      return
+    end
+
+    if IsCurrentUnitsRoster("favorites") then
+      if MultiBot.TryFavoriteRosterRightClick then
+        MultiBot.TryFavoriteRosterRightClick(unitButton)
+      end
+      return
+    end
+
     if requireEnabledStateOnRight and unitButton.state == false then
       return
     end
@@ -2449,6 +2525,20 @@ function MultiBot.BindUnitToggleHandlers(button, options)
     if IsCurrentUnitsRoster("members") then
       if MultiBot.TryGuildRosterLeftClick then
         MultiBot.TryGuildRosterLeftClick(unitButton)
+      end
+      return
+    end
+
+    if IsCurrentUnitsRoster("friends") then
+      if MultiBot.TryFriendRosterLeftClick then
+        MultiBot.TryFriendRosterLeftClick(unitButton)
+      end
+      return
+    end
+
+    if IsCurrentUnitsRoster("favorites") then
+      if MultiBot.TryFavoriteRosterLeftClick then
+        MultiBot.TryFavoriteRosterLeftClick(unitButton)
       end
       return
     end
@@ -2896,6 +2986,20 @@ local function BindBridgeAltBotHandler(button)
       return
     end
 
+    if IsCurrentUnitsRoster("friends") then
+      if MultiBot.TryFriendRosterLeftClick then
+        MultiBot.TryFriendRosterLeftClick(unitButton)
+      end
+      return
+    end
+
+    if IsCurrentUnitsRoster("favorites") then
+      if MultiBot.TryFavoriteRosterLeftClick then
+        MultiBot.TryFavoriteRosterLeftClick(unitButton)
+      end
+      return
+    end
+
     if IsCurrentUnitsRoster("actives") then
       local isOnline = MultiBot.IsUnitBotOnline
           and MultiBot.IsUnitBotOnline(unitButton, unitButton.name)
@@ -2919,6 +3023,20 @@ local function BindBridgeAltBotHandler(button)
     if IsCurrentUnitsRoster("members") then
       if MultiBot.TryGuildRosterRightClick then
         MultiBot.TryGuildRosterRightClick(unitButton)
+      end
+      return
+    end
+
+    if IsCurrentUnitsRoster("friends") then
+      if MultiBot.TryFriendRosterRightClick then
+        MultiBot.TryFriendRosterRightClick(unitButton)
+      end
+      return
+    end
+
+    if IsCurrentUnitsRoster("favorites") then
+      if MultiBot.TryFavoriteRosterRightClick then
+        MultiBot.TryFavoriteRosterRightClick(unitButton)
       end
       return
     end
