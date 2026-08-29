@@ -3617,19 +3617,6 @@ function MultiBot.ApplyBridgeBotDetail(detail)
   return true
 end
 
-local function InsertBridgeNameUnique(list, name)
-  if type(list) ~= "table" or type(name) ~= "string" or name == "" then
-    return
-  end
-
-  for _, existing in ipairs(list) do
-    if existing == name then
-      return
-    end
-  end
-
-  table.insert(list, name)
-end
 
 local function RequestBridgeUnitsRelayout()
   if MultiBot._bridgeUnitsRelayoutPending then
