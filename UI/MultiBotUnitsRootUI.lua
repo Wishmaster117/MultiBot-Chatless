@@ -958,6 +958,8 @@ local function runGuildLifecycleByGuid(button, action, guid)
             button._mbGuildResolvedGuid = tonumber(result.guid) or button._mbGuildResolvedGuid
         end
 
+        -- MB_GUILD_LIFECYCLE_STATUS_GATE_V1_BEGIN
+        local status = result and string.upper(tostring(result.status or "")) or ""
         local lifecycleState = result and string.upper(tostring(result.lifecycleState or "")) or ""
         if action == "DISCONNECT"
             and lifecycleState ~= "OFFLINE"
@@ -967,11 +969,13 @@ local function runGuildLifecycleByGuid(button, action, guid)
             MultiBot.SetGuildRosterManualOffline(button, false)
         end
 
-        if lifecycleState == "ONLINE" or lifecycleState == "OFFLINE" then
+        if status == "OK"
+            and (lifecycleState == "ONLINE" or lifecycleState == "OFFLINE") then
             applyGuildBridgeState(button, lifecycleState)
         else
             button._mbGuildBridgeState = nil
         end
+        -- MB_GUILD_LIFECYCLE_STATUS_GATE_V1_END
 
         requestGuildRosterRefresh()
     end)
