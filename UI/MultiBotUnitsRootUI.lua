@@ -249,6 +249,29 @@ local function applySocialRosterPresence(button, roster, name, online)
     setSocialRosterVisual(button, state)
 end
 
+-- MB_SOCIAL_CACHE_ROSTER_SWITCH_V1_BEGIN
+local function applyCachedSocialRosterPresence(unitsFrame, roster, display)
+    if roster ~= "members" and roster ~= "friends" then
+        return
+    end
+
+    local presence = ensureSocialRosterPresence()[roster]
+    if type(presence) ~= "table" then
+        return
+    end
+
+    for index = 1, #display do
+        local name = display[index]
+        local state = presence[name]
+        local button = unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]
+
+        if button and (state == "ONLINE" or state == "OFFLINE") then
+            applySocialRosterPresence(button, roster, name, state == "ONLINE")
+        end
+    end
+end
+-- MB_SOCIAL_CACHE_ROSTER_SWITCH_V1_END
+
 local function orderSocialRosterDisplay(roster, display)
     if roster ~= "members" and roster ~= "friends" then
         return display
@@ -649,6 +672,7 @@ local function relayoutUnitsDisplay(unitsButton, unitsFrame)
     local display = getDisplayableUnits(unitsFrame, sourceTable)
 
     if unitsButton.roster == "members" or unitsButton.roster == "friends" then
+        applyCachedSocialRosterPresence(unitsFrame, unitsButton.roster, display)
         display = orderSocialRosterDisplay(unitsButton.roster, display)
     end
 
