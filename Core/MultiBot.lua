@@ -3812,9 +3812,12 @@ function MultiBot.ApplyBridgeBotState(name, combat, normal)
     return true
   end
 
-  local isOnline = MultiBot.IsUnitBotOnline
-      and MultiBot.IsUnitBotOnline(button, name)
-      or button.state == true
+  -- MB_BRIDGE_ONLINE_FALLBACK_V1_BEGIN
+  local isOnline = (
+      (MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(button, name))
+      or (not MultiBot.IsUnitBotOnline and button.state == true)
+  )
+  -- MB_BRIDGE_ONLINE_FALLBACK_V1_END
 
   if isOnline and (existingFrame or IsBridgeUnitDisplayedNow(name)) then
     BuildBridgeUnitFrame(units, button, name, button.combat, button.normal, true)
