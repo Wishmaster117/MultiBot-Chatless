@@ -2009,7 +2009,8 @@ local function addRosterMemberButton(member, socialRoster)
     end
 end
 
-local function rebuildGuildAndFriendIndexes(button)
+-- MB_SOCIAL_REFRESH_REQUEST_CONSUME_SEPARATION_V1_BEGIN
+local function rebuildGuildAndFriendIndexes(button, requestRemoteRefresh)
     local isGuildRetry = button._guildRosterRetrying == true
     button._guildRosterRetrying = false
     local retryCount = tonumber(button._guildRosterRetryCount) or 0
@@ -2034,11 +2035,15 @@ local function rebuildGuildAndFriendIndexes(button)
         end
     end
 
-    if inGuild and type(GuildRoster) == "function" then
-        GuildRoster()
-    end
-    if type(ShowFriends) == "function" then
-        ShowFriends()
+    -- Event-driven rebuilds consume the caches that triggered the event.
+    -- Only explicit refresh paths may initiate another server refresh.
+    if requestRemoteRefresh then
+        if inGuild and type(GuildRoster) == "function" then
+            GuildRoster()
+        end
+        if type(ShowFriends) == "function" then
+            ShowFriends()
+        end
     end
 
     local _, unitsFrame = getUnitsRootObjects(button)
@@ -2110,6 +2115,7 @@ local function rebuildGuildAndFriendIndexes(button)
     configureRosterRetry(button, isGuildRetry, retryCount, needGuildRetry)
     return isGuildRetry
 end
+-- MB_SOCIAL_REFRESH_REQUEST_CONSUME_SEPARATION_V1_END
 
 -- MB_ADDON_ROSTER_COHERENCE_D1_EVENTS_BEGIN
 local socialRosterEventPending = false
@@ -2128,7 +2134,9 @@ local function scheduleSocialRosterRefresh()
         local unitsFrame = multiBar and multiBar.frames and multiBar.frames[UNITS_FRAME_NAME]
 
         if unitsButton and unitsFrame then
-            rebuildGuildAndFriendIndexes(unitsButton)
+            -- Consume GUILD_ROSTER_UPDATE / FRIENDLIST_UPDATE without
+            -- initiating another GuildRoster()/ShowFriends() request.
+            rebuildGuildAndFriendIndexes(unitsButton, false)
             if unitsButton.roster == "members" or unitsButton.roster == "friends" then
                 relayoutUnitsDisplay(unitsButton, unitsFrame)
             end
@@ -2334,7 +2342,8 @@ local function requestRosterRefreshIfNeeded(button, isGuildRetry)
 end
 
 local function onUnitsButtonRightClick(button)
-    local isGuildRetry = rebuildGuildAndFriendIndexes(button)
+    -- Explicit roster refresh may initiate Guild/Friends cache requests.
+    local isGuildRetry = rebuildGuildAndFriendIndexes(button, true)
     requestRosterRefreshIfNeeded(button, isGuildRetry)
 
     button.doLeft(button, button.roster, button.filter)
