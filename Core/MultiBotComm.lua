@@ -106,6 +106,8 @@ local GROUP_ROLL_MAX_ITEM_LINK_LENGTH = 160
 local STATE_TIMEOUT_SECONDS = 5.0
 local STATES_TIMEOUT_SECONDS = 15.0
 local STRATEGY_MUTATION_TIMEOUT_SECONDS = 5.0
+Comm._GROUP_ORDER_TIMEOUT_SECONDS = 5.0
+Comm._GROUP_ORDER_MAX_ACTIVE = 8
 local SELF_STRATEGY_MUTATION_TIMEOUT_SECONDS = 10.0
 local SELF_ACTION_TIMEOUT_SECONDS = 10.0
 local STRATEGY_MUTATION_MAX_ACTIVE = 32
@@ -1849,6 +1851,90 @@ local function validateStrategyMutationChanges(changes)
 
   return table.concat(normalized, ",")
 end
+
+-- MB_FOLLOW_STAY_ORDER_V1_TX_BEGIN
+function Comm._FinishGroupOrderCommand(token, result)
+  local state = ensureBridgeState()
+  state.groupOrderCommands = state.groupOrderCommands or {}
+
+  local pending = state.groupOrderCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.groupOrderCommands[token] = nil
+  result = type(result) == "table" and result or {}
+  result.token = token
+  result.order = result.order or pending.order
+
+  if type(pending.callback) == "function" then
+    pending.callback(result)
+  end
+
+  if MultiBot.OnGroupOrderApplied then
+    MultiBot.OnGroupOrderApplied(result.order, result)
+  end
+
+  return true
+end
+
+function Comm.RunGroupOrderCommand(order, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "GROUP_ORDER_NOT_CONNECTED"
+    return false
+  end
+
+  order = string.upper(trim(order or ""))
+  if order ~= "FOLLOW" and order ~= "STAY" then
+    state.lastError = "GROUP_ORDER_INVALID"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "GROUP_ORDER_BUSY"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-group-order-" .. tostring(state.groupOrderSeq)
+  state.groupOrderCommands[token] = {
+    order = order,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("RUN", order .. "_ORDER~" .. token) then
+    state.groupOrderCommands[token] = nil
+    state.lastError = "GROUP_ORDER_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    if not bridge.groupOrderCommands[token] then
+      return
+    end
+
+    bridge.lastError = "GROUP_ORDER_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      matched = 0,
+      succeeded = 0,
+      failed = 0,
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+-- MB_FOLLOW_STAY_ORDER_V1_TX_END
 
 local function finishStrategyMutationCommand(token, result)
   local state = ensureBridgeState()
@@ -9763,6 +9849,65 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     })
     return true
   end
+
+  -- MB_FOLLOW_STAY_ORDER_V1_RX_BEGIN
+  if opcode == "FOLLOW_ORDER_ACK" or opcode == "STAY_ORDER_ACK" then
+    local fields = splitFields(payload or "")
+    if #fields ~= 5 then
+      state.lastError = "GROUP_ORDER_ACK_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = fields[1]
+    local matched = tonumber(fields[2])
+    local succeeded = tonumber(fields[3])
+    local failed = tonumber(fields[4])
+    local reason = fields[5]
+    local order = opcode == "FOLLOW_ORDER_ACK" and "FOLLOW" or "STAY"
+    state.groupOrderCommands = state.groupOrderCommands or {}
+    local pending = state.groupOrderCommands[token]
+
+    local countsValid = matched and succeeded and failed
+      and matched >= 0 and matched <= 40 and math.floor(matched) == matched
+      and succeeded >= 0 and succeeded <= matched and math.floor(succeeded) == succeeded
+      and failed >= 0 and failed <= matched and math.floor(failed) == failed
+      and succeeded + failed == matched
+
+    if not isValidStateToken(token)
+        or not countsValid
+        or type(reason) ~= "string"
+        or reason == ""
+        or string.len(reason) > 32
+        or not string.match(reason, "^[A-Z0-9_]+$")
+        or type(pending) ~= "table"
+        or pending.order ~= order then
+      state.lastError = "GROUP_ORDER_ACK_INVALID"
+      return true
+    end
+
+    state.connected = true
+    state.lastError = reason == "OK" and nil or ("GROUP_ORDER_" .. reason)
+    debugPrint("ADDON:RX", opcode, payload or "")
+
+    local status = "failed"
+    if matched == 0 then
+      status = "empty"
+    elseif failed == 0 and succeeded == matched then
+      status = "ok"
+    elseif succeeded > 0 then
+      status = "partial"
+    end
+
+    Comm._FinishGroupOrderCommand(token, {
+      status = status,
+      matched = matched,
+      succeeded = succeeded,
+      failed = failed,
+      reason = reason,
+    })
+    return true
+  end
+  -- MB_FOLLOW_STAY_ORDER_V1_RX_END
 
   if opcode == "RTI_ACK" then
     state.connected = true

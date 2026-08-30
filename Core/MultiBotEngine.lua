@@ -824,7 +824,26 @@ MultiBot.ActionToTargetOrGroup = function(pAction)
 	return false
 end
 
-MultiBot.ActionToGroup = function(pAction)
+MultiBot.ActionToGroup = function(pAction, onComplete)
+	-- MB_FOLLOW_STAY_ORDER_V1_ROUTE_BEGIN
+	local normalizedGroupOrder = type(pAction) == "string" and string.lower(pAction) or ""
+	if(normalizedGroupOrder == "follow" or normalizedGroupOrder == "stay") then
+		if(not MultiBot.bridge
+			or MultiBot.bridge.connected ~= true
+			or not MultiBot.Comm
+			or type(MultiBot.Comm.RunGroupOrderCommand) ~= "function") then
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "GROUP_ORDER_UNAVAILABLE" end
+			return false, "blocked"
+		end
+
+		local token = MultiBot.Comm.RunGroupOrderCommand(string.upper(normalizedGroupOrder), onComplete)
+		if(token ~= false and token ~= nil) then
+			return true, "pending", token
+		end
+
+		return false, "blocked"
+	end
+	-- MB_FOLLOW_STAY_ORDER_V1_ROUTE_END
 	if(GetNumRaidMembers() > 5) then
 		local route = _mbRouteStrategyMutation(pAction, "RAID", "")
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then
