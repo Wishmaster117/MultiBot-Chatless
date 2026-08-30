@@ -2619,32 +2619,27 @@ local function createInviteControls(controlFrame)
     end
 end
 
+-- MB_CANONICAL_PAGINATION_ORDER_A2_V1_BEGIN
 local function createBrowseButton(controlFrame)
     controlFrame.addButton("Browse", 0, 180, "Interface\\AddOns\\MultiBot\\Icons\\browse.blp", MultiBot.L("tips.units.browse"))
         .doLeft = function()
             local unitsButton = MultiBot.frames.MultiBar.buttons[UNITS_BUTTON_NAME]
             local unitsFrame = unitsButton.parent.frames[UNITS_FRAME_NAME]
-            local sourceTable = getUnitsSourceTable(unitsButton)
-            local total = sourceTable and #sourceTable or 0
-            if total == 0 then
+            local total = tonumber(unitsButton.limit) or 0
+            if total <= 0 then
                 return
             end
 
-            local fromIndex = (unitsButton.to or UNITS_PAGE_SIZE) + 1
-            local toIndex = fromIndex + UNITS_PAGE_SIZE - 1
+            local fromIndex = (tonumber(unitsButton.to) or UNITS_PAGE_SIZE) + 1
             if fromIndex > total then
                 fromIndex = 1
-                toIndex = math.min(UNITS_PAGE_SIZE, total)
-            end
-            if toIndex > total then
-                toIndex = total
             end
 
-            local display = getDisplayableUnits(unitsFrame, sourceTable)
-            hideTrackedVisibleUnits(unitsButton, unitsFrame)
-            layoutVisibleUnits(unitsButton, unitsFrame, display, fromIndex, math.min(toIndex, #display))
+            unitsButton.from = fromIndex
+            relayoutUnitsDisplay(unitsButton, unitsFrame)
         end
 end
+-- MB_CANONICAL_PAGINATION_ORDER_A2_V1_END
 
 function MultiBot.InitializeUnitsRootUI(tMultiBar)
     if not tMultiBar or not tMultiBar.addButton or not tMultiBar.addFrame then
