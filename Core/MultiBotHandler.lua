@@ -75,6 +75,10 @@ local function ReconnectExistingGroupBots(reason)
 		return false
 	end
 
+	if not (MultiBot and MultiBot.allowLegacyChatFallback == true) then
+		return false
+	end
+
 	if MultiBot._groupReconnectDone then
 		return false
 	end
@@ -965,6 +969,10 @@ local function bindUnitToggleHandlers(button, options)
 			return
 		end
 
+		if not LegacyChatFallbackEnabled() then
+			return
+		end
+
 		SendChatMessage(".playerbot bot remove " .. pButton.name, "SAY")
 		hideButtonUnitFrame(pButton)
 		pButton.setDisable()
@@ -976,6 +984,10 @@ local function bindUnitToggleHandlers(button, options)
 				MultiBot.ShowHideSwitch(pButton.parent.frames[pButton.name])
 			end
 		else
+			if not LegacyChatFallbackEnabled() then
+				return
+			end
+
 			SendChatMessage(".playerbot bot add " .. pButton.name, "SAY")
 			pButton.setEnable()
 		end
@@ -1731,6 +1743,10 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				else
 					break
 				end
+			end
+
+			if not LegacyChatFallbackEnabled() then
+				return
 			end
 
 			-- REFRESH:RAID --

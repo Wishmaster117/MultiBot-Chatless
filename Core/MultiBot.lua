@@ -2509,6 +2509,10 @@ function MultiBot.BindUnitToggleHandlers(button, options)
       return
     end
 
+    if MultiBot.allowLegacyChatFallback ~= true then
+      return
+    end
+
     SendChatMessage(".playerbot bot remove " .. unitButton.name, "SAY")
     if MultiBot.SetBridgeBotOnlineState and unitButton.bridge ~= nil then
       MultiBot.SetBridgeBotOnlineState(unitButton, false)
@@ -2562,6 +2566,10 @@ function MultiBot.BindUnitToggleHandlers(button, options)
         and IsBridgeRosterBotActive(unitButton.name)
         and MultiBot.TryStructuredGroupReconnect
         and MultiBot.TryStructuredGroupReconnect(unitButton) then
+      return
+    end
+
+    if MultiBot.allowLegacyChatFallback ~= true then
       return
     end
 

@@ -1894,6 +1894,10 @@ local function addRosterMemberButton(member, socialRoster)
 
             -- Preserve the pre-existing fallback only when structured
             -- lifecycle capabilities are unavailable.
+            if MultiBot.allowLegacyChatFallback ~= true then
+                return
+            end
+
             SendChatMessage(".playerbot bot remove " .. button.name, "SAY")
             if MultiBot.SetBridgeBotOnlineState and button.bridge ~= nil then
                 MultiBot.SetBridgeBotOnlineState(button, false)
@@ -1925,6 +1929,9 @@ local function addRosterMemberButton(member, socialRoster)
             return
         end
         if button.state == false then
+            return
+        end
+        if MultiBot.allowLegacyChatFallback ~= true then
             return
         end
         button._mbSocialForceCollapsed = true
@@ -1962,6 +1969,10 @@ local function addRosterMemberButton(member, socialRoster)
                 return
             end
 
+            if MultiBot.allowLegacyChatFallback ~= true then
+                return
+            end
+
             SendChatMessage(".playerbot bot add " .. button.name, "SAY")
             if button.setEnable then
                 button.setEnable()
@@ -1993,8 +2004,8 @@ local function addRosterMemberButton(member, socialRoster)
             return
         end
 
-        button._mbSocialForceCollapsed = false
         if button.state then
+            button._mbSocialForceCollapsed = false
             if button.parent.frames[button.name] ~= nil then
                 if button._mbGroupRejoinCollapsed == true then
                     button._mbGroupRejoinCollapsed = false
@@ -2004,6 +2015,11 @@ local function addRosterMemberButton(member, socialRoster)
             return
         end
 
+        if MultiBot.allowLegacyChatFallback ~= true then
+            return
+        end
+
+        button._mbSocialForceCollapsed = false
         SendChatMessage(".playerbot bot add " .. button.name, "SAY")
         button.setEnable()
     end
