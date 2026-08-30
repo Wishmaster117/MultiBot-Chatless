@@ -844,6 +844,40 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 		return false, "blocked"
 	end
 	-- MB_FOLLOW_STAY_ORDER_V1_ROUTE_END
+
+	-- MB_ATTACK_ORDER_V1_ROUTE_BEGIN
+	local attackAudience = nil
+	if(normalizedGroupOrder == "do attack my target") then
+		attackAudience = "ALL"
+	elseif(normalizedGroupOrder == "@tank do attack my target") then
+		attackAudience = "TANK"
+	elseif(normalizedGroupOrder == "@healer do attack my target") then
+		attackAudience = "HEALER"
+	elseif(normalizedGroupOrder == "@dps do attack my target") then
+		attackAudience = "DPS"
+	elseif(normalizedGroupOrder == "@melee do attack my target") then
+		attackAudience = "MELEE"
+	elseif(normalizedGroupOrder == "@ranged do attack my target") then
+		attackAudience = "RANGED"
+	end
+
+	if(attackAudience ~= nil) then
+		if(not MultiBot.bridge
+			or MultiBot.bridge.connected ~= true
+			or not MultiBot.Comm
+			or type(MultiBot.Comm.RunAttackOrderCommand) ~= "function") then
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "ATTACK_ORDER_UNAVAILABLE" end
+			return false, "blocked"
+		end
+
+		local token = MultiBot.Comm.RunAttackOrderCommand(attackAudience, onComplete)
+		if(token ~= false and token ~= nil) then
+			return true, "pending", token
+		end
+
+		return false, "blocked"
+	end
+	-- MB_ATTACK_ORDER_V1_ROUTE_END
 	if(GetNumRaidMembers() > 5) then
 		local route = _mbRouteStrategyMutation(pAction, "RAID", "")
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then

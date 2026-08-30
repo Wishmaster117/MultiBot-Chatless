@@ -282,26 +282,125 @@ Cela évite :
 
 ---
 
-## 5. Prochain chantier normal
+## 5. Clôture ordres collectifs Follow / Stay / Attack — 30/08/2026
 
-### Audit ciblé `follow` / `attack` / `stay`
-
-Le prochain chantier fonctionnel recommandé est :
+### Capacités livrées
 
 ```text
-audit ciblé des ordres collectifs follow / attack / stay
+FOLLOW_ORDER_V1
+STAY_ORDER_V1
+ATTACK_ORDER_V1
 ```
 
-Avant toute conception :
+Les trois ordres sont désormais migrés vers des chemins Bridge spécialisés.
 
-- vérifier les sélecteurs/actions/API Playerbots réels ;
-- vérifier les scopes réellement supportés ;
-- vérifier le comportement groupe/raid ;
-- identifier les dépendances chat actuelles ;
-- vérifier permissions et états runtime ;
-- ne pas concevoir d'endpoint générique `RUN~ORDER` à l'aveugle.
+Architecture validée :
 
-Aucun nouveau code avant audit + analyse + validation utilisateur.
+```text
+UI Addon
+  -> route spécialisée dans ActionToGroup
+  -> RUN structuré
+  -> endpoint Bridge borné
+  -> API/action Playerbots auditée
+  -> ACK structuré
+```
+
+Aucun exécuteur générique `RUN~ORDER` n'a été ajouté. Les trois routes structurées passent avant le fallback legacy PARTY/RAID, qui reste disponible uniquement pour les commandes non migrées et les usages volontairement conservés.
+
+### Follow / Stay
+
+Requêtes :
+
+```text
+RUN~FOLLOW_ORDER~<token>
+RUN~STAY_ORDER~<token>
+```
+
+ACK :
+
+```text
+FOLLOW_ORDER_ACK~<token>~<matched>~<succeeded>~<failed>~<reason>
+STAY_ORDER_ACK~<token>~<matched>~<succeeded>~<failed>~<reason>
+```
+
+Le Bridge réutilise les actions Playerbots auditées `follow chat shortcut` et `stay chat shortcut` sans passer par `HandleCommand()`. Le scope est dérivé du groupe réel du requester côté serveur, avec contrôles de sécurité, rate limit et anti-rejeu.
+
+### Attack
+
+Requête :
+
+```text
+RUN~ATTACK_ORDER~<token>~<audience>
+```
+
+ACK :
+
+```text
+ATTACK_ORDER_ACK~<token>~<audience>~<matched>~<succeeded>~<failed>~<reason>
+```
+
+Audiences validées :
+
+```text
+ALL
+TANK
+HEALER
+DPS
+MELEE
+RANGED
+```
+
+Sémantique conservée depuis le `StrategyChatFilter` Playerbots audité :
+
+```text
+TANK   = IsTank(bot)
+HEALER = IsHeal(bot)
+DPS    = !IsTank(bot) && !IsHeal(bot)
+RANGED = IsRanged(bot)
+MELEE  = !IsRanged(bot)
+ALL    = aucun filtre de rôle
+```
+
+La cible est autoritative côté serveur :
+
+```text
+requester->GetTarget()
+```
+
+Le Bridge n'utilise pas `DoSpecificAction("attack my target")`, car l'action Playerbots correspondante résout la cible via le master du bot. Un adaptateur local au Bridge expose donc `AttackAction::Attack(Unit*)` afin d'appliquer explicitement la cible du requester sans modifier Playerbots.
+
+`WaitForAttackStrategy::ShouldWait()` peut différer l'appel physique `bot->Attack()` après acceptation de l'ordre. Le succès Bridge représente donc l'acceptation et l'application de l'état/target de combat, pas l'obligation que `GetVictim()` pointe immédiatement sur la cible.
+
+Aucun changement CMake n'a été nécessaire : le projet généré `modules.vcxproj` expose déjà les include paths Playerbots nécessaires à `AttackAction.h`.
+
+### Sécurité et limites communes
+
+Les endpoints GroupOrder réutilisent les protections communes validées :
+
+- groupe du requester dérivé côté serveur ;
+- bots Bridge-visible du même groupe ;
+- `PLAYERBOT_SECURITY_ALLOW_ALL` par bot ;
+- session/world/runtime vérifiés ;
+- limite de bots bornée ;
+- rate limiting partagé ;
+- token anti-rejeu ;
+- ACK technique uniquement via le Bridge.
+
+### Validation finale
+
+- Follow/Stay runtime validés ;
+- Attack compilé sans rerun CMake ;
+- worldserver redémarré ;
+- Attack runtime validé sur les audiences testées ;
+- `ATTACK_ORDER_ACK` observé dans les logs Bridge ;
+- `MultiBotComm.lua` maintenu à **199 locals main-chunk** ;
+- aucun `HandleCommand()` dans les blocs Follow/Stay/Attack ;
+- aucun `RUN~ORDER` générique ;
+- Playerbots resté strictement inchangé.
+
+### Suite recommandée
+
+Continuer l'audit **famille par famille** des derniers chemins automatiques classés `CONTROL/PARSING` encore dépendants du chat. Ne pas déclarer le projet fully chatless tant que les occurrences restantes de `SendChatMessage` n'ont pas été classées et validées.
 
 ---
 
@@ -497,6 +596,10 @@ Cette section conserve uniquement les preuves structurantes utiles à la reprise
 
 | Référence | SHA-256 | Portée |
 | --- | --- | --- |
+| `audit-multibot-follow-stay-final-pre-branch-v1c-2026-08-30-181420.zip` | `D0351714C289392B635CB68992AA31D043C17043C0111839884E6126333F11ED` | Clôture Follow/Stay structurés, runtime validé, 199 locals main-chunk et Playerbots intact. |
+| `audit-multibot-attack-selectors-bridge-migration-v1-2026-08-30-182703.zip` | `B69122E485CF725B1852A6AB3D7752A923E4A0366E0201617A99839DF9BD0202` | Sémantique exacte des audiences Attack et dépendance `AttackMyTargetAction` au master. |
+| `audit-multibot-attack-wait-build-access-v2b-2026-08-30-184309.zip` | `702758ABD0AED5A485391EB23CF9D1FCE9C38977017BEA49B2A865828D797BDF` | `WaitForAttackStrategy`, faisabilité `AttackAction::Attack(Unit*)` et include paths build confirmés. |
+| `audit-multibot-group-orders-attack-final-pre-commit-v1-2026-08-30-195459.zip` | `BA45BC56CDD6B8392A6DB236340BEDA8D78AD4B2DBB6484C74CB064462F07F9F` | Audit final Follow/Stay/Attack, build/runtime Attack validés, aucun parser générique. |
 | `audit-multibot-alt-roster-lifecycle-post-merge-v1-2026-08-30-143746.zip` | `4FCF642996BDC8B279155EF9018637AA44E4D83F1B0109CC4065A62441B91B8A` | Clôture post-merge Addon #75 / Bridge #34, `main` synchronisés et Playerbots intact. |
 | `checkpoint-multibot-friends-favorites-lifecycle-v1-2026-08-29-232823.zip` | `CB90287ED1FCD7D808D83FD22607D1420061642F1478FDCA3278CF1C13271512` | Checkpoint roster Friends/Favorites avant clôture lifecycle. |
 | `audit-multibot-item-move-drag-ghost-final-v1-2026-08-16-183942.zip` | `2F149A2CAE53FD839FB077C4E2E1298E389038AF4737F061EAC5E594D05D1C3A` | Validation finale UX drag/drop `ITEM_MOVE_V1`. |

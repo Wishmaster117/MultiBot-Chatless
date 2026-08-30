@@ -1936,6 +1936,72 @@ function Comm.RunGroupOrderCommand(order, callback)
 end
 -- MB_FOLLOW_STAY_ORDER_V1_TX_END
 
+-- MB_ATTACK_ORDER_V1_TX_BEGIN
+function Comm.RunAttackOrderCommand(audience, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "ATTACK_ORDER_NOT_CONNECTED"
+    return false
+  end
+
+  audience = string.upper(trim(audience or ""))
+  if audience ~= "ALL"
+      and audience ~= "TANK"
+      and audience ~= "HEALER"
+      and audience ~= "DPS"
+      and audience ~= "MELEE"
+      and audience ~= "RANGED" then
+    state.lastError = "ATTACK_ORDER_BAD_AUDIENCE"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "ATTACK_ORDER_BUSY"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-attack-order-" .. tostring(state.groupOrderSeq)
+  state.groupOrderCommands[token] = {
+    order = "ATTACK",
+    audience = audience,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("RUN", "ATTACK_ORDER~" .. token .. "~" .. audience) then
+    state.groupOrderCommands[token] = nil
+    state.lastError = "ATTACK_ORDER_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    if not bridge.groupOrderCommands[token] then
+      return
+    end
+
+    bridge.lastError = "ATTACK_ORDER_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      audience = audience,
+      matched = 0,
+      succeeded = 0,
+      failed = 0,
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+-- MB_ATTACK_ORDER_V1_TX_END
+
 local function finishStrategyMutationCommand(token, result)
   local state = ensureBridgeState()
   local pending = state.strategyMutationCommands[token]
@@ -9908,6 +9974,87 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
   -- MB_FOLLOW_STAY_ORDER_V1_RX_END
+
+  -- MB_ATTACK_ORDER_V1_RX_BEGIN
+  if opcode == "ATTACK_ORDER_ACK" then
+    local fields = splitFields(payload or "")
+    if #fields ~= 6 then
+      state.lastError = "ATTACK_ORDER_ACK_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = fields[1]
+    local audience = fields[2]
+    local matched = tonumber(fields[3])
+    local succeeded = tonumber(fields[4])
+    local failed = tonumber(fields[5])
+    local reason = fields[6]
+    state.groupOrderCommands = state.groupOrderCommands or {}
+    local pending = state.groupOrderCommands[token]
+
+    local audienceValid = audience == "ALL"
+      or audience == "TANK"
+      or audience == "HEALER"
+      or audience == "DPS"
+      or audience == "MELEE"
+      or audience == "RANGED"
+
+    local countsValid = matched and succeeded and failed
+      and matched >= 0 and matched <= 40 and math.floor(matched) == matched
+      and succeeded >= 0 and succeeded <= matched and math.floor(succeeded) == succeeded
+      and failed >= 0 and failed <= matched and math.floor(failed) == failed
+      and succeeded + failed == matched
+
+    local reasonValid = reason == "OK"
+      or reason == "BAD_AUDIENCE"
+      or reason == "RATE_LIMIT"
+      or reason == "REPLAY"
+      or reason == "NO_GROUP"
+      or reason == "NO_TARGET"
+      or reason == "NO_BOTS"
+      or reason == "BOT_LIMIT"
+      or reason == "PARTIAL"
+      or reason == "FAILED"
+
+    if not isValidStateToken(token)
+        or not audienceValid
+        or not countsValid
+        or not reasonValid
+        or type(pending) ~= "table"
+        or pending.order ~= "ATTACK"
+        or pending.audience ~= audience then
+      state.lastError = "ATTACK_ORDER_ACK_INVALID"
+      return true
+    end
+
+    state.connected = true
+    if reason == "OK" then
+      state.lastError = nil
+    else
+      state.lastError = "ATTACK_ORDER_" .. reason
+    end
+    debugPrint("ADDON:RX", opcode, payload or "")
+
+    local status = "failed"
+    if reason == "OK" and matched > 0 and failed == 0 and succeeded == matched then
+      status = "ok"
+    elseif reason == "NO_BOTS" and matched == 0 then
+      status = "empty"
+    elseif succeeded > 0 then
+      status = "partial"
+    end
+
+    Comm._FinishGroupOrderCommand(token, {
+      status = status,
+      audience = audience,
+      matched = matched,
+      succeeded = succeeded,
+      failed = failed,
+      reason = reason,
+    })
+    return true
+  end
+  -- MB_ATTACK_ORDER_V1_RX_END
 
   if opcode == "RTI_ACK" then
     state.connected = true

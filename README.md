@@ -77,7 +77,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Enchanting** | Dedicated Enchanting Trade Service using the native WoW Trade workflow. |
 | **Quests** | Bridge-backed quest list and structured bot quest abandon. Native quest sharing remains available. |
 | **Loot** | Structured loot profiles and exact persistent always-loot item add/remove. |
-| **Group tools** | Formation, Roll, RTI, Pull Control, Disperse and other migrated group controls. |
+| **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1` and `ATTACK_ORDER_V1` collective orders. Attack keeps the validated Tank / Healer / DPS / Melee / Ranged audiences. |
 | **Character information** | Bot skills, reputations, currencies/emblems, spellbook, stats and PvP stats. |
 | **Outfits** | Outfit listing and actions through the Bridge. |
 | **SelfBot** | Dedicated enable/disable, strategy and selected action support. |
@@ -142,6 +142,9 @@ SELF_ACTION_V1
 ALT_ROSTER_V1
 BOT_LIFECYCLE_V1
 BOT_TARGET_RESOLVE_V1
+FOLLOW_ORDER_V1
+STAY_ORDER_V1
+ATTACK_ORDER_V1
 ```
 
 The exact protocol is an implementation detail of the addon and Bridge. The normal user experience should remain UI-driven.
@@ -199,15 +202,9 @@ The major read paths and a large part of the action surface are now bridge-first
 
 The project is **not declared fully chatless yet**. Remaining `SendChatMessage` paths are handled family by family so that useful manual commands are not removed accidentally and legacy compatibility is not broken without testing.
 
-The next normal roadmap item is a targeted audit of collective:
+Collective **Follow**, **Stay** and **Attack** are now bridge-first and runtime validated through dedicated structured endpoints. Their exact UI commands are routed before the legacy PARTY/RAID chat fallback, and no generic arbitrary Playerbots command executor is used.
 
-```text
-follow
-attack
-stay
-```
-
-No generic arbitrary Playerbots command executor is planned.
+The next normal work is to continue auditing the remaining automatic `CONTROL/PARSING` chat paths family by family. The project therefore remains intentionally **mostly chatless**, not fully chatless.
 
 Detailed development history, audits, deferred work and technical residuals are tracked in the project documentation.
 
