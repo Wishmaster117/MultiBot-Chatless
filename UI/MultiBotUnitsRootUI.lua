@@ -2601,6 +2601,10 @@ local function createInviteControls(controlFrame)
         MultiBot.timer.invite.roster = MultiBot.frames["MultiBar"].buttons[UNITS_BUTTON_NAME].roster
         MultiBot.timer.invite.needs = #MultiBot.index[MultiBot.timer.invite.roster]
         MultiBot.timer.invite.index = 1
+        MultiBot.timer.invite.source = "BAR"
+        MultiBot.timer.invite.runId = (tonumber(MultiBot.timer.invite.runId) or 0) + 1
+        MultiBot.timer.invite.pending = false
+        MultiBot.timer.invite.pendingName = nil
         MultiBot.auto.invite = true
         SendChatMessage(MultiBot.L("info.starting"), "SAY")
     end
@@ -2628,6 +2632,10 @@ local function createInviteControls(controlFrame)
                 MultiBot.timer.invite.roster = MultiBot.frames["MultiBar"].buttons[UNITS_BUTTON_NAME].roster
                 MultiBot.timer.invite.needs = definition.needs(raidCount, partyCount)
                 MultiBot.timer.invite.index = 1
+                MultiBot.timer.invite.source = "BAR"
+                MultiBot.timer.invite.runId = (tonumber(MultiBot.timer.invite.runId) or 0) + 1
+                MultiBot.timer.invite.pending = false
+                MultiBot.timer.invite.pendingName = nil
                 MultiBot.auto.invite = true
                 button.parent:Hide()
                 SendChatMessage(MultiBot.L("info.starting"), "SAY")

@@ -148,34 +148,161 @@ function MultiBot.HandleOnUpdate(pElapsed)
 		MultiBot.auto.talent = false
 	end
 
+	-- MB_BAR_AUTOINVITE_STRUCTURED_V1_BEGIN
 	if(MultiBot.auto.invite and MultiBot.timer.invite.elapsed >= MultiBot.timer.invite.interval) then
-		local tTable = MultiBot.index[MultiBot.timer.invite.roster]
+		local invite = MultiBot.timer.invite
+		local tTable = MultiBot.index[invite.roster]
+		local inviteSource = (invite.roster == "raidus") and "RAIDUS" or invite.source
+		if inviteSource == nil then inviteSource = "BAR" end
+		invite.source = inviteSource
 
-		if(MultiBot.timer.invite.needs == 0 or MultiBot.timer.invite.index > #tTable) then
-			if(MultiBot.timer.invite.roster == "raidus") then
+		if inviteSource == "BAR" and invite.pending == true then
+			invite.elapsed = 0
+		elseif(invite.needs == 0 or invite.index > #tTable) then
+			if(inviteSource == "RAIDUS") then
 				MultiBot.timer.sort.elapsed = 0
 				MultiBot.timer.sort.index = 1
 				MultiBot.timer.sort.needs = 0
 				MultiBot.auto.sort = true
 			end
 
-			MultiBot.timer.invite.elapsed = 0
-			MultiBot.timer.invite.roster = ""
-			MultiBot.timer.invite.index = 1
-			MultiBot.timer.invite.needs = 0
+			invite.elapsed = 0
+			invite.roster = ""
+			invite.index = 1
+			invite.needs = 0
+			invite.source = nil
+			invite.pending = false
+			invite.pendingName = nil
 			MultiBot.auto.invite = false
 			return
-		end
+		else
+			local inviteName = tTable[invite.index]
+			if(MultiBot.isMember(inviteName) == false) then
+				if inviteSource == "BAR" then
+					local bridge = MultiBot and MultiBot.bridge
+					local structuredAvailable = bridge and bridge.connected == true
+						and bridge.botLifecycleCapable == true
+						and bridge.botTargetResolveCapable == true
+						and MultiBot.Comm
+						and type(MultiBot.Comm.ResolveBotTarget) == "function"
+						and type(MultiBot.Comm.RunBotLifecycle) == "function"
 
-		if(MultiBot.isMember(tTable[MultiBot.timer.invite.index]) == false) then
-			SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", tTable[MultiBot.timer.invite.index]), "SAY")
-			SendChatMessage(".playerbot bot add " .. tTable[MultiBot.timer.invite.index], "SAY")
-			MultiBot.timer.invite.needs = MultiBot.timer.invite.needs - 1
-		end
+					if structuredAvailable then
+						SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", inviteName), "SAY")
+						local runId = tonumber(invite.runId) or 0
+						invite.pending = true
+						invite.pendingName = inviteName
 
-		MultiBot.timer.invite.index = MultiBot.timer.invite.index + 1
-		MultiBot.timer.invite.elapsed = 0
+						local resolveToken = MultiBot.Comm.ResolveBotTarget(inviteName, function(result)
+							local live = MultiBot.timer.invite
+							if not MultiBot.auto.invite
+								or live.source ~= "BAR"
+								or (tonumber(live.runId) or 0) ~= runId
+								or live.pendingName ~= inviteName then
+								return
+							end
+
+							local function finishPending()
+								live.pending = false
+								live.pendingName = nil
+								live.elapsed = 0
+							end
+
+							if not result or result.status ~= "OK" then
+								finishPending()
+								return
+							end
+
+							local guid = tonumber(result.guid)
+							local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+							local reason = string.upper(tostring(result.reason or ""))
+
+							if lifecycleState == "ONLINE" or reason == "IN_USE" then
+								if MultiBot.isMember(inviteName) == false then
+									if GetNumPartyMembers() == 4 then ConvertToRaid() end
+									MultiBot.doSlash("/invite", inviteName)
+								end
+								finishPending()
+								return
+							end
+
+							if not guid or guid <= 0
+								or (lifecycleState ~= "OFFLINE" and lifecycleState ~= "CONNECTING") then
+								finishPending()
+								return
+							end
+
+							local lifecycleToken = MultiBot.Comm.RunBotLifecycle("CONNECT", guid, function(lifecycleResult)
+								local current = MultiBot.timer.invite
+								if not MultiBot.auto.invite
+									or current.source ~= "BAR"
+									or (tonumber(current.runId) or 0) ~= runId
+									or current.pendingName ~= inviteName then
+									return
+								end
+
+								local finalState = lifecycleResult and string.upper(tostring(lifecycleResult.lifecycleState or "")) or ""
+								if lifecycleResult and lifecycleResult.status == "OK"
+									and finalState == "ONLINE"
+									and MultiBot.isMember(inviteName) == false then
+									if GetNumPartyMembers() == 4 then ConvertToRaid() end
+									MultiBot.doSlash("/invite", inviteName)
+								end
+								current.pending = false
+								current.pendingName = nil
+								current.elapsed = 0
+							end)
+
+							if not lifecycleToken then
+								finishPending()
+							end
+						end)
+
+						if resolveToken then
+							invite.needs = invite.needs - 1
+							invite.index = invite.index + 1
+							invite.elapsed = 0
+						else
+							invite.elapsed = 0
+							invite.roster = ""
+							invite.index = 1
+							invite.needs = 0
+							invite.source = nil
+							invite.pending = false
+							invite.pendingName = nil
+							MultiBot.auto.invite = false
+						end
+					elseif LegacyChatFallbackEnabled() then
+						SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", inviteName), "SAY")
+						SendChatMessage(".playerbot bot add " .. inviteName, "SAY")
+						invite.needs = invite.needs - 1
+						invite.index = invite.index + 1
+						invite.elapsed = 0
+					else
+						invite.elapsed = 0
+						invite.roster = ""
+						invite.index = 1
+						invite.needs = 0
+						invite.source = nil
+						invite.pending = false
+						invite.pendingName = nil
+						MultiBot.auto.invite = false
+					end
+				else
+					-- Raidus keeps the historical transport until its dedicated migration.
+					SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", inviteName), "SAY")
+					SendChatMessage(".playerbot bot add " .. inviteName, "SAY")
+					invite.needs = invite.needs - 1
+					invite.index = invite.index + 1
+					invite.elapsed = 0
+				end
+			else
+				invite.index = invite.index + 1
+				invite.elapsed = 0
+			end
+		end
 	end
+	-- MB_BAR_AUTOINVITE_STRUCTURED_V1_END
 
 	if(MultiBot.auto.sort and MultiBot.timer.sort.elapsed >= MultiBot.timer.sort.interval) then
 		MultiBot.timer.sort.index = MultiBot.raidus.doRaidSort(MultiBot.timer.sort.index)
