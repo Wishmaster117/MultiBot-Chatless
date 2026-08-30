@@ -2255,6 +2255,11 @@ function MultiBot.TryStructuredGroupDisconnect(button)
     button._mbGroupResolvedGuid = guid
 
     if result.lifecycleState == "OFFLINE" then
+      -- MB_GROUP_ALREADY_OFFLINE_PENDING_CLEANUP_V1_BEGIN
+      -- No disconnect mutation is in flight: BOT_TARGET_RESOLVE already
+      -- confirmed OFFLINE, so release the UI latch immediately.
+      button._mbGroupDisconnectPending = nil
+      -- MB_GROUP_ALREADY_OFFLINE_PENDING_CLEANUP_V1_END
       button._mbGroupLifecyclePhase = nil
       if MultiBot.SetBridgeBotOnlineState then
         MultiBot.SetBridgeBotOnlineState(button, false)
