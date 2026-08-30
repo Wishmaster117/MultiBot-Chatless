@@ -4884,6 +4884,47 @@ function Comm.MarkDisconnected(reason)
   state.protocol = nil
   state.lastError = reason or nil
   state.capabilityBatchActive = false
+  -- MB_BOT_LIFECYCLE_DISCONNECT_CLEANUP_V1_BEGIN
+  -- Complete pending structured lifecycle work before discarding request
+  -- tables. This lets existing roster callbacks clear their own pending UI
+  -- flags instead of leaving shared buttons locked across world transitions.
+  local pendingResolveTokens = {}
+  for token in pairs(state.botTargetResolveCommands or {}) do
+    pendingResolveTokens[#pendingResolveTokens + 1] = token
+  end
+  for _, token in ipairs(pendingResolveTokens) do
+    finishBotTargetResolveCommand(state, token, {
+      token = token,
+      status = "ERR",
+      reason = "BRIDGE_DISCONNECTED",
+      name = "",
+      guid = 0,
+      lifecycleState = "UNKNOWN",
+      final = true,
+    })
+  end
+  state.botTargetResolveCommands = {}
+
+  local pendingLifecycleTokens = {}
+  for token in pairs(state.botLifecycleCommands or {}) do
+    pendingLifecycleTokens[#pendingLifecycleTokens + 1] = token
+  end
+  for _, token in ipairs(pendingLifecycleTokens) do
+    local command = state.botLifecycleCommands[token]
+    if type(command) == "table" then
+      finishBotLifecycleCommand(state, token, {
+        token = token,
+        guid = command.guid,
+        action = command.action,
+        status = "ERR",
+        reason = "BRIDGE_DISCONNECTED",
+        lifecycleState = command.action == "CONNECT" and "OFFLINE" or "ONLINE",
+        final = true,
+      })
+    end
+  end
+  state.botLifecycleCommands = {}
+  -- MB_BOT_LIFECYCLE_DISCONNECT_CLEANUP_V1_END
   state.inventoryActive = nil
   state.inventoryExactActive = nil
   state.inventoryExactSnapshots = {}
@@ -9936,10 +9977,8 @@ state.selfActionCapable = false
   state.altRosterCapable = false
   state.botLifecycleCapable = false
   state.botTargetResolveCapable = false
-  state.botTargetResolveCommands = {}
   state.altRoster = {}
   state.altRosterBatch = nil
-  state.botLifecycleCommands = {}
   state.selfBotCapable = false
   state.details = {}
   state.stats = {}
