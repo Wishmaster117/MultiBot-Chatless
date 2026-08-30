@@ -1034,6 +1034,45 @@ function Comm.RunBotLifecycle(action, guid, callback)
     state.botLifecycleCommands[token] = nil
     return nil
   end
+
+  -- MB_BOT_LIFECYCLE_INITIAL_TIMEOUT_V1_BEGIN
+  -- Arm the final client timeout as soon as the RUN request is accepted.
+  -- Polling still starts only after a Bridge PENDING reply; this timer exists
+  -- solely so a lost initial reply cannot leave the lifecycle token pending.
+  safeDelay(BOT_LIFECYCLE_TIMEOUT_SECONDS, function()
+    local live = ensureBridgeState()
+    local pending = live.botLifecycleCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    if live.connected ~= true then
+      finishBotLifecycleCommand(live, token, {
+        token = token,
+        guid = pending.guid,
+        action = pending.action,
+        status = "ERR",
+        reason = "BRIDGE_DISCONNECTED",
+        lifecycleState = pending.action == "CONNECT" and "OFFLINE" or "ONLINE",
+        final = true,
+      })
+      return
+    end
+
+    local lifecycleState = pending.action == "CONNECT" and "OFFLINE" or "ONLINE"
+    updateAltRosterEntryState(live, pending.guid, lifecycleState)
+    finishBotLifecycleCommand(live, token, {
+      token = token,
+      guid = pending.guid,
+      action = pending.action,
+      status = "ERR",
+      reason = "CLIENT_TIMEOUT",
+      lifecycleState = lifecycleState,
+      final = true,
+    })
+  end)
+  -- MB_BOT_LIFECYCLE_INITIAL_TIMEOUT_V1_END
+
   return token
 end
 
