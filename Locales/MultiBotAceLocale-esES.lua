@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local esESValues = {
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_BEGIN
+  ["raidus.pool.delete.confirm"] = "¿Eliminar a %s del pool de Raidus?\n\nEsta acción elimina únicamente la entrada guardada por MultiBot. El personaje del servidor no se elimina.",
+  ["tips.raidus.pool.interactions"] = "|cffffffffClic izquierdo: arrastrar y soltar|r\n|cffff4444Mayús + clic derecho: eliminar del pool de Raidus|r",
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_END
   -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
   ["loot.item.add"] = "Despojar siempre: añadir objeto",
   ["loot.item.remove"] = "Despojar siempre: retirar objeto",

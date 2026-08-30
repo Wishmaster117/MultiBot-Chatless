@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local zhCNValues = {
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_BEGIN
+  ["raidus.pool.delete.confirm"] = "从 Raidus 池中移除 %s？\n\n此操作只会删除 MultiBot 保存的条目，不会删除服务器上的角色。",
+  ["tips.raidus.pool.interactions"] = "|cffffffff左键：拖放|r\n|cffff4444Shift + 右键：从 Raidus 池中移除|r",
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_END
   -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
   ["loot.item.add"] = "始终拾取：添加物品",
   ["loot.item.remove"] = "始终拾取：移除物品",

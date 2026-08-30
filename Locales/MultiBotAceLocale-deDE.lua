@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local deDEValues = {
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_BEGIN
+  ["raidus.pool.delete.confirm"] = "%s aus dem Raidus-Pool entfernen?\n\nDadurch wird nur der von MultiBot gespeicherte Eintrag entfernt. Der Servercharakter wird nicht gelöscht.",
+  ["tips.raidus.pool.interactions"] = "|cffffffffLinksklick: ziehen und ablegen|r\n|cffff4444Umschalt + Rechtsklick: aus dem Raidus-Pool entfernen|r",
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_END
   -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
   ["loot.item.add"] = "Immer plündern: Gegenstand hinzufügen",
   ["loot.item.remove"] = "Immer plündern: Gegenstand entfernen",

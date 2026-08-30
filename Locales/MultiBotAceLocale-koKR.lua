@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local koKRValues = {
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_BEGIN
+  ["raidus.pool.delete.confirm"] = "Raidus 풀에서 %s 캐릭터를 제거하시겠습니까?\n\nMultiBot에 저장된 항목만 삭제됩니다. 서버의 캐릭터는 삭제되지 않습니다.",
+  ["tips.raidus.pool.interactions"] = "|cffffffff왼쪽 클릭: 끌어서 놓기|r\n|cffff4444Shift + 오른쪽 클릭: Raidus 풀에서 제거|r",
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_END
   -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
   ["loot.item.add"] = "항상 획득: 아이템 추가",
   ["loot.item.remove"] = "항상 획득: 아이템 제거",

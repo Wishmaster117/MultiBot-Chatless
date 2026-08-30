@@ -848,6 +848,37 @@ local function applyRaidusLayout(layout)
     end
 end
 
+-- MB_RAIDUS_POOL_DELETE_V1_BEGIN
+if StaticPopupDialogs then
+    StaticPopupDialogs["MULTIBOT_RAIDUS_DELETE_POOL_BOT"] = {
+        text = MultiBot.L("raidus.pool.delete.confirm"),
+        button1 = YES,
+        button2 = NO,
+        OnAccept = function(self)
+            local data = self and self.data
+            local name = data and data.name
+            if not name or name == "" or not MultiBot.RemoveGlobalBotEntry then
+                return
+            end
+
+            local currentLayout = parseRaidusLayoutData(serializeRaidusLayoutFromFrames())
+            if not MultiBot.RemoveGlobalBotEntry(name) then
+                return
+            end
+
+            if MultiBot.raidus.setRaidus then
+                MultiBot.raidus.setRaidus()
+                applyRaidusLayout(currentLayout)
+            end
+        end,
+        timeout = 0,
+        whileDead = 1,
+        hideOnEscape = 1,
+        preferredIndex = 3,
+    }
+end
+-- MB_RAIDUS_POOL_DELETE_V1_END
+
 local RAIDUS_ACTION_BAR_Y = raidusUsesAceWindow and 332 or 360
 local RAIDUS_ACTION_SHIFT_X = raidusUsesAceWindow and -20 or 0
 local RAIDUS_SORT_SHIFT_X = raidusUsesAceWindow and -55 or 0
@@ -1392,6 +1423,34 @@ MultiBot.raidus.setRaidus = function()
 			pButton.tip.addText("5", "|c" .. roleHex .. formatRaidusRoleLabel(botRole) .. "|r  |cff333333Score:|r |cffffdd55" .. botScore .. "|r", "BOTTOM", 0, 188, 15)
 			pButton.tip.addText("6", "|cff333333Talents:|r |cff505050" .. botTalents .. "|r", "BOTTOM", 0, 172, 14)
 			pButton.tip.addText("7", "|cff555555CASH - " .. tReward .. " - GOLD|h", "BOTTOM", 0, 154, 20)
+			-- MB_RAIDUS_TOOLTIP_INTERACTION_PANEL_V1_BEGIN
+			local interactionPanel = CreateFrame("Frame", nil, pButton.tip)
+			interactionPanel:SetPoint("BOTTOM", pButton.tip, "BOTTOM", 0, 96)
+			interactionPanel:SetSize(232, 54)
+			interactionPanel:EnableMouse(false)
+			interactionPanel:SetFrameLevel((pButton.tip:GetFrameLevel() or 0) + 2)
+
+			if interactionPanel.SetBackdrop then
+				interactionPanel:SetBackdrop({
+					bgFile = "Interface\\Buttons\\WHITE8X8",
+					edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+					tile = true,
+					tileSize = 8,
+					edgeSize = 10,
+					insets = { left = 3, right = 3, top = 3, bottom = 3 },
+				})
+				interactionPanel:SetBackdropColor(0, 0, 0, 0.82)
+				interactionPanel:SetBackdropBorderColor(1, 0.82, 0, 0.78)
+			end
+
+			local interactionText = interactionPanel:CreateFontString(nil, "ARTWORK")
+			interactionText:SetFont("Fonts\\ARIALN.ttf", 13, "PLAIN")
+			interactionText:SetPoint("CENTER", interactionPanel, "CENTER", 0, 0)
+			interactionText:SetWidth(214)
+			interactionText:SetJustifyH("CENTER")
+			interactionText:SetText(MultiBot.L("tips.raidus.pool.interactions"))
+			interactionText:Show()
+			-- MB_RAIDUS_TOOLTIP_INTERACTION_PANEL_V1_END
 			pButton.tip:Show()
 		end)
 
@@ -1460,6 +1519,19 @@ MultiBot.raidus.setRaidus = function()
             elseif button == "RightButton" then
                 local name = pButton.parent.name
                 if not name or name == "" then
+                    return
+                end
+
+                if IsShiftKeyDown and IsShiftKeyDown() then
+                    local poolFrame = MultiBot.raidus.frames and MultiBot.raidus.frames["Pool"]
+                    if pButton.parent.parent ~= poolFrame then
+                        return
+                    end
+
+                    local dialog = StaticPopup_Show and StaticPopup_Show("MULTIBOT_RAIDUS_DELETE_POOL_BOT", name)
+                    if dialog then
+                        dialog.data = { name = name }
+                    end
                     return
                 end
 

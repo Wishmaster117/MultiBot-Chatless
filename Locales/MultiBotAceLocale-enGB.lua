@@ -4,6 +4,10 @@ if type(register) ~= "function" then
 end
 
 local enGBValues = {
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_BEGIN
+  ["raidus.pool.delete.confirm"] = "Remove %s from the Raidus pool?\n\nThis removes only the saved MultiBot entry. The server character is not deleted.",
+  ["tips.raidus.pool.interactions"] = "|cffffffffLeft-click: drag and drop|r\n|cffff4444Shift + Right-click: remove from the Raidus pool|r",
+  -- MB_RAIDUS_POOL_DELETE_I18N_V1_END
   -- MB_LOOT_RULE_ITEM_I18N_V1_BEGIN
   ["loot.item.add"] = "Always loot: add item",
   ["loot.item.remove"] = "Always loot: remove item",

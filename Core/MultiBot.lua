@@ -287,6 +287,27 @@ function MultiBot.SetGlobalBotEntry(name, value)
   return value
 end
 
+function MultiBot.RemoveGlobalBotEntry(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+
+  local removed = false
+  local store = MultiBot.Store and MultiBot.Store.GetBotsStore and MultiBot.Store.GetBotsStore()
+  if store and store[name] ~= nil then
+    store[name] = nil
+    removed = true
+  end
+
+  local legacyStore = getLegacyGlobalBotStore()
+  if legacyStore[name] ~= nil and isGlobalBotRosterEntry(legacyStore[name]) then
+    legacyStore[name] = nil
+    removed = true
+  end
+
+  return removed
+end
+
 function MultiBot.ClearGlobalBotStore()
   local store = MultiBot.Store and MultiBot.Store.EnsureBotsStore and MultiBot.Store.EnsureBotsStore()
   if not store then
