@@ -16,25 +16,27 @@ Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontaireme
 
 ```text
 Repo:   L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot
-Branch: main
-HEAD:   09e0233c1f2e17d03c191d1be67da926767c955d
-Remote: origin/main = même HEAD
+Branch: feature/group-orders-chatless
+HEAD:   08d8190deea7de342f64feace3f782106bd10868
+Remote: origin/feature/group-orders-chatless = même HEAD
 ```
 
-- PR #75 **Feature/alt roster bot lifecycle** mergée.
-- `TODO.md` reste une modification locale séparée et hors scope des patches documentaires.
+- branche Group Orders commitée, poussée et synchronisée ;
+- Follow / Stay / Attack livrés sur cette branche ;
+- la clôture lifecycle issue de la PR #75 reste la baseline fonctionnelle des rosters.
 
 ### Bridge
 
 ```text
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge
-Branch: main
-HEAD:   24cef0badfde0c06fc0b917b7510f8f15220a775
-Remote: origin/main = même HEAD
+Branch: feature/group-orders-chatless
+HEAD:   f4cd6fa879fd57a36f2c0a13b8eff8cddaba3bb0
+Remote: origin/feature/group-orders-chatless = même HEAD
 ```
 
-- PR #34 **Feature/alt roster bot lifecycle** mergée.
-- Baseline post-merge auditée et propre.
+- branche Group Orders commitée, poussée et synchronisée ;
+- endpoints Follow / Stay / Attack livrés sur cette branche ;
+- la clôture lifecycle issue de la PR #34 reste la baseline fonctionnelle du Bridge.
 
 ### Playerbots
 
@@ -277,8 +279,66 @@ Cela évite :
 - reviews Addon #75 et Bridge #34 fermées ;
 - merges effectués ;
 - audit post-merge propre ;
-- arbres `main` identiques aux feature heads validés ;
 - Playerbots resté strictement inchangé.
+
+### Portée exacte de cette clôture
+
+La clôture lifecycle ci-dessus est une **clôture fonctionnelle des rosters et de `BOT_LIFECYCLE_V1`**. Elle ne signifie pas que tous les anciens transports `.playerbot bot ...` ont déjà disparu de l'Addon.
+
+L'audit global puis l'audit lifecycle résiduel du 30/08/2026 ont identifié des appelants historiques hors des routes roster principales. Ils sont suivis comme **reliquats de transport chat** et ne remettent pas en cause la validation runtime des rosters.
+
+Audit lifecycle résiduel :
+
+```text
+PLAYERBOT_CHAT_OCCURRENCE_COUNT=24
+STRUCTURED_FIRST_FALLBACK_COUNT=4
+DIRECT_ADD_REMOVE_CHAT_REVIEW_COUNT=12
+BULK_LIFECYCLE_REVIEW_COUNT=2
+INIT_AUTO_REVIEW_COUNT=1
+SELF_BOT_LEGACY_REVIEW_COUNT=2
+BOT_LIST_REVIEW_COUNT=1
+OTHER_PLAYERBOT_CHAT_REVIEW_COUNT=2
+```
+
+Ces valeurs sont des métriques de scan et de préclassification. L'analyse manuelle distingue notamment une occurrence documentaire/commentaire du code réellement exécutable.
+
+### Conclusions architecturales lifecycle résiduelles
+
+`BOT_LIFECYCLE_V1` et `BOT_TARGET_RESOLVE_V1` couvrent déjà la sémantique nécessaire aux connexions/déconnexions **unitaires**. Aucun nouvel exécuteur générique n'est requis pour AutoInvite, Raidus ou les add/remove unitaires.
+
+Les relations d'autorisation Bridge restent alignées sur le modèle Playerbots audité :
+
+```text
+sameAccount
+sameGuild
+addClassBot
+linked/trusted account
+```
+
+Les reliquats actifs se répartissent ainsi :
+
+- `ReconnectExistingGroupBots()` : ancien reconnect automatique encore capable d'émettre `.playerbot bot add ...` lorsque le Bridge/capability n'est pas disponible ;
+- certains fallbacks structured-first des rosters : chat historique encore présent après échec/indisponibilité du chemin structuré ;
+- AutoInvite : add unitaire encore envoyé en chat ;
+- Raidus : add/remove unitaire et cleanup de layout encore envoyés en chat ;
+- `add *` / `remove *` : sémantique bulk liée au **groupe du master** dans Playerbots, à préserver exactement ;
+- anciens handlers Units : reliquats à attribuer précisément avant suppression ;
+- `bot list` : fallback legacy déjà borné par la politique de fallback ;
+- `bot self` : à comparer/nettoyer autour de `SELF_BOT_V1` ;
+- `addclass` et `init=auto` : **hors lifecycle simple**, à traiter comme chantiers spécialisés distincts.
+
+### Invariant de transport à imposer
+
+Le prochain hardening doit garantir :
+
+```text
+MultiBot.allowLegacyChatFallback == false
+=> aucune émission automatique de
+   .playerbot bot add ...
+   .playerbot bot remove ...
+```
+
+Un fallback legacy ne doit être possible que lorsqu'il est explicitement autorisé par la politique de compatibilité.
 
 ---
 
@@ -398,9 +458,81 @@ Les endpoints GroupOrder réutilisent les protections communes validées :
 - aucun `RUN~ORDER` générique ;
 - Playerbots resté strictement inchangé.
 
-### Suite recommandée
+### Prochain chantier normal — lifecycle residual transport
 
-Continuer l'audit **famille par famille** des derniers chemins automatiques classés `CONTROL/PARSING` encore dépendants du chat. Ne pas déclarer le projet fully chatless tant que les occurrences restantes de `SendChatMessage` n'ont pas été classées et validées.
+L'audit `SendChatMessage` global et l'audit lifecycle détaillé imposent maintenant un ordre de reprise précis.
+
+#### Étape 1 — gating des fallbacks lifecycle
+
+Objectif unique :
+
+```text
+aucun fallback lifecycle automatique
+si MultiBot.allowLegacyChatFallback == false
+```
+
+Périmètre prioritaire :
+
+- `ReconnectExistingGroupBots()` ;
+- fallbacks add/remove après tentative structured-first ;
+- toute émission automatique `.playerbot bot add/remove` liée au lifecycle.
+
+Cette étape est un **hardening de politique**, pas une nouvelle fonctionnalité Bridge.
+
+#### Étape 2 — appelants lifecycle actifs
+
+Migrer séparément vers `BOT_TARGET_RESOLVE_V1` + `BOT_LIFECYCLE_V1` :
+
+- AutoInvite ;
+- Raidus add/remove par slot ;
+- cleanup Raidus des membres hors layout.
+
+Chaque migration doit rester un patch minimal et conserver les postconditions UI existantes.
+
+#### Étape 3 — bulk groupe
+
+Auditer puis migrer :
+
+```text
+.playerbot bot add *
+.playerbot bot remove *
+```
+
+Playerbots interprète `*` selon le **groupe réel du master**. La migration doit préserver cette sémantique exacte ; elle ne doit pas devenir un login/logout arbitraire de tous les bots du compte.
+
+La solution préférée est un fan-out borné des opérations lifecycle unitaires si l'audit prouve la parité complète. Un nouvel endpoint bulk n'est justifié que si cette parité ne peut pas être obtenue proprement.
+
+#### Étape 4 — nettoyage Units / legacy
+
+Après migration des producteurs actifs :
+
+- attribuer les branches add/remove génériques restantes à leurs rosters réels ;
+- supprimer uniquement les fallbacks prouvés morts ;
+- retirer progressivement les parsers lifecycle legacy devenus sans producteur ;
+- conserver les fallbacks explicitement justifiés.
+
+#### Étape 5 — Creator / init spécialisés
+
+Ne pas mélanger au lifecycle simple :
+
+```text
+.playerbot bot addclass ...
+.playerbot bot init=auto ...
+```
+
+`addclass` sélectionne/crée un bot selon classe/genre et `init=auto` utilise une logique Playerbots d'initialisation/gear. Ils nécessitent des audits et endpoints spécialisés séparés.
+
+#### Après lifecycle residual transport
+
+Ordre fonctionnel recommandé :
+
+1. Flee + Group Actions (`drink`, `release`, `revive`, `summon`) ;
+2. RTSC ;
+3. Quest interactions (`accept *`, `talk`, `los`, gameobject use, reward choice) ;
+4. actions bots ordinaires restantes (maintenance, autogear, Hunter pet controls, spell cast) ;
+5. nettoyage final des fallbacks/parsers chat devenus morts.
+
+Ne pas déclarer le projet fully chatless tant que les occurrences restantes de `SendChatMessage` n'ont pas été classées et validées.
 
 ---
 
@@ -490,6 +622,42 @@ Le chemin `PROFESSION_RECIPE_CRAFT` doit être comparé aux protections de `CRAF
 
 Le projet ne doit pas être décrit comme **fully chatless** tant que les occurrences restantes de `SendChatMessage` n'ont pas été classées.
 
+### Snapshot global du 30/08/2026
+
+Le scan first-party a relevé :
+
+```text
+SENDCHATMESSAGE_FIRST_PARTY_COUNT=145
+SENDCHATMESSAGE_THIRD_PARTY_COUNT=0
+
+CONTROL_PARSING_HEURISTIC_COUNT=69
+COMPATIBILITY_FALLBACK_HEURISTIC_COUNT=14
+USER_FEEDBACK_HEURISTIC_COUNT=32
+DIAGNOSTIC_HEURISTIC_COUNT=2
+NEEDS_REVIEW_HEURISTIC_COUNT=28
+```
+
+Ces nombres sont des **métriques heuristiques de scan**, pas 145 migrations à réaliser. Une même fonction générique peut transporter plusieurs commandes, tandis que de nombreuses occurrences sont déjà derrière un endpoint Bridge, un fallback désactivé par défaut, un message utilisateur ou du code legacy.
+
+Le scan `ActionToGroup` a également montré que Follow / Stay / Attack ne représentent plus le problème principal : leurs routes structurées passent avant le transport PARTY/RAID historique.
+
+### Familles actives à reprendre
+
+Ordre courant :
+
+```text
+1. lifecycle residual transport
+2. Flee + Group Actions
+3. RTSC
+4. Quest interactions
+5. remaining ordinary-bot actions
+6. legacy parser/fallback cleanup
+```
+
+Les listes de quêtes `INCOMPLETED`, `COMPLETED` et `ALL` sont déjà Bridge-first ; ne pas les remigrer. Le reliquat Quest concerne surtout les interactions/commandes encore chat.
+
+### Classification finale attendue
+
 Chaque occurrence doit finir dans une catégorie claire :
 
 ```text
@@ -506,7 +674,8 @@ Après preuve de non-régression :
 - supprimer les parsers legacy devenus morts ;
 - conserver les commandes manuelles utiles ;
 - conserver un fallback seulement lorsqu'il est explicitement justifié ;
-- continuer les tests de spam chat après chaque migration.
+- continuer les tests de spam chat après chaque migration ;
+- retirer le throttle/infrastructure `SendChatMessage` uniquement en toute fin, lorsqu'aucun producteur nécessaire ne l'utilise encore.
 
 ---
 
@@ -584,7 +753,12 @@ Repères principaux conservés :
 - décision Disenchant clôturée ;
 - Alt roster / lifecycle Addon PR #75 mergée ;
 - Alt roster / lifecycle Bridge PR #34 mergée ;
-- audit post-merge lifecycle final : propre.
+- audit post-merge lifecycle final : propre ;
+- Follow / Stay / Attack structurés, compilés/testés puis commités et poussés sur `feature/group-orders-chatless` ;
+- Addon `08d8190deea7de342f64feace3f782106bd10868` synchronisé avec son upstream ;
+- Bridge `f4cd6fa879fd57a36f2c0a13b8eff8cddaba3bb0` synchronisé avec son upstream ;
+- audit global des `SendChatMessage` restants effectué ;
+- audit lifecycle résiduel `.playerbot` effectué : `ROADMAP_UPDATE_CANDIDATE=True`.
 
 Les détails de branches anciennes ne doivent plus être présentés comme état courant dans les README.
 
@@ -596,6 +770,8 @@ Cette section conserve uniquement les preuves structurantes utiles à la reprise
 
 | Référence | SHA-256 | Portée |
 | --- | --- | --- |
+| `audit-multibot-lifecycle-remaining-playerbot-chat-paths-v1-2026-08-30-212756.zip` | `BEF78AEDA9F4F6486C66F359030E0AF42F2F96D96D5C063B9020D9DDC44861F9` | Audit read-only des 24 occurrences `.playerbot` résiduelles, classification lifecycle, stabilité Git et Playerbots inchangé. |
+| `audit-multibot-group-orders-post-push-manual-closure-v1-2026-08-30-210500.txt` | `DE6B8B7926F278ECEC80B084B5966CE5473D6865E388D1E61295EB5141504865` | Clôture post-push Follow/Stay/Attack après confirmation sync/clean et correction des faux négatifs des scripts post-push. |
 | `audit-multibot-follow-stay-final-pre-branch-v1c-2026-08-30-181420.zip` | `D0351714C289392B635CB68992AA31D043C17043C0111839884E6126333F11ED` | Clôture Follow/Stay structurés, runtime validé, 199 locals main-chunk et Playerbots intact. |
 | `audit-multibot-attack-selectors-bridge-migration-v1-2026-08-30-182703.zip` | `B69122E485CF725B1852A6AB3D7752A923E4A0366E0201617A99839DF9BD0202` | Sémantique exacte des audiences Attack et dépendance `AttackMyTargetAction` au master. |
 | `audit-multibot-attack-wait-build-access-v2b-2026-08-30-184309.zip` | `702758ABD0AED5A485391EB23CF9D1FCE9C38977017BEA49B2A865828D797BDF` | `WaitForAttackStrategy`, faisabilité `AttackAction::Attack(Unit*)` et include paths build confirmés. |
