@@ -4,7 +4,7 @@
 ## Notes: User Interface for Playerbot
 ## Author: Nico Löbbert
 ## SavedVariablesPerCharacter: MultiBotSave, MultiBotDB, MultiBotSaved
-## SavedVariables: MultiBotGlobalSave
+## SavedVariables: MultiBotGlobalSave, MultiBotMinimapIconDB
 ## X-Maintainer: Wishmaster117 aka TheWarlock
 ## X-Contributors: Wishmaster117 aka TheWarlock
 ## X-Contact: plexalexdcnh@gmail.com
