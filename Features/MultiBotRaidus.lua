@@ -140,6 +140,9 @@ end
 
 MultiBot.raidus:HookScript("OnShow", function()
     syncRaidusMainButtonState(true)
+    if type(MultiBot.raidus.ValidatePool) == "function" then
+        MultiBot.raidus.ValidatePool(false)
+    end
 end)
 
 MultiBot.raidus:HookScript("OnHide", function()
@@ -774,6 +777,57 @@ local function parseRaidusLayoutData(layoutData)
     return layout
 end
 
+-- MB_RAIDUS_POOL_SERVER_VALIDATION_V1_FOUNDATION_BEGIN
+local RAIDUS_POOL_VALIDATION_MAX_ACTIVE = 32
+local RAIDUS_POOL_VALIDATION_BURST_SIZE = 4
+local RAIDUS_POOL_VALIDATION_BURST_DELAY = 0.10
+local RAIDUS_POOL_VALIDATION_COOLDOWN = 10.0
+
+local function getRaidusPoolValidationState()
+    local state = MultiBot.raidus._poolValidation
+    if type(state) ~= "table" then
+        state = {}
+        MultiBot.raidus._poolValidation = state
+    end
+
+    if type(state.byName) ~= "table" then
+        state.byName = {}
+    end
+    state.running = state.running == true
+    state.cooldown = state.cooldown == true
+    state.filterEnabled = state.filterEnabled == true
+    state.generation = tonumber(state.generation or 0) or 0
+    return state
+end
+
+local function getRaidusPoolValidationKey(name)
+    if type(name) ~= "string" or name == "" then
+        return nil
+    end
+    return string.lower(name)
+end
+
+local function isRaidusPoolNameUnavailable(name)
+    local state = getRaidusPoolValidationState()
+    if state.filterEnabled ~= true then
+        return false
+    end
+
+    local key = getRaidusPoolValidationKey(name)
+    local entry = key and state.byName[key]
+    return type(entry) == "table" and entry.unavailable == true
+end
+
+MultiBot.raidus.GetPoolValidation = function(name)
+    local state = getRaidusPoolValidationState()
+    local key = getRaidusPoolValidationKey(name)
+    if not key then
+        return nil
+    end
+    return state.byName[key]
+end
+-- MB_RAIDUS_POOL_SERVER_VALIDATION_V1_FOUNDATION_END
+
 local function buildRaidusPoolFrameIndex(poolFrames)
     local index = {}
     if not poolFrames then
@@ -791,6 +845,12 @@ end
 
 local function getRaidusPoolFrameByName(poolFrameIndex, name)
     if not poolFrameIndex or not name or name == "" or name == "-" then
+        return nil
+    end
+    if name == UnitName("player") then
+        return poolFrameIndex[name]
+    end
+    if isRaidusPoolNameUnavailable(name) then
         return nil
     end
 
@@ -1325,6 +1385,39 @@ local function appendRaidusBotIfValid(bots, name, value)
     end
 end
 
+-- MB_RAIDUS_PLAYER_SLOT_MASTER_V1_FOUNDATION_BEGIN
+local function buildRaidusPlayerCardData()
+    local name = UnitName("player")
+    if not name or name == "" then
+        return nil
+    end
+
+    local localClass, classToken = UnitClass("player")
+    local localRace = UnitRace("player")
+    local normalizedClass = MultiBot.toClass(classToken or localClass or "")
+    if not normalizedClass or normalizedClass == "" then
+        return nil
+    end
+
+    local score = 0
+    if type(MultiBot.ItemLevel) == "function" then
+        score = tonumber(MultiBot.ItemLevel("player")) or 0
+    end
+
+    return {
+        name = name,
+        race = localRace or "",
+        gender = MultiBot.CASE(UnitSex("player"), "[U]", "[N]", "[M]", "[F]"),
+        special = "",
+        talents = "",
+        class = normalizedClass,
+        level = tonumber(UnitLevel("player")) or 0,
+        score = score,
+        isPlayer = true,
+    }
+end
+-- MB_RAIDUS_PLAYER_SLOT_MASTER_V1_FOUNDATION_END
+
 MultiBot.raidus.setRaidus = function()
 	local tPool = MultiBot.raidus.frames["Pool"]
 	local tSlot = 1
@@ -1335,9 +1428,13 @@ MultiBot.raidus.setRaidus = function()
 	local tBots = {}
 	-- Mode de tri actuel ("Score", "Level", "Class")
 	local sortMode = MultiBot.raidus.sortMode or "Score"
+    local playerName = UnitName("player")
 
     for tName, tValue in pairs(getRaidusGlobalBotStore()) do
-        local tBot = buildRaidusBotFromGlobalSave(tName, tValue)
+        local tBot = nil
+        if tName ~= playerName and not isRaidusPoolNameUnavailable(tName) then
+            tBot = buildRaidusBotFromGlobalSave(tName, tValue)
+        end
         if tBot then
             local tClass = MultiBot.toClass(tBot.class)
 			local classWeight = MultiBotRaidusClassWeight[tClass] or 0
@@ -1367,6 +1464,11 @@ MultiBot.raidus.setRaidus = function()
 		return (a.sort or 0) > (b.sort or 0)
 	end)
 
+    local playerBot = buildRaidusPlayerCardData()
+    if playerBot then
+        table.insert(tBots, 1, playerBot)
+    end
+
 	local function formatRaidusSlotName(name, maxLen)
 		local text = tostring(name or "")
 		local limit = maxLen or 16
@@ -1388,6 +1490,7 @@ MultiBot.raidus.setRaidus = function()
 		tFrame.slot = "Slot" .. tSlot
 		tFrame.name = tBot.name
 		tFrame.bot = tBot
+        tFrame.isPlayer = tBot.isPlayer == true
 		setRaidusSlotRoleBorder(tFrame, nil, 0.22)
 
         local tButton = tFrame.addButton("Icon", -128, 3, "Interface\\AddOns\\MultiBot\\Icons\\class_" .. string.lower(tFrame.class) .. ".blp", "")
@@ -1406,7 +1509,7 @@ MultiBot.raidus.setRaidus = function()
 			local botSpecial = bot.special or "?"
 			local botLevel   = bot.level or 0
 			local botScore   = bot.score or 0
-			local botRole    = bot.role or MultiBotRaidusDetectRole(bot)
+			local botRole    = bot.isPlayer and nil or (bot.role or MultiBotRaidusDetectRole(bot))
 			local roleColor  = RAIDUS_ROLE_COLORS[botRole] or RAIDUS_ROLE_COLORS["DPS"]
 			local roleHex    = string.format("ff%02x%02x%02x", math.floor(roleColor[1] * 255 + 0.5), math.floor(roleColor[2] * 255 + 0.5), math.floor(roleColor[3] * 255 + 0.5))
 			local classHex   = getRaidusClassHexColor(MultiBot.toClass(botClass))
@@ -1420,8 +1523,14 @@ MultiBot.raidus.setRaidus = function()
 			pButton.tip.addText("2", "|cff555555-DEAD OR ALIVE-|h", "TOP", 0, -55, 24)
 			pButton.tip.addText("3", "|cff333333" .. botName .. " - " .. botGender .. " - " .. botRace .. "|h", "BOTTOM", 0, 224, 15)
 			pButton.tip.addText("4", "|c" .. classHex .. botClass .. "|r  |cff909090(" .. botSpecial .. ")|r", "BOTTOM", 0, 206, 15)
-			pButton.tip.addText("5", "|c" .. roleHex .. formatRaidusRoleLabel(botRole) .. "|r  |cff333333Score:|r |cffffdd55" .. botScore .. "|r", "BOTTOM", 0, 188, 15)
-			pButton.tip.addText("6", "|cff333333Talents:|r |cff505050" .. botTalents .. "|r", "BOTTOM", 0, 172, 14)
+            local roleScoreText = "|cff333333Score:|r |cffffdd55" .. botScore .. "|r"
+            local talentsText = ""
+            if not bot.isPlayer then
+                roleScoreText = "|c" .. roleHex .. formatRaidusRoleLabel(botRole) .. "|r  " .. roleScoreText
+                talentsText = "|cff333333Talents:|r |cff505050" .. botTalents .. "|r"
+            end
+			pButton.tip.addText("5", roleScoreText, "BOTTOM", 0, 188, 15)
+			pButton.tip.addText("6", talentsText, "BOTTOM", 0, 172, 14)
 			pButton.tip.addText("7", "|cff555555CASH - " .. tReward .. " - GOLD|h", "BOTTOM", 0, 154, 20)
 			-- MB_RAIDUS_TOOLTIP_INTERACTION_PANEL_V1_BEGIN
 			local interactionPanel = CreateFrame("Frame", nil, pButton.tip)
@@ -1448,7 +1557,11 @@ MultiBot.raidus.setRaidus = function()
 			interactionText:SetPoint("CENTER", interactionPanel, "CENTER", 0, 0)
 			interactionText:SetWidth(214)
 			interactionText:SetJustifyH("CENTER")
-			interactionText:SetText(MultiBot.L("tips.raidus.pool.interactions"))
+            local interactionHint = MultiBot.L("tips.raidus.pool.interactions")
+            if bot.isPlayer and type(interactionHint) == "string" then
+                interactionHint = string.match(interactionHint, "^[^\r\n]+") or interactionHint
+            end
+			interactionText:SetText(interactionHint)
 			interactionText:Show()
 			-- MB_RAIDUS_TOOLTIP_INTERACTION_PANEL_V1_END
 			pButton.tip:Show()
@@ -1519,6 +1632,9 @@ MultiBot.raidus.setRaidus = function()
             elseif button == "RightButton" then
                 local name = pButton.parent.name
                 if not name or name == "" then
+                    return
+                end
+                if pButton.parent.isPlayer then
                     return
                 end
 
@@ -1594,6 +1710,194 @@ MultiBot.raidus.setRaidus = function()
 		end
 	end
 end
+
+-- MB_RAIDUS_POOL_SERVER_VALIDATION_V1_RUNTIME_BEGIN
+local function rebuildRaidusPoolAfterValidation()
+    if not MultiBot.raidus or not MultiBot.raidus.IsShown or not MultiBot.raidus:IsShown() then
+        return
+    end
+
+    local currentLayout = parseRaidusLayoutData(serializeRaidusLayoutFromFrames())
+    MultiBot.raidus.setRaidus()
+    if currentLayout then
+        applyRaidusLayout(currentLayout)
+    end
+end
+
+local function scheduleRaidusPoolValidation(delaySeconds, callback)
+    if type(callback) ~= "function" then
+        return
+    end
+    if type(MultiBot.TimerAfter) == "function" then
+        MultiBot.TimerAfter(delaySeconds or 0, callback)
+    else
+        callback()
+    end
+end
+
+local function recordRaidusPoolValidationResult(state, name, result)
+    local key = getRaidusPoolValidationKey(name)
+    if not key then
+        return
+    end
+
+    local status = type(result) == "table" and tostring(result.status or "") or ""
+    local reason = type(result) == "table" and tostring(result.reason or "") or "LOCAL_UNAVAILABLE"
+    local lifecycleState = type(result) == "table" and tostring(result.lifecycleState or "UNKNOWN") or "UNKNOWN"
+    local unavailable = status == "ERR" and reason == "NOT_ALLOWED"
+    local verified = status == "OK" or unavailable
+
+    state.byName[key] = {
+        name = name,
+        status = status ~= "" and status or "ERR",
+        reason = reason,
+        lifecycleState = lifecycleState,
+        unavailable = unavailable,
+        verified = verified,
+        transient = not verified,
+    }
+end
+
+MultiBot.raidus.ValidatePool = function(force)
+    local state = getRaidusPoolValidationState()
+    if state.running then
+        return false
+    end
+    if force ~= true and state.cooldown then
+        return false
+    end
+
+    local bridge = MultiBot.bridge
+    local comm = MultiBot.Comm
+    if not bridge or bridge.connected ~= true or bridge.botTargetResolveCapable ~= true
+        or not comm or type(comm.ResolveBotTarget) ~= "function" then
+        local hadFilter = state.filterEnabled == true
+        state.filterEnabled = false
+        if hadFilter then
+            rebuildRaidusPoolAfterValidation()
+        end
+        return false
+    end
+
+    local names = {}
+    local activeNames = {}
+    local playerName = UnitName("player")
+    for name, value in pairs(getRaidusGlobalBotStore()) do
+        if name ~= playerName and buildRaidusBotFromGlobalSave(name, value) then
+            table.insert(names, name)
+            local key = getRaidusPoolValidationKey(name)
+            if key then
+                activeNames[key] = true
+            end
+        end
+    end
+
+    table.sort(names, function(a, b)
+        return string.lower(a) < string.lower(b)
+    end)
+
+    for key, _ in pairs(state.byName) do
+        if not activeNames[key] then
+            state.byName[key] = nil
+        end
+    end
+
+    state.running = true
+    state.cooldown = true
+    state.generation = state.generation + 1
+    state.queue = names
+    state.nextIndex = 1
+    state.active = 0
+    state.completed = 0
+    state.total = #names
+
+    local generation = state.generation
+    scheduleRaidusPoolValidation(RAIDUS_POOL_VALIDATION_COOLDOWN, function()
+        local live = getRaidusPoolValidationState()
+        if live.generation == generation then
+            live.cooldown = false
+        end
+    end)
+
+    local finished = false
+    local function finishValidation()
+        if finished then
+            return
+        end
+        local live = getRaidusPoolValidationState()
+        if live.generation ~= generation then
+            return
+        end
+
+        finished = true
+        live.running = false
+        live.filterEnabled = true
+        live.queue = nil
+        live.nextIndex = nil
+        rebuildRaidusPoolAfterValidation()
+    end
+
+    if #names == 0 then
+        finishValidation()
+        return true
+    end
+
+    local pumpValidation
+    pumpValidation = function()
+        local live = getRaidusPoolValidationState()
+        if live.generation ~= generation or live.running ~= true then
+            return
+        end
+
+        local launched = 0
+        while live.active < RAIDUS_POOL_VALIDATION_MAX_ACTIVE
+            and live.nextIndex <= #names
+            and launched < RAIDUS_POOL_VALIDATION_BURST_SIZE do
+            local name = names[live.nextIndex]
+            live.nextIndex = live.nextIndex + 1
+            live.active = live.active + 1
+            launched = launched + 1
+
+            local token = comm.ResolveBotTarget(name, function(result)
+                local callbackState = getRaidusPoolValidationState()
+                if callbackState.generation ~= generation or callbackState.running ~= true then
+                    return
+                end
+
+                callbackState.active = math.max(0, (callbackState.active or 1) - 1)
+                callbackState.completed = (callbackState.completed or 0) + 1
+                recordRaidusPoolValidationResult(callbackState, name, result)
+
+                if callbackState.nextIndex > #names and callbackState.active == 0 then
+                    finishValidation()
+                end
+            end)
+
+            if not token then
+                live.active = math.max(0, live.active - 1)
+                live.completed = (live.completed or 0) + 1
+                recordRaidusPoolValidationResult(live, name, {
+                    status = "ERR",
+                    reason = "LOCAL_UNAVAILABLE",
+                    lifecycleState = "UNKNOWN",
+                })
+            end
+        end
+
+        if live.nextIndex > #names and live.active == 0 then
+            finishValidation()
+            return
+        end
+
+        scheduleRaidusPoolValidation(RAIDUS_POOL_VALIDATION_BURST_DELAY, pumpValidation)
+    end
+
+    pumpValidation()
+    return true
+end
+-- MB_RAIDUS_POOL_SERVER_VALIDATION_V1_RUNTIME_END
+
+-- MB_RAIDUS_PLAYER_SLOT_MASTER_V1_RUNTIME_END
 
 -- GETTER --
 
@@ -1817,10 +2121,11 @@ local function MultiBotRaidusCollectSelectedBots()
     local unitButtons = unitsFrame and unitsFrame.buttons
 
     local globalBots = getRaidusGlobalBotStore()
+    local playerName = UnitName("player")
 
     if unitButtons then
         for name, button in pairs(unitButtons) do
-            if button.state then
+            if button.state and name ~= playerName then
                 appendRaidusBotIfValid(bots, name, globalBots[name])
             end
         end
@@ -1829,7 +2134,9 @@ local function MultiBotRaidusCollectSelectedBots()
     -- Fallback : aucun bot sélectionné = on prend tout le monde
     if #bots == 0 then
         for name, value in pairs(globalBots) do
-            appendRaidusBotIfValid(bots, name, value)
+            if name ~= playerName then
+                appendRaidusBotIfValid(bots, name, value)
+            end
         end
     end
 
@@ -1878,13 +2185,19 @@ MultiBot.raidus.autoBalanceRaid = function(mode)
         return
     end
 
-    local groupsUsed = math.min(RAIDUS_GROUP_COUNT, math.ceil(botCount / RAIDUS_GROUP_SLOT_COUNT))
+    local playerName = UnitName("player")
+    if not playerName or playerName == "" then
+        return
+    end
+
+    local groupsUsed = math.min(RAIDUS_GROUP_COUNT, math.ceil((botCount + 1) / RAIDUS_GROUP_SLOT_COUNT))
     if groupsUsed <= 0 then
         return
     end
 
     -- Matrice [groupe][slot] initialisée à "-"
     local layout = createEmptyRaidusLayout()
+    layout[1][1] = playerName
 
     if mode == "role" then
         -- Mode avancé Tank / Heal / DPS
@@ -1909,7 +2222,7 @@ MultiBot.raidus.autoBalanceRaid = function(mode)
 
         local nextFreeSlot = {}
         for g = 1, groupsUsed do
-            nextFreeSlot[g] = 1
+            nextFreeSlot[g] = MultiBot.IF(g == 1, 2, 1)
         end
 
         local function placeListRoundRobin(list)
@@ -1946,12 +2259,19 @@ MultiBot.raidus.autoBalanceRaid = function(mode)
         -- Mode score simple par défaut
         MultiBotRaidusSortByScore(bots)
 
+        local positions = {}
+        for s = 1, RAIDUS_GROUP_SLOT_COUNT do
+            for g = 1, groupsUsed do
+                if not (g == 1 and s == 1) then
+                    table.insert(positions, { group = g, slot = s })
+                end
+            end
+        end
+
         for index, bot in ipairs(bots) do
-            local idx0 = index - 1
-            local g = (idx0 % groupsUsed) + 1
-            local s = math.floor(idx0 / groupsUsed) + 1
-            if s <= RAIDUS_GROUP_SLOT_COUNT then
-                layout[g][s] = bot.name
+            local position = positions[index]
+            if position then
+                layout[position.group][position.slot] = bot.name
             end
         end
     end
