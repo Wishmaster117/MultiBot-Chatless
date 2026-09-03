@@ -68,6 +68,7 @@ local CAPABILITY_STATE_FIELDS = {
   [LOOT_RULE_ITEM_CAPABILITY] = "lootRuleItemCapable",
   [ALT_ROSTER_CAPABILITY] = "altRosterCapable",
   [BOT_LIFECYCLE_CAPABILITY] = "botLifecycleCapable",
+  ["BOT_GROUP_REMOVE_V1"] = "botGroupRemoveCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -366,6 +367,7 @@ local function ensureBridgeState()
   state.lootRuleItemCapable = state.lootRuleItemCapable or false
   state.altRosterCapable = state.altRosterCapable or false
   state.botLifecycleCapable = state.botLifecycleCapable or false
+  state.botGroupRemoveCapable = state.botGroupRemoveCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -1008,7 +1010,11 @@ function Comm.RunBotLifecycle(action, guid, callback)
   end
 
   action = string.upper(trim(action))
-  if action ~= "CONNECT" and action ~= "DISCONNECT" then
+  if action ~= "CONNECT" and action ~= "DISCONNECT" and action ~= "DISCONNECT_GROUP" then
+    return nil
+  end
+  if action == "DISCONNECT_GROUP" and state.botGroupRemoveCapable ~= true then
+    state.lastError = "BOT_LIFECYCLE_GROUP_REMOVE_UNAVAILABLE"
     return nil
   end
 
@@ -1031,7 +1037,7 @@ function Comm.RunBotLifecycle(action, guid, callback)
     polling = false,
   }
 
-  local requestType = action == "CONNECT" and "BOT_CONNECT" or "BOT_DISCONNECT"
+  local requestType = action == "CONNECT" and "BOT_CONNECT" or (action == "DISCONNECT_GROUP" and "BOT_DISCONNECT_GROUP" or "BOT_DISCONNECT")
   if not Comm.Send("RUN", requestType .. "~" .. tostring(guid) .. "~" .. token) then
     state.botLifecycleCommands[token] = nil
     return nil
@@ -1205,7 +1211,7 @@ local function handleBotLifecycleResult(payload, state)
   if not isValidStateToken(token)
       or guid == nil
       or name == nil
-      or (action ~= "CONNECT" and action ~= "DISCONNECT")
+      or (action ~= "CONNECT" and action ~= "DISCONNECT" and action ~= "DISCONNECT_GROUP")
       or (status ~= "OK" and status ~= "PENDING" and status ~= "ERR")
       or reason == nil then
     state.lastError = "BOT_LIFECYCLE_BAD_PAYLOAD"
@@ -1315,7 +1321,7 @@ local function handleBotLifecycleState(payload, state)
 
   if command.action == "CONNECT" and lifecycleState ~= "ONLINE" then
     result.status = "ERR"
-  elseif command.action == "DISCONNECT" and lifecycleState ~= "OFFLINE" then
+  elseif (command.action == "DISCONNECT" or command.action == "DISCONNECT_GROUP") and lifecycleState ~= "OFFLINE" then
     result.status = "ERR"
   end
 
@@ -1370,6 +1376,7 @@ function Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, sta
 
   if requestType ~= "BOT_CONNECT"
       and requestType ~= "BOT_DISCONNECT"
+      and requestType ~= "BOT_DISCONNECT_GROUP"
       and requestType ~= "BOT_LIFECYCLE_STATE" then
     return false
   end

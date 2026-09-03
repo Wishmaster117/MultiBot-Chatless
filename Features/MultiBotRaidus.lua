@@ -122,7 +122,7 @@ local function runRaidusLifecycleForName(name, mode, refreshPool)
     end
 
     mode = string.upper(tostring(mode or "TOGGLE"))
-    if mode ~= "TOGGLE" and mode ~= "DISCONNECT" then
+    if mode ~= "TOGGLE" and mode ~= "DISCONNECT" and mode ~= "DISCONNECT_GROUP" then
         return false
     end
 
@@ -130,6 +130,14 @@ local function runRaidusLifecycleForName(name, mode, refreshPool)
     if not comm then
         if MultiBot and MultiBot.bridge then
             MultiBot.bridge.lastError = "RAIDUS_LIFECYCLE_UNAVAILABLE"
+        end
+        return false
+    end
+
+    if mode == "DISCONNECT_GROUP"
+        and (not MultiBot.bridge or MultiBot.bridge.botGroupRemoveCapable ~= true) then
+        if MultiBot and MultiBot.bridge then
+            MultiBot.bridge.lastError = "RAIDUS_GROUP_REMOVE_UNAVAILABLE"
         end
         return false
     end
@@ -166,9 +174,9 @@ local function runRaidusLifecycleForName(name, mode, refreshPool)
         end
 
         local action = nil
-        if mode == "DISCONNECT" then
+        if mode == "DISCONNECT" or mode == "DISCONNECT_GROUP" then
             if lifecycleState == "ONLINE" then
-                action = "DISCONNECT"
+                action = mode
             end
         elseif lifecycleState == "ONLINE" then
             action = "DISCONNECT"
@@ -1403,10 +1411,7 @@ end
 local function removeRaidusMembersOutsideLayout(raidByMembers, raidByName, selfName)
     for raidMemberName, _ in pairs(raidByMembers) do
         if raidMemberName ~= selfName and raidByName[raidMemberName] == nil then
-            if MultiBot.isMember(raidMemberName) then
-                UninviteUnit(raidMemberName)
-            end
-            runRaidusLifecycleForName(raidMemberName, "DISCONNECT", false)
+            runRaidusLifecycleForName(raidMemberName, "DISCONNECT_GROUP", false)
         end
     end
 end
@@ -1455,7 +1460,7 @@ end
 
 local btnApply = styleRaidusActionButton(MultiBot.raidus.wowButton("Apply", -514 + RAIDUS_ACTION_SHIFT_X, RAIDUS_ACTION_BAR_Y, 80, 20, 12), true)
 btnApply.doLeft = function(pButton)
-    local tRaidByIndex, tRaidByName = MultiBot.raidus.getRaidTarget()
+    local tRaidByIndex, tRaidByName = MultiBot.raidus.getRaidTarget(true)
     if(tRaidByIndex == nil or tRaidByName == nil) then return end
 
     local tSelf = UnitName("player")
@@ -1466,6 +1471,10 @@ btnApply.doLeft = function(pButton)
 
     local tRaidByMembers = buildRaidusCurrentGroupMembersForCleanup()
     removeRaidusMembersOutsideLayout(tRaidByMembers, tRaidByName, tSelf)
+
+    if #tRaidByIndex == 0 then
+        return
+    end
 
     announceRaidusApplySelection(tSelected, inviteList, usedLayoutFallback)
     startRaidusApplyInviteOrSort(tNeeds)
@@ -2135,7 +2144,7 @@ MultiBot.raidus.getRaidState = function()
 	return buildRaidusCurrentRosterState()
 end
 
-MultiBot.raidus.getRaidTarget = function()
+MultiBot.raidus.getRaidTarget = function(allowEmpty)
 	local tRaidByIndex = {}
 	local tRaidByName = {}
 	local tIndex = 1
@@ -2155,7 +2164,12 @@ MultiBot.raidus.getRaidTarget = function()
 		end
 	end)
 
-	if(tBots) then return SendChatMessage("There is no Bot in the Raid", "SAY") end
+	if(tBots) then
+		if allowEmpty == true then
+			return tRaidByIndex, tRaidByName
+		end
+		return SendChatMessage("There is no Bot in the Raid", "SAY")
+	end
 	if(tUser) then return SendChatMessage("Place me in a Raidus raid group slot before clicking Apply.", "SAY") end
 	return tRaidByIndex, tRaidByName
 end
