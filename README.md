@@ -78,6 +78,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Quests** | Bridge-backed quest list and structured bot quest abandon. Native quest sharing remains available. |
 | **Loot** | Structured loot profiles and exact persistent always-loot item add/remove. |
 | **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1` and `ATTACK_ORDER_V1` collective orders. Attack keeps the validated Tank / Healer / DPS / Melee / Ranged audiences. |
+| **Raidus raid planner** | Persistent 8×5 Working Layout, Saved Layouts, Score/Level/Class sorting, drag/drop, Auto balance, structured Apply and human-safe outside-layout bot removal through `BOT_GROUP_REMOVE_V1`. |
 | **Character information** | Bot skills, reputations, currencies/emblems, spellbook, stats and PvP stats. |
 | **Outfits** | Outfit listing and actions through the Bridge. |
 | **SelfBot** | Dedicated enable/disable, strategy and selected action support. |
@@ -104,6 +105,29 @@ User-facing behavior now follows the same rule everywhere:
 - roster-specific UI state must not leak into another roster.
 
 The companion Bridge also gained the server-side lifecycle authorization and hardening required for these flows.
+
+---
+
+# Recent Milestone — Raidus Working Layout & Safe Apply
+
+Raidus was completed and runtime validated on **3 September 2026** as a persistent raid-planning workflow.
+
+Current behavior includes:
+
+- an **8 groups × 5 slots** Working Layout;
+- persistent Working Layout restoration across close/reopen and `/reload`;
+- Saved Layout slots exposed by the UI;
+- Score, Level and Class pool sorting;
+- drag/drop and slot swapping;
+- score-based and role-based Auto balance;
+- structured bot connect/disconnect from the pool;
+- structured `Apply` for required bot connections;
+- `BOT_GROUP_REMOVE_V1` for safe removal of managed Playerbots that are currently grouped but absent from the layout;
+- an empty Working Layout acting as **cleanup-only** instead of starting AutoSort.
+
+The Bridge revalidates group-removal mutations server-side. A connected human player is not treated as a Playerbot simply because that character is in the group.
+
+See the [Raidus User Guide](docs/RAIDUS_GUIDE.md) for the current user-facing workflow.
 
 ---
 
@@ -142,6 +166,7 @@ SELF_ACTION_V1
 ALT_ROSTER_V1
 BOT_LIFECYCLE_V1
 BOT_TARGET_RESOLVE_V1
+BOT_GROUP_REMOVE_V1
 FOLLOW_ORDER_V1
 STAY_ORDER_V1
 ATTACK_ORDER_V1
@@ -204,7 +229,9 @@ The project is **not declared fully chatless yet**. Remaining `SendChatMessage` 
 
 Collective **Follow**, **Stay** and **Attack** are now bridge-first and runtime validated through dedicated structured endpoints. Their exact UI commands are routed before the legacy PARTY/RAID chat fallback, and no generic arbitrary Playerbots command executor is used.
 
-The next normal work is to continue auditing the remaining automatic `CONTROL/PARSING` chat paths family by family. The project therefore remains intentionally **mostly chatless**, not fully chatless.
+The current lifecycle audit shows that unitary roster lifecycle, AutoInvite and Raidus are already structured-first or explicitly legacy-gated. The next normal lifecycle migration is the remaining **group bulk** pair `.playerbot bot add *` / `.playerbot bot remove *`, preserving Playerbots' real-group semantics rather than interpreting `*` as every bot on the account.
+
+The project therefore remains intentionally **mostly chatless**, not fully chatless.
 
 Detailed development history, audits, deferred work and technical residuals are tracked in the project documentation.
 
@@ -213,6 +240,7 @@ Detailed development history, audits, deferred work and technical residuals are 
 # Documentation
 
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — technical source of truth, completed milestones, audit references, next work and deferred backlog.
+- [`docs/RAIDUS_GUIDE.md`](docs/RAIDUS_GUIDE.md) — current English user guide for the Raidus raid planner and its bridge-first lifecycle behavior.
 - [`docs/DEBUG_RUNBOOK.md`](docs/DEBUG_RUNBOOK.md) — in-game debug commands, observability guidance and bug-report procedure.
 
 ---
