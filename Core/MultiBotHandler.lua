@@ -155,8 +155,10 @@ function MultiBot.HandleOnUpdate(pElapsed)
 		local inviteSource = (invite.roster == "raidus") and "RAIDUS" or invite.source
 		if inviteSource == nil then inviteSource = "BAR" end
 		invite.source = inviteSource
+		local structuredSource = inviteSource == "BAR" or inviteSource == "RAIDUS"
+		-- MB_RAIDUS_AUTOINVITE_STRUCTURED_V1
 
-		if inviteSource == "BAR" and invite.pending == true then
+		if structuredSource and invite.pending == true then
 			invite.elapsed = 0
 		elseif(invite.needs == 0 or invite.index > #tTable) then
 			if(inviteSource == "RAIDUS") then
@@ -178,7 +180,7 @@ function MultiBot.HandleOnUpdate(pElapsed)
 		else
 			local inviteName = tTable[invite.index]
 			if(MultiBot.isMember(inviteName) == false) then
-				if inviteSource == "BAR" then
+				if structuredSource then
 					local bridge = MultiBot and MultiBot.bridge
 					local structuredAvailable = bridge and bridge.connected == true
 						and bridge.botLifecycleCapable == true
@@ -190,13 +192,14 @@ function MultiBot.HandleOnUpdate(pElapsed)
 					if structuredAvailable then
 						SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", inviteName), "SAY")
 						local runId = tonumber(invite.runId) or 0
+						local callbackSource = inviteSource
 						invite.pending = true
 						invite.pendingName = inviteName
 
 						local resolveToken = MultiBot.Comm.ResolveBotTarget(inviteName, function(result)
 							local live = MultiBot.timer.invite
 							if not MultiBot.auto.invite
-								or live.source ~= "BAR"
+								or live.source ~= callbackSource
 								or (tonumber(live.runId) or 0) ~= runId
 								or live.pendingName ~= inviteName then
 								return
@@ -217,11 +220,16 @@ function MultiBot.HandleOnUpdate(pElapsed)
 							local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
 							local reason = string.upper(tostring(result.reason or ""))
 
-							if lifecycleState == "ONLINE" or reason == "IN_USE" then
+							if lifecycleState == "ONLINE" or (callbackSource == "BAR" and reason == "IN_USE") then
 								if MultiBot.isMember(inviteName) == false then
 									if GetNumPartyMembers() == 4 then ConvertToRaid() end
 									MultiBot.doSlash("/invite", inviteName)
 								end
+								finishPending()
+								return
+							end
+
+							if callbackSource == "RAIDUS" and reason == "IN_USE" then
 								finishPending()
 								return
 							end
@@ -235,7 +243,7 @@ function MultiBot.HandleOnUpdate(pElapsed)
 							local lifecycleToken = MultiBot.Comm.RunBotLifecycle("CONNECT", guid, function(lifecycleResult)
 								local current = MultiBot.timer.invite
 								if not MultiBot.auto.invite
-									or current.source ~= "BAR"
+									or current.source ~= callbackSource
 									or (tonumber(current.runId) or 0) ~= runId
 									or current.pendingName ~= inviteName then
 									return
@@ -272,7 +280,7 @@ function MultiBot.HandleOnUpdate(pElapsed)
 							invite.pendingName = nil
 							MultiBot.auto.invite = false
 						end
-					elseif LegacyChatFallbackEnabled() then
+					elseif inviteSource == "BAR" and LegacyChatFallbackEnabled() then
 						SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", inviteName), "SAY")
 						SendChatMessage(".playerbot bot add " .. inviteName, "SAY")
 						invite.needs = invite.needs - 1
@@ -289,12 +297,14 @@ function MultiBot.HandleOnUpdate(pElapsed)
 						MultiBot.auto.invite = false
 					end
 				else
-					-- Raidus keeps the historical transport until its dedicated migration.
-					SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", inviteName), "SAY")
-					SendChatMessage(".playerbot bot add " .. inviteName, "SAY")
-					invite.needs = invite.needs - 1
-					invite.index = invite.index + 1
 					invite.elapsed = 0
+					invite.roster = ""
+					invite.index = 1
+					invite.needs = 0
+					invite.source = nil
+					invite.pending = false
+					invite.pendingName = nil
+					MultiBot.auto.invite = false
 				end
 			else
 				invite.index = invite.index + 1

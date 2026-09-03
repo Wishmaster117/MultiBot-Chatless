@@ -85,36 +85,130 @@ local function MultiBotRaidusDetectRole(bot)
     return "DPS"
 end
 
--- Retourne true si le bot (par son nom) est dans ton groupe ou raid
-local function MultiBotRaidusIsBotGrouped(name)
-    if not name or name == "" then
-        return false
+-- MB_RAIDUS_STRUCTURED_LIFECYCLE_V1_BEGIN
+local raidusLifecyclePending = {}
+
+local function getRaidusLifecycleComm()
+    local bridge = MultiBot and MultiBot.bridge
+    local comm = MultiBot and MultiBot.Comm
+    if not bridge or bridge.connected ~= true
+        or bridge.botLifecycleCapable ~= true
+        or bridge.botTargetResolveCapable ~= true
+        or not comm
+        or type(comm.ResolveBotTarget) ~= "function"
+        or type(comm.RunBotLifecycle) ~= "function" then
+        return nil
     end
 
-    local numRaid = GetNumRaidMembers()
-    if numRaid and numRaid > 0 then
-        for i = 1, numRaid do
-            local raidName, _, _, _, _, _, _, online = GetRaidRosterInfo(i)
-            if raidName == name and online then
-                return true
-            end
-        end
-        return false
-    end
-
-    local numParty = GetNumPartyMembers()
-    if numParty and numParty > 0 then
-        for i = 1, numParty do
-            local unit = "party" .. i
-            local partyName = UnitName(unit)
-            if partyName == name and UnitIsConnected(unit) then
-                return true
-            end
-        end
-    end
-
-    return false
+    return comm
 end
+
+local function finishRaidusLifecyclePending(key, entry, refreshPool)
+    if raidusLifecyclePending[key] == entry then
+        raidusLifecyclePending[key] = nil
+    end
+
+    if refreshPool == true
+        and MultiBot
+        and MultiBot.raidus
+        and type(MultiBot.raidus.ValidatePool) == "function" then
+        MultiBot.raidus.ValidatePool(true)
+    end
+end
+
+local function runRaidusLifecycleForName(name, mode, refreshPool)
+    if type(name) ~= "string" or name == "" then
+        return false
+    end
+
+    mode = string.upper(tostring(mode or "TOGGLE"))
+    if mode ~= "TOGGLE" and mode ~= "DISCONNECT" then
+        return false
+    end
+
+    local comm = getRaidusLifecycleComm()
+    if not comm then
+        if MultiBot and MultiBot.bridge then
+            MultiBot.bridge.lastError = "RAIDUS_LIFECYCLE_UNAVAILABLE"
+        end
+        return false
+    end
+
+    local key = string.lower(name)
+    if raidusLifecyclePending[key] ~= nil then
+        return false
+    end
+
+    local entry = {
+        name = name,
+        mode = mode,
+        phase = "RESOLVING",
+    }
+    raidusLifecyclePending[key] = entry
+
+    local resolveToken = comm.ResolveBotTarget(name, function(result)
+        if raidusLifecyclePending[key] ~= entry or entry.phase ~= "RESOLVING" then
+            return
+        end
+
+        if not result or string.upper(tostring(result.status or "")) ~= "OK" then
+            finishRaidusLifecyclePending(key, entry, false)
+            return
+        end
+
+        local guid = tonumber(result.guid)
+        local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+        local reason = string.upper(tostring(result.reason or ""))
+
+        if not guid or guid <= 0 or reason == "IN_USE" then
+            finishRaidusLifecyclePending(key, entry, false)
+            return
+        end
+
+        local action = nil
+        if mode == "DISCONNECT" then
+            if lifecycleState == "ONLINE" then
+                action = "DISCONNECT"
+            end
+        elseif lifecycleState == "ONLINE" then
+            action = "DISCONNECT"
+        elseif lifecycleState == "OFFLINE" then
+            action = "CONNECT"
+        end
+
+        if not action then
+            finishRaidusLifecyclePending(key, entry, false)
+            return
+        end
+
+        entry.phase = "MUTATING"
+        entry.action = action
+
+        local lifecycleToken = comm.RunBotLifecycle(action, guid, function(lifecycleResult)
+            if raidusLifecyclePending[key] ~= entry or entry.phase ~= "MUTATING" then
+                return
+            end
+
+            if lifecycleResult and lifecycleResult.final == false then
+                return
+            end
+
+            finishRaidusLifecyclePending(key, entry, refreshPool == true)
+        end)
+
+        if not lifecycleToken then
+            finishRaidusLifecyclePending(key, entry, false)
+        end
+    end)
+
+    if not resolveToken then
+        finishRaidusLifecyclePending(key, entry, false)
+        return false
+    end
+
+    return true
+end
+-- MB_RAIDUS_STRUCTURED_LIFECYCLE_V1_END
 
 MultiBot.raidus = MultiBot.newFrame(MultiBot, -340, -126, 32, 884, 884)
 MultiBot.raidus:SetMovable(true)
@@ -1162,40 +1256,48 @@ btnSave.doLeft = function(pButton)
 	SendChatMessage("I wrote it down.", "SAY")
 end
 
-local function collectRaidusApplyInviteList(raidByName, selfName)
+-- MB_RAIDUS_OUTSIDE_LAYOUT_PARTY_REMOVAL_V2_BEGIN
+local function buildRaidusCurrentGroupMembersForCleanup()
+    local currentMembers = {}
+    local raidCount = GetNumRaidMembers() or 0
+
+    if raidCount > 0 then
+        for raidIndex = 1, raidCount do
+            local raidName = GetRaidRosterInfo(raidIndex)
+            if raidName and raidName ~= "" then
+                currentMembers[raidName] = true
+            end
+        end
+        return currentMembers
+    end
+
+    local partyCount = GetNumPartyMembers() or 0
+    for partyIndex = 1, partyCount do
+        local partyName = UnitName("party" .. partyIndex)
+        if partyName and partyName ~= "" then
+            currentMembers[partyName] = true
+        end
+    end
+
+    return currentMembers
+end
+-- MB_RAIDUS_OUTSIDE_LAYOUT_PARTY_REMOVAL_V2_END
+local function collectRaidusApplyInviteList(raidByIndex, selfName)
     local inviteList = {}
     local selectedCount = 0
-    local selectedNames = {}
 
-    for unitName, unitButton in pairs(MultiBot.frames["MultiBar"].frames["Units"].buttons) do
-        if unitButton.state then
+    for index = 1, #(raidByIndex or {}) do
+        local entry = raidByIndex[index]
+        local raidName = entry and entry.name
+        if raidName and raidName ~= "" and raidName ~= selfName then
             selectedCount = selectedCount + 1
-            selectedNames[unitName] = true
-        elseif unitName ~= selfName and raidByName[unitName] ~= nil then
-            table.insert(inviteList, unitName)
-        end
-    end
-
-    local fallbackInviteList = {}
-    local hasLayoutOnly = false
-    for raidName, _ in pairs(raidByName) do
-        if raidName ~= selfName then
-            if not selectedNames[raidName] then
-                hasLayoutOnly = true
-            end
             if not MultiBot.isMember(raidName) then
-                table.insert(fallbackInviteList, raidName)
+                table.insert(inviteList, raidName)
             end
         end
     end
 
-    local usedLayoutFallback = false
-    if (selectedCount == 0 or hasLayoutOnly) and #fallbackInviteList > 0 then
-        inviteList = fallbackInviteList
-        usedLayoutFallback = true
-    end
-
-    return selectedCount, inviteList, usedLayoutFallback
+    return selectedCount, inviteList, true
 end
 
 local function removeRaidusMembersOutsideLayout(raidByMembers, raidByName, selfName)
@@ -1204,7 +1306,7 @@ local function removeRaidusMembersOutsideLayout(raidByMembers, raidByName, selfN
             if MultiBot.isMember(raidMemberName) then
                 UninviteUnit(raidMemberName)
             end
-            SendChatMessage(".playerbot bot remove " .. raidMemberName, "SAY")
+            runRaidusLifecycleForName(raidMemberName, "DISCONNECT", false)
         end
     end
 end
@@ -1225,11 +1327,23 @@ local function announceRaidusApplySelection(selectedCount, inviteList, usedLayou
 end
 
 local function startRaidusApplyInviteOrSort(inviteCount)
+    local invite = MultiBot.timer.invite
+    invite.runId = (tonumber(invite.runId) or 0) + 1
+    invite.elapsed = 0
+    invite.roster = ""
+    invite.index = 1
+    invite.needs = 0
+    invite.source = "RAIDUS"
+    invite.pending = false
+    invite.pendingName = nil
+
+    MultiBot.auto.invite = false
+    MultiBot.auto.sort = false
+
     if inviteCount > 0 then
         SendChatMessage(MultiBot.L("info.starting"), "SAY")
-        MultiBot.timer.invite.roster = "raidus"
-        MultiBot.timer.invite.needs = inviteCount
-        MultiBot.timer.invite.index = 1
+        invite.roster = "raidus"
+        invite.needs = inviteCount
         MultiBot.auto.invite = true
     else
         MultiBot.timer.sort.elapsed = 0
@@ -1245,12 +1359,12 @@ btnApply.doLeft = function(pButton)
     if(tRaidByIndex == nil or tRaidByName == nil) then return end
 
     local tSelf = UnitName("player")
-    local tSelected, inviteList, usedLayoutFallback = collectRaidusApplyInviteList(tRaidByName, tSelf)
+    local tSelected, inviteList, usedLayoutFallback = collectRaidusApplyInviteList(tRaidByIndex, tSelf)
 
     MultiBot.index.raidus = inviteList
     local tNeeds = #inviteList
 
-    local tRaidByMembers = MultiBot.raidus.getRaidState()
+    local tRaidByMembers = buildRaidusCurrentGroupMembersForCleanup()
     removeRaidusMembersOutsideLayout(tRaidByMembers, tRaidByName, tSelf)
 
     announceRaidusApplySelection(tSelected, inviteList, usedLayoutFallback)
@@ -1568,7 +1682,7 @@ MultiBot.raidus.setRaidus = function()
 		end)
 
         -- Clic gauche : drag & drop dans les groupes
-        -- Clic droit  : connecte / déconnecte le bot (add/remove)
+        -- Clic droit  : connecte / déconnecte le bot via Bridge lifecycle
         tButton:SetScript("OnMouseDown", function(pButton, button)
             if button == "LeftButton" then
                 pButton.parent:StartMoving()
@@ -1651,15 +1765,7 @@ MultiBot.raidus.setRaidus = function()
                     return
                 end
 
-                if MultiBotRaidusIsBotGrouped(name) then
-                    -- Bot déjà dans le groupe/raid :
-                    -- on laisse le core playerbots gérer leave + logout
-                    SendChatMessage(".playerbot bot remove " .. name, "SAY")
-                else
-                    -- Bot pas dans le groupe/raid :
-                    -- login + invite via playerbots
-                    SendChatMessage(".playerbot bot add " .. name, "SAY")
-                end
+                runRaidusLifecycleForName(name, "TOGGLE", true)
             end
         end)
 
@@ -1723,6 +1829,12 @@ local function rebuildRaidusPoolAfterValidation()
         applyRaidusLayout(currentLayout)
     end
 end
+
+-- MB_RAIDUS_PRESERVE_LAYOUT_ON_BRIDGE_DETAIL_V1_BEGIN
+MultiBot.raidus.refreshPreservingLayout = function()
+    rebuildRaidusPoolAfterValidation()
+end
+-- MB_RAIDUS_PRESERVE_LAYOUT_ON_BRIDGE_DETAIL_V1_END
 
 local function scheduleRaidusPoolValidation(delaySeconds, callback)
     if type(callback) ~= "function" then

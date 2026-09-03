@@ -278,14 +278,16 @@ end
 
 local function toggleRaidus(button)
     if MultiBot.OnOffSwitch(button) then
-        MultiBot.raidus.setRaidus()
+        if not MultiBot.raidus._sessionLayoutInitialized then
+          MultiBot.raidus.setRaidus()
+          MultiBot.raidus._sessionLayoutInitialized = true
+        end
         MultiBot.raidus:Show()
         return
     end
 
     MultiBot.raidus:Hide()
-end
-
+    end
 local function toggleLeftControl(button, controlName)
     withLeftRoot(function(leftRoot)
         local frameName = LEFT_LAYOUT_FRAME_NAMES[controlName] or controlName

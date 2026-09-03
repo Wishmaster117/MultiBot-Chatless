@@ -3644,8 +3644,8 @@ function MultiBot.ApplyBridgeBotDetail(detail)
     MultiBot.UpdateFavoritesIndex()
   end
 
-  if MultiBot.raidus and MultiBot.raidus.setRaidus and MultiBot.raidus.IsShown and MultiBot.raidus:IsShown() then
-    MultiBot.raidus.setRaidus()
+  if MultiBot.raidus and MultiBot.raidus.refreshPreservingLayout and MultiBot.raidus.IsShown and MultiBot.raidus:IsShown() then
+    MultiBot.raidus.refreshPreservingLayout()
   end
 
   return true
