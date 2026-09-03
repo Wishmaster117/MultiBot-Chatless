@@ -280,6 +280,12 @@ local function toggleRaidus(button)
     if MultiBot.OnOffSwitch(button) then
         if not MultiBot.raidus._sessionLayoutInitialized then
           MultiBot.raidus.setRaidus()
+          if type(MultiBot.raidus.restoreWorkingLayout) == "function" then
+            MultiBot.raidus.restoreWorkingLayout()
+          end
+          if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+            MultiBot.raidus.persistWorkingLayout()
+          end
           MultiBot.raidus._sessionLayoutInitialized = true
         end
         MultiBot.raidus:Show()

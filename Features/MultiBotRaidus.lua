@@ -1023,6 +1023,9 @@ if StaticPopupDialogs then
             if MultiBot.raidus.setRaidus then
                 MultiBot.raidus.setRaidus()
                 applyRaidusLayout(currentLayout)
+                if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+                    MultiBot.raidus.persistWorkingLayout()
+                end
             end
         end,
         timeout = 0,
@@ -1074,6 +1077,9 @@ btnLoad.doLeft = function(pButton)
 
 	local layout = parseRaidusLayoutData(layoutData)
 	applyRaidusLayout(layout)
+	if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+		MultiBot.raidus.persistWorkingLayout()
+	end
 end
 
 local function UpdateRaidusSlotButtonText(button)
@@ -1096,6 +1102,9 @@ UIDropDownMenu_Initialize(slotDropDown, function(self, level)
 			UIDropDownMenu_SetSelectedValue(slotDropDown, tostring(i))
 			UpdateRaidusSlotButtonText(MultiBot.raidus.buttons["Slot"])
 			MultiBot.raidus.setRaidus()
+			if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+				MultiBot.raidus.persistWorkingLayout()
+			end
 		end
 		UIDropDownMenu_AddButton(info, level)
 	end
@@ -1184,6 +1193,9 @@ btnScore.doLeft = function(pButton)
 
     updateRaidusSortButtonsVisual("Score")
     MultiBot.raidus.setRaidus()
+    if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+        MultiBot.raidus.persistWorkingLayout()
+    end
 end
 
 -- Bouton "Level"
@@ -1216,6 +1228,9 @@ btnLevel.doLeft = function(pButton)
 
     updateRaidusSortButtonsVisual("Level")
     MultiBot.raidus.setRaidus()
+    if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+        MultiBot.raidus.persistWorkingLayout()
+    end
 end
 
 -- Bouton "Class"
@@ -1248,13 +1263,98 @@ btnClass.doLeft = function(pButton)
 
     updateRaidusSortButtonsVisual("Class")
     MultiBot.raidus.setRaidus()
+    if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+        MultiBot.raidus.persistWorkingLayout()
+    end
 end
 
 local btnSave = styleRaidusActionButton(MultiBot.raidus.wowButton("Save", -597 + RAIDUS_ACTION_SHIFT_X, RAIDUS_ACTION_BAR_Y, 80, 20, 12), false)
 btnSave.doLeft = function(pButton)
 	setRaidusLayoutValue(MultiBot.raidus.save, serializeRaidusLayoutFromFrames())
+	if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+		MultiBot.raidus.persistWorkingLayout()
+	end
 	SendChatMessage("I wrote it down.", "SAY")
 end
+
+-- MB_RAIDUS_PERSISTENT_WORKING_LAYOUT_V1_BEGIN
+local RAIDUS_WORKING_STATE_VERSION = 1
+
+local function getRaidusWorkingStateStore(createIfMissing)
+    if MultiBot.Store then
+        local store = nil
+        if createIfMissing and type(MultiBot.Store.EnsureUIChildStore) == "function" then
+            store = MultiBot.Store.EnsureUIChildStore("raidusWorkingState")
+        elseif type(MultiBot.Store.GetUIChildStore) == "function" then
+            store = MultiBot.Store.GetUIChildStore("raidusWorkingState")
+        end
+        if type(store) == "table" then
+            return store
+        end
+    end
+
+    local profile = MultiBot.db and MultiBot.db.profile
+    if type(profile) ~= "table" then
+        return nil
+    end
+
+    if type(profile.ui) ~= "table" then
+        if not createIfMissing then
+            return nil
+        end
+        profile.ui = {}
+    end
+
+    if type(profile.ui.raidusWorkingState) ~= "table" then
+        if not createIfMissing then
+            return nil
+        end
+        profile.ui.raidusWorkingState = {}
+    end
+
+    return profile.ui.raidusWorkingState
+end
+
+local function persistRaidusWorkingLayout()
+    local store = getRaidusWorkingStateStore(true)
+    if not store then
+        return false
+    end
+
+    store.version = RAIDUS_WORKING_STATE_VERSION
+    store.layout = serializeRaidusLayoutFromFrames()
+    store.save = tostring(MultiBot.raidus.save or "")
+    return true
+end
+
+local function restoreRaidusWorkingLayout()
+    local store = getRaidusWorkingStateStore(false)
+    if type(store) ~= "table"
+        or tonumber(store.version or 0) ~= RAIDUS_WORKING_STATE_VERSION
+        or type(store.layout) ~= "string"
+        or store.layout == "" then
+        return false
+    end
+
+    local parseOk, layout = pcall(parseRaidusLayoutData, store.layout)
+    if not parseOk or type(layout) ~= "table" then
+        return false
+    end
+
+    applyRaidusLayout(layout)
+    MultiBot.raidus.save = tostring(store.save or "")
+
+    local slotStateButton = MultiBot.raidus.buttons and MultiBot.raidus.buttons["Slot"]
+    if slotStateButton then
+        UpdateRaidusSlotButtonText(slotStateButton)
+    end
+
+    return true
+end
+
+MultiBot.raidus.persistWorkingLayout = persistRaidusWorkingLayout
+MultiBot.raidus.restoreWorkingLayout = restoreRaidusWorkingLayout
+-- MB_RAIDUS_PERSISTENT_WORKING_LAYOUT_V1_END
 
 -- MB_RAIDUS_OUTSIDE_LAYOUT_PARTY_REMOVAL_V2_BEGIN
 local function buildRaidusCurrentGroupMembersForCleanup()
@@ -1737,6 +1837,7 @@ MultiBot.raidus.setRaidus = function()
                             showRaidusDropFeedback("Ajoute dans " .. targetGroup .. " / " .. targetSlot)
                         end
                     end
+                    persistRaidusWorkingLayout()
                 else
                     pButton.parent:ClearAllPoints()
                     pButton.parent:SetPoint(pButton.parent.align, pButton.parent.x, pButton.parent.y)
@@ -1828,6 +1929,7 @@ local function rebuildRaidusPoolAfterValidation()
     if currentLayout then
         applyRaidusLayout(currentLayout)
     end
+    persistRaidusWorkingLayout()
 end
 
 -- MB_RAIDUS_PRESERVE_LAYOUT_ON_BRIDGE_DETAIL_V1_BEGIN
@@ -2287,6 +2389,7 @@ MultiBot.raidus.autoBalanceRaid = function(mode)
     -- On repart d'un état propre : pool reconstruite, groupes vidés
     if MultiBot.raidus.setRaidus then
         MultiBot.raidus.setRaidus()
+        persistRaidusWorkingLayout()
     end
 
     local bots = MultiBotRaidusCollectSelectedBots()
@@ -2389,4 +2492,5 @@ MultiBot.raidus.autoBalanceRaid = function(mode)
     end
 
      applyRaidusLayout(layout)
+     persistRaidusWorkingLayout()
 end
