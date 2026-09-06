@@ -63,7 +63,8 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | Area | Current behavior |
 | --- | --- |
 | **Bot rosters** | My Bots / Altbots, Group, Guild, Friends and Favorites with online/offline presence and structured lifecycle handling. |
-| **Bot connect / disconnect** | `ALT_ROSTER_V1`, `BOT_LIFECYCLE_V1` and `BOT_TARGET_RESOLVE_V1` provide structured discovery, target resolution and lifecycle control. Offline EveryBars stay collapsed; online EveryBars expand consistently. |
+| **Bot connect / disconnect** | `ALT_ROSTER_V1`, `BOT_LIFECYCLE_V1`, `BOT_TARGET_RESOLVE_V1` and `BOT_GROUP_LIFECYCLE_V1` provide structured discovery, unit lifecycle control and bounded group/raid bulk connect-disconnect from the Faction Banner. Offline EveryBars stay collapsed; online EveryBars expand consistently. |
+| **Creator AddClass** | `CREATOR_ADDCLASS_V1` routes class/gender bot selection through the Bridge. Random, Male, Female and Death Knight paths are runtime validated; existing auto-group and roster refresh behavior is preserved. |
 | **Bot state & strategies** | Framed bot-state reads and structured strategy mutations for migrated controls, including Warlock selectors. |
 | **Inventory** | Bag-aware exact inventory for Backpack, Bag 1..4 and Keyring, including empty slots and container filtering. |
 | **Item movement** | Whole-stack drag/drop between supported physical inventory slots through the Bridge. |
@@ -131,6 +132,53 @@ See the [Raidus User Guide](docs/RAIDUS_GUIDE.md) for the current user-facing wo
 
 ---
 
+# Recent Milestone — Bulk Group Lifecycle
+
+The Faction Banner bulk lifecycle path was completed, compiled and runtime validated on **6 September 2026**.
+
+The addon now uses the dedicated capability:
+
+```text
+BOT_GROUP_LIFECYCLE_V1
+```
+
+for the historical group-wide lifecycle actions:
+
+- left click → structured `CONNECT`;
+- right click → structured `DISCONNECT`;
+- scope → the requester's real party/raid membership, excluding the requester;
+- disconnect → bots go offline without being forcibly removed from the group;
+- connect → offline controllable group members are handed back to Playerbots for normal asynchronous login.
+
+The structured path preserves Playerbots' real-group `*` semantics without interpreting `*` as every bot on the account. The legacy `.playerbot bot add *` / `.playerbot bot remove *` transport remains only behind the explicit compatibility fallback and was not observed during the validated runtime test.
+
+---
+
+# Recent Milestone — Creator AddClass
+
+The Creator `addclass` path was migrated and runtime validated on **6 September 2026** through the dedicated capability:
+
+```text
+CREATOR_ADDCLASS_V1
+```
+
+The normal Creator flow now sends only typed class/gender data to the Bridge. The Bridge validates the request, builds the specialized Playerbots `addclass` operation server-side, and preserves Playerbots' existing AddClass pool, permission and Death Knight level rules.
+
+Validated runtime behavior:
+
+- Random → OK;
+- Male → OK;
+- Female → OK;
+- Death Knight → OK;
+- automatic group invitation preserved;
+- roster refresh and EveryBar behavior preserved;
+- no `.playerbot bot addclass ...` SAY observed with `MultiBot.allowLegacyChatFallback = false`;
+- no Lua error or crash observed.
+
+The legacy AddClass chat producer remains compatibility-fallback-only. `init=auto` is intentionally unchanged and is the next Creator/init sub-path to audit and migrate.
+
+---
+
 # Bridge Capabilities
 
 The addon negotiates feature capabilities with the Bridge before using newer paths.
@@ -167,6 +215,8 @@ ALT_ROSTER_V1
 BOT_LIFECYCLE_V1
 BOT_TARGET_RESOLVE_V1
 BOT_GROUP_REMOVE_V1
+BOT_GROUP_LIFECYCLE_V1
+CREATOR_ADDCLASS_V1
 FOLLOW_ORDER_V1
 STAY_ORDER_V1
 ATTACK_ORDER_V1
@@ -229,7 +279,9 @@ The project is **not declared fully chatless yet**. Remaining `SendChatMessage` 
 
 Collective **Follow**, **Stay** and **Attack** are now bridge-first and runtime validated through dedicated structured endpoints. Their exact UI commands are routed before the legacy PARTY/RAID chat fallback, and no generic arbitrary Playerbots command executor is used.
 
-The current lifecycle audit shows that unitary roster lifecycle, AutoInvite and Raidus are already structured-first or explicitly legacy-gated. The next normal lifecycle migration is the remaining **group bulk** pair `.playerbot bot add *` / `.playerbot bot remove *`, preserving Playerbots' real-group semantics rather than interpreting `*` as every bot on the account.
+Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or explicitly legacy-gated. The Faction Banner bulk pair `.playerbot bot add *` / `.playerbot bot remove *` is now also migrated through `BOT_GROUP_LIFECYCLE_V1`, preserving Playerbots' real party/raid semantics and delegating the actual login/logout operations to `PlayerbotMgr`.
+
+Creator `addclass` is now bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. The next active Creator/init sub-path is `init=auto`; deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 

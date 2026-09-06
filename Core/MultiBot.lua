@@ -4365,13 +4365,47 @@ end
 -- Usage : MultiBot.AddClassToTarget("warlock"        ) -- Random
 --         MultiBot.AddClassToTarget("warlock","male" ) -- Male
 --         MultiBot.AddClassToTarget("warlock","female") -- Female
+-- MB_CREATOR_ADDCLASS_V1_BEGIN
 MultiBot.AddClassToTarget = function(classCmd, gender)
-  if not classCmd then return end             -- secure that
-  local msg = ".playerbot bot addclass " .. classCmd
-  if gender then                                 -- male / female / 0 / 1
-	msg = msg .. " " .. gender
-	print("[DBG] Message de sortie :" ,msg)
+  if not classCmd then return nil end
+
+  classCmd = string.lower(tostring(classCmd))
+  gender = gender and string.lower(tostring(gender)) or nil
+  if gender == "0" then
+    gender = "male"
+  elseif gender == "1" then
+    gender = "female"
   end
+
+  local bridge = MultiBot.bridge
+  local comm = MultiBot.Comm
+  if bridge and bridge.connected == true
+      and bridge.creatorAddClassCapable == true
+      and comm and type(comm.RunCreatorAddClass) == "function" then
+    local token = comm.RunCreatorAddClass(classCmd, gender)
+    if token then
+      if MultiBot.BeginAddClassAutoGroup then
+        MultiBot.BeginAddClassAutoGroup(classCmd)
+      end
+      if MultiBot.RequestBridgeRosterRefresh then
+        MultiBot.RequestBridgeRosterRefresh()
+      end
+      return token
+    end
+  end
+
+  if MultiBot.allowLegacyChatFallback ~= true then
+    if bridge then
+      bridge.lastError = "CREATOR_ADDCLASS_CAPABILITY_UNAVAILABLE"
+    end
+    return nil
+  end
+
+  local msg = ".playerbot bot addclass " .. classCmd
+  if gender then
+    msg = msg .. " " .. gender
+  end
+
   if MultiBot.BeginAddClassAutoGroup then
     MultiBot.BeginAddClassAutoGroup(classCmd)
   end
@@ -4381,8 +4415,9 @@ MultiBot.AddClassToTarget = function(classCmd, gender)
   if MultiBot.RequestBridgeRosterRefresh then
     MultiBot.RequestBridgeRosterRefresh()
   end
+  return true
 end
-
+-- MB_CREATOR_ADDCLASS_V1_END
 -- Init Wrapper
 function MultiBot.InitAuto(name)
   SendChatMessage(".playerbot bot init=auto " .. name, "SAY")

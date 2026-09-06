@@ -70,6 +70,7 @@ local CAPABILITY_STATE_FIELDS = {
   [BOT_LIFECYCLE_CAPABILITY] = "botLifecycleCapable",
   ["BOT_GROUP_REMOVE_V1"] = "botGroupRemoveCapable",
   ["BOT_GROUP_LIFECYCLE_V1"] = "botGroupLifecycleCapable",
+  ["CREATOR_ADDCLASS_V1"] = "creatorAddClassCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -370,6 +371,7 @@ local function ensureBridgeState()
   state.botLifecycleCapable = state.botLifecycleCapable or false
   state.botGroupRemoveCapable = state.botGroupRemoveCapable or false
   state.botGroupLifecycleCapable = state.botGroupLifecycleCapable or false
+  state.creatorAddClassCapable = state.creatorAddClassCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -377,6 +379,7 @@ local function ensureBridgeState()
   state.altRosterBatch = type(state.altRosterBatch) == "table" and state.altRosterBatch or nil
   state.botLifecycleSeq = tonumber(state.botLifecycleSeq) or 0
   state.botLifecycleCommands = type(state.botLifecycleCommands) == "table" and state.botLifecycleCommands or {}
+  state.creatorAddClassCommands = type(state.creatorAddClassCommands) == "table" and state.creatorAddClassCommands or {}
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -1171,6 +1174,140 @@ function Comm.ApplyBotGroupLifecycleResultPayload(payload, state)
   return true
 end
 -- MB_BOT_GROUP_LIFECYCLE_V1_END
+-- MB_CREATOR_ADDCLASS_V1_BEGIN
+function Comm.RunCreatorAddClass(classCmd, gender)
+  local state = ensureBridgeState()
+  if state.connected ~= true
+      or state.creatorAddClassCapable ~= true then
+    return nil
+  end
+
+  classCmd = string.lower(trim(tostring(classCmd or "")))
+  if classCmd ~= "warrior"
+      and classCmd ~= "paladin"
+      and classCmd ~= "hunter"
+      and classCmd ~= "rogue"
+      and classCmd ~= "priest"
+      and classCmd ~= "shaman"
+      and classCmd ~= "mage"
+      and classCmd ~= "warlock"
+      and classCmd ~= "druid"
+      and classCmd ~= "dk" then
+    return nil
+  end
+
+  gender = string.lower(trim(tostring(gender or "random")))
+  if gender == "" then
+    gender = "random"
+  elseif gender == "0" then
+    gender = "male"
+  elseif gender == "1" then
+    gender = "female"
+  end
+  if gender ~= "random" and gender ~= "male" and gender ~= "female" then
+    return nil
+  end
+
+  local activeCount = 0
+  for _ in pairs(state.creatorAddClassCommands or {}) do
+    activeCount = activeCount + 1
+  end
+  if activeCount >= 8 then
+    state.lastError = "CREATOR_ADDCLASS_TOO_MANY_ACTIVE"
+    return nil
+  end
+
+  local token = nextBotLifecycleToken(state, "CONNECT")
+  if not isValidStateToken(token) then
+    return nil
+  end
+
+  state.creatorAddClassCommands[token] = {
+    token = token,
+    classCmd = classCmd,
+    gender = gender,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send(
+      "RUN",
+      "CREATOR_ADDCLASS~" .. token .. "~" .. classCmd .. "~" .. gender) then
+    state.creatorAddClassCommands[token] = nil
+    return nil
+  end
+
+  safeDelay(8.0, function()
+    local live = ensureBridgeState()
+    local pending = live.creatorAddClassCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    live.creatorAddClassCommands[token] = nil
+    local reason = live.connected == true and "CLIENT_TIMEOUT" or "BRIDGE_DISCONNECTED"
+    live.lastError = "CREATOR_ADDCLASS_" .. reason
+    live.lastCreatorAddClassResult = {
+      token = token,
+      classCmd = pending.classCmd,
+      gender = pending.gender,
+      status = "ERR",
+      reason = reason,
+    }
+  end)
+
+  return token
+end
+
+function Comm.ApplyCreatorAddClassResultPayload(payload, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+
+  local fields = splitFields(payload or "")
+  if #fields ~= 5 then
+    state.lastError = "CREATOR_ADDCLASS_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local classCmd = string.lower(trim(fields[2]))
+  local gender = string.lower(trim(fields[3]))
+  local status = string.upper(trim(fields[4]))
+  local reason = urlDecodeFieldStrict(fields[5], 64, false)
+
+  if not isValidStateToken(token) then
+    state.lastError = "CREATOR_ADDCLASS_BAD_TOKEN"
+    return true
+  end
+
+  local command = state.creatorAddClassCommands[token]
+  if type(command) ~= "table" then
+    return true
+  end
+
+  if classCmd ~= command.classCmd
+      or gender ~= command.gender
+      or (status ~= "OK" and status ~= "ERR")
+      or reason == nil
+      or reason == "" then
+    state.creatorAddClassCommands[token] = nil
+    state.lastError = "CREATOR_ADDCLASS_BAD_RESPONSE"
+    return true
+  end
+
+  state.creatorAddClassCommands[token] = nil
+  state.connected = true
+  state.lastError = status == "ERR"
+      and ("CREATOR_ADDCLASS_" .. reason)
+      or nil
+  state.lastCreatorAddClassResult = {
+    token = token,
+    classCmd = classCmd,
+    gender = gender,
+    status = status,
+    reason = reason,
+  }
+  return true
+end
+-- MB_CREATOR_ADDCLASS_V1_END
 
 local function failAltRosterBatch(state, reason)
   state.altRosterBatch = nil
@@ -1434,6 +1571,8 @@ function Comm.HandleAltBotLifecycleAddonMessage(opcode, payload, state)
     return handleBotLifecycleState(payload, state)
   elseif opcode == "BOT_GROUP_LIFECYCLE" then
     return Comm.ApplyBotGroupLifecycleResultPayload(payload, state)
+  elseif opcode == "CREATOR_ADDCLASS" then
+    return Comm.ApplyCreatorAddClassResultPayload(payload, state)
   end
   return false
 end
@@ -1464,6 +1603,28 @@ function Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, sta
     return true
   end
 
+  if requestType == "CREATOR_ADDCLASS" then
+    state = type(state) == "table" and state or ensureBridgeState()
+    token = trim(token or "")
+    reason = trim(reason or "PROTOCOL_ERROR")
+    if reason == "" then
+      reason = "PROTOCOL_ERROR"
+    end
+
+    local command = state.creatorAddClassCommands[token]
+    if type(command) == "table" then
+      state.creatorAddClassCommands[token] = nil
+      state.lastCreatorAddClassResult = {
+        token = token,
+        classCmd = command.classCmd,
+        gender = command.gender,
+        status = "ERR",
+        reason = reason,
+      }
+    end
+    state.lastError = "CREATOR_ADDCLASS_" .. reason
+    return true
+  end
   if requestType == "BOT_GROUP_LIFECYCLE" then
     state = type(state) == "table" and state or ensureBridgeState()
     reason = trim(reason or "PROTOCOL_ERROR")
