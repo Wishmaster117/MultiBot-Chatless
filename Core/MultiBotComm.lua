@@ -69,6 +69,7 @@ local CAPABILITY_STATE_FIELDS = {
   [ALT_ROSTER_CAPABILITY] = "altRosterCapable",
   [BOT_LIFECYCLE_CAPABILITY] = "botLifecycleCapable",
   ["BOT_GROUP_REMOVE_V1"] = "botGroupRemoveCapable",
+  ["BOT_GROUP_LIFECYCLE_V1"] = "botGroupLifecycleCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -368,6 +369,7 @@ local function ensureBridgeState()
   state.altRosterCapable = state.altRosterCapable or false
   state.botLifecycleCapable = state.botLifecycleCapable or false
   state.botGroupRemoveCapable = state.botGroupRemoveCapable or false
+  state.botGroupLifecycleCapable = state.botGroupLifecycleCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -1084,6 +1086,92 @@ function Comm.RunBotLifecycle(action, guid, callback)
   return token
 end
 
+-- MB_BOT_GROUP_LIFECYCLE_V1_BEGIN
+function Comm.RunBotGroupLifecycle(action)
+  local state = ensureBridgeState()
+  if state.connected ~= true
+      or state.botGroupLifecycleCapable ~= true then
+    return nil
+  end
+
+  action = string.upper(trim(action))
+  if action ~= "CONNECT" and action ~= "DISCONNECT" then
+    return nil
+  end
+
+  local token = nextBotLifecycleToken(state, action)
+  if not isValidStateToken(token) then
+    return nil
+  end
+
+  if not Comm.Send("RUN", "BOT_GROUP_LIFECYCLE~" .. token .. "~" .. action) then
+    return nil
+  end
+
+  return token
+end
+
+function Comm.ApplyBotGroupLifecycleResultPayload(payload, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+
+  local fields = splitFields(payload or "")
+  if #fields ~= 9 then
+    state.lastError = "BOT_GROUP_LIFECYCLE_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local action = string.upper(trim(fields[2]))
+  local status = string.upper(trim(fields[3]))
+  local matched = parseBoundedInteger(fields[4], 0, 39)
+  local succeeded = parseBoundedInteger(fields[5], 0, 39)
+  local pending = parseBoundedInteger(fields[6], 0, 39)
+  local skipped = parseBoundedInteger(fields[7], 0, 39)
+  local failed = parseBoundedInteger(fields[8], 0, 39)
+  local reason = urlDecodeFieldStrict(fields[9], 64, false)
+
+  if not isValidStateToken(token)
+      or (action ~= "CONNECT" and action ~= "DISCONNECT")
+      or (status ~= "OK" and status ~= "ERR")
+      or matched == nil
+      or succeeded == nil
+      or pending == nil
+      or skipped == nil
+      or failed == nil
+      or reason == nil
+      or succeeded + pending + skipped + failed ~= matched then
+    state.lastError = "BOT_GROUP_LIFECYCLE_BAD_PAYLOAD"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "ERR"
+      and ("BOT_GROUP_LIFECYCLE_" .. reason)
+      or nil
+  state.lastBotGroupLifecycleResult = {
+    token = token,
+    action = action,
+    status = status,
+    matched = matched,
+    succeeded = succeeded,
+    pending = pending,
+    skipped = skipped,
+    failed = failed,
+    reason = reason,
+  }
+
+  safeDelay(0.10, function()
+    if MultiBot and type(MultiBot.RequestBridgeRosterRefresh) == "function" then
+      MultiBot.RequestBridgeRosterRefresh()
+    elseif Comm.RequestRoster then
+      Comm.RequestRoster()
+    end
+  end)
+
+  return true
+end
+-- MB_BOT_GROUP_LIFECYCLE_V1_END
+
 local function failAltRosterBatch(state, reason)
   state.altRosterBatch = nil
   state.lastError = "ALT_ROSTER_" .. tostring(reason or "INVALID")
@@ -1344,6 +1432,8 @@ function Comm.HandleAltBotLifecycleAddonMessage(opcode, payload, state)
     return handleBotLifecycleResult(payload, state)
   elseif opcode == "BOT_LIFECYCLE_STATE" then
     return handleBotLifecycleState(payload, state)
+  elseif opcode == "BOT_GROUP_LIFECYCLE" then
+    return Comm.ApplyBotGroupLifecycleResultPayload(payload, state)
   end
   return false
 end
@@ -1371,6 +1461,16 @@ function Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, sta
         final = true,
       })
     end
+    return true
+  end
+
+  if requestType == "BOT_GROUP_LIFECYCLE" then
+    state = type(state) == "table" and state or ensureBridgeState()
+    reason = trim(reason or "PROTOCOL_ERROR")
+    if reason == "" then
+      reason = "PROTOCOL_ERROR"
+    end
+    state.lastError = "BOT_GROUP_LIFECYCLE_" .. reason
     return true
   end
 

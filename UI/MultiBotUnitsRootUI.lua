@@ -2384,12 +2384,36 @@ local function createFactionBanner(unitsFrame)
 
     local button = allianceFrame.addButton("FactionBanner", 0, 0, bannerIcon, MultiBot.L("tips.units.alliance"))
     button:doShow()
+    -- MB_BOT_GROUP_LIFECYCLE_V1_BEGIN
     button.doRight = function()
-        SendChatMessage(".playerbot bot remove *", "SAY")
+        local bridge = MultiBot.bridge
+        if bridge and bridge.connected == true
+            and bridge.botGroupLifecycleCapable == true
+            and MultiBot.Comm
+            and type(MultiBot.Comm.RunBotGroupLifecycle) == "function" then
+            MultiBot.Comm.RunBotGroupLifecycle("DISCONNECT")
+            return
+        end
+
+        if MultiBot.allowLegacyChatFallback == true then
+            SendChatMessage(".playerbot bot remove *", "SAY")
+        end
     end
     button.doLeft = function()
-        SendChatMessage(".playerbot bot add *", "SAY")
+        local bridge = MultiBot.bridge
+        if bridge and bridge.connected == true
+            and bridge.botGroupLifecycleCapable == true
+            and MultiBot.Comm
+            and type(MultiBot.Comm.RunBotGroupLifecycle) == "function" then
+            MultiBot.Comm.RunBotGroupLifecycle("CONNECT")
+            return
+        end
+
+        if MultiBot.allowLegacyChatFallback == true then
+            SendChatMessage(".playerbot bot add *", "SAY")
+        end
     end
+    -- MB_BOT_GROUP_LIFECYCLE_V1_END
 
     return allianceFrame, button
 end
