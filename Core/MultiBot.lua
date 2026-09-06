@@ -4419,9 +4419,53 @@ MultiBot.AddClassToTarget = function(classCmd, gender)
 end
 -- MB_CREATOR_ADDCLASS_V1_END
 -- Init Wrapper
+-- MB_CREATOR_INIT_AUTO_V1_BEGIN
 function MultiBot.InitAuto(name)
+  if type(name) ~= "string" or name == "" then return nil end
+
+  local bridge = MultiBot.bridge
+  local comm = MultiBot.Comm
+  if bridge and bridge.connected == true
+      and bridge.creatorInitAutoCapable == true
+      and comm and type(comm.RunCreatorInitAuto) == "function" then
+    return comm.RunCreatorInitAuto("TARGET", name)
+  end
+
+  if MultiBot.allowLegacyChatFallback ~= true then
+    if bridge then
+      bridge.lastError = "CREATOR_INIT_AUTO_CAPABILITY_UNAVAILABLE"
+    end
+    return nil
+  end
+
   SendChatMessage(".playerbot bot init=auto " .. name, "SAY")
+  return true
 end
+
+function MultiBot.InitAutoGroup()
+  local bridge = MultiBot.bridge
+  local comm = MultiBot.Comm
+  if bridge and bridge.connected == true
+      and bridge.creatorInitAutoCapable == true
+      and comm and type(comm.RunCreatorInitAuto) == "function" then
+    return comm.RunCreatorInitAuto("GROUP")
+  end
+
+  if MultiBot.allowLegacyChatFallback ~= true then
+    if bridge then
+      bridge.lastError = "CREATOR_INIT_AUTO_CAPABILITY_UNAVAILABLE"
+    end
+    return nil
+  end
+
+  if not IsInRaid() and not IsInGroup() then
+    return nil
+  end
+
+  SendChatMessage(".playerbot bot init=auto *", "SAY")
+  return true
+end
+-- MB_CREATOR_INIT_AUTO_V1_END
 
 -- Localization payload moved to AceLocale files.
 -- Keep runtime containers initialized elsewhere; locale files hydrate values.

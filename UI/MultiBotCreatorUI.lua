@@ -91,13 +91,8 @@ local function initializeTarget()
     end
 
     local name = UnitName("target")
-    if MultiBot.isRoster("players", name) then
-        SendChatMessage(MultiBot.L("info.players"), "SAY")
-        return
-    end
-
-    if MultiBot.isRoster("members", name) then
-        SendChatMessage(MultiBot.L("info.members"), "SAY")
+    if not name or name == "" then
+        SendChatMessage(MultiBot.L("info.target"), "SAY")
         return
     end
 
@@ -105,28 +100,10 @@ local function initializeTarget()
 end
 
 local function initializeGroup()
-    local function iterate(unitPrefix, count)
-        for index = 1, count do
-            local name = UnitName(unitPrefix .. index)
-            if name and name ~= UnitName("player") then
-                if MultiBot.isRoster("players", name) then
-                    SendChatMessage(MultiBot.doReplace(MultiBot.L("info.player"), "NAME", name), "SAY")
-                elseif MultiBot.isRoster("members", name) then
-                    SendChatMessage(MultiBot.doReplace(MultiBot.L("info.member"), "NAME", name), "SAY")
-                else
-                    MultiBot.InitAuto(name)
-                end
-            end
+    if IsInRaid() or IsInGroup() then
+        if MultiBot.InitAutoGroup then
+            MultiBot.InitAutoGroup()
         end
-    end
-
-    if IsInRaid() then
-        iterate("raid", GetNumGroupMembers())
-        return
-    end
-
-    if IsInGroup() then
-        iterate("party", GetNumSubgroupMembers())
         return
     end
 

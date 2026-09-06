@@ -71,6 +71,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["BOT_GROUP_REMOVE_V1"] = "botGroupRemoveCapable",
   ["BOT_GROUP_LIFECYCLE_V1"] = "botGroupLifecycleCapable",
   ["CREATOR_ADDCLASS_V1"] = "creatorAddClassCapable",
+  ["CREATOR_INIT_AUTO_V1"] = "creatorInitAutoCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -372,6 +373,7 @@ local function ensureBridgeState()
   state.botGroupRemoveCapable = state.botGroupRemoveCapable or false
   state.botGroupLifecycleCapable = state.botGroupLifecycleCapable or false
   state.creatorAddClassCapable = state.creatorAddClassCapable or false
+  state.creatorInitAutoCapable = state.creatorInitAutoCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -380,6 +382,7 @@ local function ensureBridgeState()
   state.botLifecycleSeq = tonumber(state.botLifecycleSeq) or 0
   state.botLifecycleCommands = type(state.botLifecycleCommands) == "table" and state.botLifecycleCommands or {}
   state.creatorAddClassCommands = type(state.creatorAddClassCommands) == "table" and state.creatorAddClassCommands or {}
+  state.creatorInitAutoCommands = type(state.creatorInitAutoCommands) == "table" and state.creatorInitAutoCommands or {}
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -1308,6 +1311,147 @@ function Comm.ApplyCreatorAddClassResultPayload(payload, state)
   return true
 end
 -- MB_CREATOR_ADDCLASS_V1_END
+-- MB_CREATOR_INIT_AUTO_V1_BEGIN
+function Comm.RunCreatorInitAuto(mode, botName)
+  local state = ensureBridgeState()
+  if state.connected ~= true
+      or state.creatorInitAutoCapable ~= true then
+    return nil
+  end
+
+  mode = string.upper(trim(tostring(mode or "")))
+  if mode ~= "TARGET" and mode ~= "GROUP" then
+    state.lastError = "CREATOR_INIT_AUTO_BAD_MODE"
+    return nil
+  end
+
+  botName = trim(tostring(botName or ""))
+  if mode == "TARGET" then
+    if botName == "" or #botName > 64
+        or string.find(botName, "~", 1, true)
+        or string.find(botName, "\r", 1, true)
+        or string.find(botName, "\n", 1, true) then
+      state.lastError = "CREATOR_INIT_AUTO_BAD_TARGET"
+      return nil
+    end
+  else
+    botName = ""
+  end
+
+  local activeCount = 0
+  for _ in pairs(state.creatorInitAutoCommands or {}) do
+    activeCount = activeCount + 1
+  end
+  if activeCount >= 4 then
+    state.lastError = "CREATOR_INIT_AUTO_TOO_MANY_ACTIVE"
+    return nil
+  end
+
+  local token = nextBotLifecycleToken(state, "INIT")
+  if not isValidStateToken(token) then
+    return nil
+  end
+
+  state.creatorInitAutoCommands[token] = {
+    token = token,
+    mode = mode,
+    botName = botName,
+    startedAt = safeNow(),
+  }
+
+  local encodedTarget = urlEncodeField(botName)
+  if not Comm.Send(
+      "RUN",
+      "CREATOR_INIT_AUTO~" .. token .. "~" .. mode .. "~" .. encodedTarget) then
+    state.creatorInitAutoCommands[token] = nil
+    return nil
+  end
+
+  local timeoutSeconds = mode == "GROUP" and 60.0 or 20.0
+  safeDelay(timeoutSeconds, function()
+    local live = ensureBridgeState()
+    local pending = live.creatorInitAutoCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    live.creatorInitAutoCommands[token] = nil
+    local reason = live.connected == true and "CLIENT_TIMEOUT" or "BRIDGE_DISCONNECTED"
+    live.lastError = "CREATOR_INIT_AUTO_" .. reason
+    live.lastCreatorInitAutoResult = {
+      token = token,
+      mode = pending.mode,
+      botName = pending.botName,
+      status = "ERR",
+      reason = reason,
+      total = 0,
+      initialized = 0,
+      skipped = 0,
+      failed = 0,
+    }
+  end)
+
+  return token
+end
+
+function Comm.ApplyCreatorInitAutoResultPayload(payload, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+
+  local fields = splitFields(payload or "")
+  if #fields ~= 8 then
+    state.lastError = "CREATOR_INIT_AUTO_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local mode = string.upper(trim(fields[2]))
+  local status = string.upper(trim(fields[3]))
+  local reason = urlDecodeFieldStrict(fields[4], 64, false)
+  local total = parseBoundedInteger(fields[5], 0, 40)
+  local initialized = parseBoundedInteger(fields[6], 0, 40)
+  local skipped = parseBoundedInteger(fields[7], 0, 40)
+  local failed = parseBoundedInteger(fields[8], 0, 40)
+
+  if not isValidStateToken(token) then
+    state.lastError = "CREATOR_INIT_AUTO_BAD_TOKEN"
+    return true
+  end
+
+  local command = state.creatorInitAutoCommands[token]
+  if type(command) ~= "table" then
+    return true
+  end
+
+  if mode ~= command.mode
+      or (status ~= "OK" and status ~= "ERR")
+      or reason == nil or reason == ""
+      or total == nil or initialized == nil or skipped == nil or failed == nil
+      or total ~= initialized + skipped + failed
+      or (mode == "TARGET" and total > 1) then
+    state.creatorInitAutoCommands[token] = nil
+    state.lastError = "CREATOR_INIT_AUTO_BAD_RESPONSE"
+    return true
+  end
+
+  state.creatorInitAutoCommands[token] = nil
+  state.connected = true
+  state.lastError = status == "ERR"
+      and ("CREATOR_INIT_AUTO_" .. reason)
+      or nil
+  state.lastCreatorInitAutoResult = {
+    token = token,
+    mode = mode,
+    botName = command.botName,
+    status = status,
+    reason = reason,
+    total = total,
+    initialized = initialized,
+    skipped = skipped,
+    failed = failed,
+  }
+  return true
+end
+-- MB_CREATOR_INIT_AUTO_V1_END
 
 local function failAltRosterBatch(state, reason)
   state.altRosterBatch = nil
@@ -1573,6 +1717,8 @@ function Comm.HandleAltBotLifecycleAddonMessage(opcode, payload, state)
     return Comm.ApplyBotGroupLifecycleResultPayload(payload, state)
   elseif opcode == "CREATOR_ADDCLASS" then
     return Comm.ApplyCreatorAddClassResultPayload(payload, state)
+  elseif opcode == "CREATOR_INIT_AUTO" then
+    return Comm.ApplyCreatorInitAutoResultPayload(payload, state)
   end
   return false
 end
@@ -1623,6 +1769,31 @@ function Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, sta
       }
     end
     state.lastError = "CREATOR_ADDCLASS_" .. reason
+    return true
+  end
+  if requestType == "CREATOR_INIT_AUTO" then
+    state = type(state) == "table" and state or ensureBridgeState()
+    reason = trim(reason or "PROTOCOL_ERROR")
+    if reason == "" then
+      reason = "PROTOCOL_ERROR"
+    end
+
+    local command = state.creatorInitAutoCommands[token]
+    if type(command) == "table" then
+      state.creatorInitAutoCommands[token] = nil
+      state.lastCreatorInitAutoResult = {
+        token = token,
+        mode = command.mode,
+        botName = command.botName,
+        status = "ERR",
+        reason = reason,
+        total = 0,
+        initialized = 0,
+        skipped = 0,
+        failed = 0,
+      }
+    end
+    state.lastError = "CREATOR_INIT_AUTO_" .. reason
     return true
   end
   if requestType == "BOT_GROUP_LIFECYCLE" then
