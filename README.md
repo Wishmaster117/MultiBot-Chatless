@@ -78,7 +78,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Enchanting** | Dedicated Enchanting Trade Service using the native WoW Trade workflow. |
 | **Quests** | Bridge-backed quest list and structured bot quest abandon. Native quest sharing remains available. |
 | **Loot** | Structured loot profiles and exact persistent always-loot item add/remove. |
-| **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1`, `ATTACK_ORDER_V1` and `FLEE_ORDER_V1` collective orders. Attack and Flee keep the validated Tank / Healer / DPS / Melee / Ranged audiences; Flee feedback is chatless and names the authoritative Bridge-selected bots. |
+| **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1`, `ATTACK_ORDER_V1`, `FLEE_ORDER_V1` and bounded `GROUP_ACTION_V1`. The Group Actions set `drink` / `release` / `revive` / `summon` now uses native Playerbots actions through the Bridge. |
 | **Raidus raid planner** | Persistent 8×5 Working Layout, Saved Layouts, Score/Level/Class sorting, drag/drop, Auto balance, structured Apply and human-safe outside-layout bot removal through `BOT_GROUP_REMOVE_V1`. |
 | **Character information** | Bot skills, reputations, currencies/emblems, spellbook, stats and PvP stats. |
 | **Outfits** | Outfit listing and actions through the Bridge. |
@@ -201,7 +201,30 @@ The Bridge remains authoritative for role matching and invokes the audited nativ
 
 Normal Playerbots Flee success whispers are filtered client-side only while a matching Flee request is pending. Playerbots error feedback and unrelated human whispers remain visible. Runtime validation covered ALL, controlled TARGET, non-bot TARGET rejection, all role audiences, name feedback, whisper suppression and Follow / Stay / Attack non-regression.
 
-The next active group-action migration is the bounded set `drink`, `release`, `revive` and `summon`.
+The bounded Group Actions set `drink`, `release`, `revive` and `summon` has since been migrated through `GROUP_ACTION_V1`. The next active migration is **RTSC**.
+
+---
+
+# Recent Milestone — Group Actions Chatless
+
+The bounded Group Actions set was migrated, compiled and runtime validated on **11 September 2026** through:
+
+```text
+GROUP_ACTION_V1
+```
+
+Covered actions are:
+
+- `drink` → native Playerbots `drink`;
+- `release` → native Playerbots `release`;
+- `revive` → native Playerbots `spirit healer`;
+- `summon` → native Playerbots `summon`.
+
+The Bridge keeps a closed action allowlist, revalidates requester/group/bot state and Playerbots control permission, and reuses the existing group-order rate-limit, replay protection and validated 40-bot bound. The addon routes only these four exact actions through this endpoint.
+
+Runtime validation covered all four actions, including the full `Release -> Revive` ghost/spirit-healer flow. `GROUP_ACTION_ACK` was observed, no automatic legacy PARTY/RAID command chat was observed, `MultiBotComm.lua` remained at **199 top-level locals**, and `mod-playerbots` remained strictly read-only.
+
+The next active migration is **RTSC**, followed by quest interactions, remaining ordinary-bot actions and final legacy parser/fallback cleanup.
 
 ---
 
@@ -247,6 +270,7 @@ FOLLOW_ORDER_V1
 STAY_ORDER_V1
 ATTACK_ORDER_V1
 FLEE_ORDER_V1
+GROUP_ACTION_V1
 ```
 
 The exact protocol is an implementation detail of the addon and Bridge. The normal user experience should remain UI-driven.
@@ -312,7 +336,7 @@ Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or expli
 
 Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
 
-The next active migration in the current group/combat batch is **Group Actions**: `drink`, `release`, `revive` and `summon`, followed by RTSC, quest interactions, remaining ordinary-bot actions and final legacy parser/fallback cleanup.
+The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is now bridge-first and runtime validated through `GROUP_ACTION_V1`. The next active migration is **RTSC**, followed by quest interactions, remaining ordinary-bot actions and final legacy parser/fallback cleanup.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 

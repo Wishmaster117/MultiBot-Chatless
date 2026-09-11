@@ -937,6 +937,38 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 	end
 	-- MB_FLEE_ORDER_V1_GROUP_ROUTE_END
 
+	-- MB_GROUP_ACTION_V1_ROUTE_BEGIN
+	local groupAction = nil
+	if(normalizedGroupOrder == "drink") then
+		groupAction = "DRINK"
+	elseif(normalizedGroupOrder == "release") then
+		groupAction = "RELEASE"
+	elseif(normalizedGroupOrder == "revive") then
+		groupAction = "REVIVE"
+	elseif(normalizedGroupOrder == "summon") then
+		groupAction = "SUMMON"
+	end
+
+	if(groupAction ~= nil) then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.groupActionCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunGroupActionCommand) == "function") then
+			local token = MultiBot.Comm.RunGroupActionCommand(groupAction, onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.allowLegacyChatFallback ~= true) then
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "GROUP_ACTION_UNAVAILABLE" end
+			return false, "blocked"
+		end
+	end
+	-- MB_GROUP_ACTION_V1_ROUTE_END
+
 	if(GetNumRaidMembers() > 5) then
 		local route = _mbRouteStrategyMutation(pAction, "RAID", "")
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then

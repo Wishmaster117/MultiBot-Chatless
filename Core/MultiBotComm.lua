@@ -73,6 +73,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["CREATOR_ADDCLASS_V1"] = "creatorAddClassCapable",
   ["CREATOR_INIT_AUTO_V1"] = "creatorInitAutoCapable",
   ["FLEE_ORDER_V1"] = "fleeOrderCapable",
+  ["GROUP_ACTION_V1"] = "groupActionCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -376,6 +377,7 @@ local function ensureBridgeState()
   state.creatorAddClassCapable = state.creatorAddClassCapable or false
   state.creatorInitAutoCapable = state.creatorInitAutoCapable or false
   state.fleeOrderCapable = state.fleeOrderCapable or false
+  state.groupActionCapable = state.groupActionCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -2104,6 +2106,7 @@ state.selfActionCapable = false
     state.inventoryOpenCapable = false
     state.lootRuleItemCapable = false
     state.groupRollCapable = false
+    state.groupActionCapable = false
     state.enchantTradeCapable = false
     state.questAbandonCapable = false
     state.talentApplyCapable = false
@@ -2377,6 +2380,76 @@ function Comm.RunGroupOrderCommand(order, callback)
 end
 -- MB_FOLLOW_STAY_ORDER_V1_TX_END
 
+-- MB_GROUP_ACTION_V1_TX_BEGIN
+function Comm.RunGroupActionCommand(action, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "GROUP_ACTION_NOT_CONNECTED"
+    return false
+  end
+  if state.groupActionCapable ~= true then
+    state.lastError = "GROUP_ACTION_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  action = string.upper(trim(action or ""))
+  if action ~= "DRINK"
+      and action ~= "RELEASE"
+      and action ~= "REVIVE"
+      and action ~= "SUMMON" then
+    state.lastError = "GROUP_ACTION_BAD_ACTION"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "GROUP_ACTION_BUSY"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-group-action-" .. tostring(state.groupOrderSeq)
+  state.groupOrderCommands[token] = {
+    order = "GROUP_ACTION",
+    action = action,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("RUN", "GROUP_ACTION~" .. token .. "~" .. action) then
+    state.groupOrderCommands[token] = nil
+    state.lastError = "GROUP_ACTION_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    local pending = bridge.groupOrderCommands[token]
+    if type(pending) ~= "table"
+        or pending.order ~= "GROUP_ACTION"
+        or pending.action ~= action then
+      return
+    end
+
+    bridge.lastError = "GROUP_ACTION_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      action = action,
+      matched = 0,
+      succeeded = 0,
+      failed = 0,
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+-- MB_GROUP_ACTION_V1_TX_END
 -- MB_ATTACK_ORDER_V1_TX_BEGIN
 function Comm.RunAttackOrderCommand(audience, callback)
   local state = ensureBridgeState()
@@ -6312,6 +6385,7 @@ state.selfActionCapable = false
   state.inventoryOpenCapable = false
   state.lootRuleItemCapable = false
   state.groupRollCapable = false
+  state.groupActionCapable = false
   state.enchantTradeCapable = false
   state.questAbandonCapable = false
   state.talentApplyCapable = false
@@ -10912,6 +10986,83 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   end
   -- MB_FOLLOW_STAY_ORDER_V1_RX_END
 
+  -- MB_GROUP_ACTION_V1_RX_BEGIN
+  if opcode == "GROUP_ACTION_ACK" then
+    local fields = splitFields(payload or "")
+    if #fields ~= 6 then
+      state.lastError = "GROUP_ACTION_ACK_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = fields[1]
+    local action = fields[2]
+    local matched = tonumber(fields[3])
+    local succeeded = tonumber(fields[4])
+    local failed = tonumber(fields[5])
+    local reason = fields[6]
+    state.groupOrderCommands = state.groupOrderCommands or {}
+    local pending = state.groupOrderCommands[token]
+
+    local actionValid = action == "DRINK"
+      or action == "RELEASE"
+      or action == "REVIVE"
+      or action == "SUMMON"
+
+    local countsValid = matched and succeeded and failed
+      and matched >= 0 and matched <= 40 and math.floor(matched) == matched
+      and succeeded >= 0 and succeeded <= matched and math.floor(succeeded) == succeeded
+      and failed >= 0 and failed <= matched and math.floor(failed) == failed
+      and succeeded + failed == matched
+
+    local reasonValid = reason == "OK"
+      or reason == "BAD_ACTION"
+      or reason == "RATE_LIMIT"
+      or reason == "REPLAY"
+      or reason == "NO_GROUP"
+      or reason == "NO_BOTS"
+      or reason == "BOT_LIMIT"
+      or reason == "PARTIAL"
+      or reason == "FAILED"
+
+    if not isValidStateToken(token)
+        or not actionValid
+        or not countsValid
+        or not reasonValid
+        or type(pending) ~= "table"
+        or pending.order ~= "GROUP_ACTION"
+        or pending.action ~= action then
+      state.lastError = "GROUP_ACTION_ACK_INVALID"
+      return true
+    end
+
+    state.connected = true
+    if reason == "OK" then
+      state.lastError = nil
+    else
+      state.lastError = "GROUP_ACTION_" .. reason
+    end
+    debugPrint("ADDON:RX", opcode, payload or "")
+
+    local status = "failed"
+    if reason == "OK" and matched > 0 and failed == 0 and succeeded == matched then
+      status = "ok"
+    elseif reason == "NO_BOTS" and matched == 0 then
+      status = "empty"
+    elseif succeeded > 0 then
+      status = "partial"
+    end
+
+    Comm._FinishGroupOrderCommand(token, {
+      status = status,
+      action = action,
+      matched = matched,
+      succeeded = succeeded,
+      failed = failed,
+      reason = reason,
+    })
+    return true
+  end
+  -- MB_GROUP_ACTION_V1_RX_END
   -- MB_ATTACK_ORDER_V1_RX_BEGIN
   if opcode == "ATTACK_ORDER_ACK" then
     local fields = splitFields(payload or "")
@@ -11239,6 +11390,7 @@ state.selfActionCapable = false
   state.inventoryOpenCapable = false
   state.lootRuleItemCapable = false
   state.groupRollCapable = false
+  state.groupActionCapable = false
   state.enchantTradeCapable = false
   state.questAbandonCapable = false
   state.talentApplyCapable = false

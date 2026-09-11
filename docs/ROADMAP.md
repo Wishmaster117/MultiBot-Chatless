@@ -17,8 +17,8 @@ Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontaireme
 ```text
 Repo:   L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot
 Branch: feature/group-orders-chatless
-Base HEAD auditée avant commit de clôture Flee:
-        3d99f0c5607e0195d2c8a0fab86a42e92c7b1a61
+Base HEAD auditée avant commit de clôture Group Actions:
+        dbc48ad2e85c8a2b5a48df4447155062c11ab52b
 ```
 
 État fonctionnel audité au 11/09/2026 :
@@ -29,17 +29,18 @@ Base HEAD auditée avant commit de clôture Flee:
 - Faction Banner bulk group lifecycle livré via `BOT_GROUP_LIFECYCLE_V1` ;
 - Creator `addclass` livré via `CREATOR_ADDCLASS_V1` ;
 - Flee livré via `FLEE_ORDER_V1`, avec feedback chatless et noms ALL / TARGET / rôles validés ;
-- `Core\MultiBotComm.lua` final Flee : `F1B19AAC980C8213CA7494CDDFF6CC6364975D11811A1EBE4A85F40E29501E9A` ;
+- `Core\MultiBotComm.lua` final Group Actions : `FEEC5C0811B4B9BA2EEC49ECEAB1A23B1C6653BA4A2225D37FC561926BBED4F8` ;
 - `MultiBotComm.lua` reste à **199 locals** au niveau chunk principal ;
-- prochain chantier actif : Group Actions (`drink`, `release`, `revive`, `summon`).
+- Group Actions (`drink`, `release`, `revive`, `summon`) livrées et runtime validées via `GROUP_ACTION_V1` ;
+- prochain chantier actif : RTSC.
 
 ### Bridge
 
 ```text
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge
 Branch: feature/group-orders-chatless
-Base HEAD auditée avant commit de clôture Flee:
-        77b709007a13975c4898e845aaf04f0ad2fa067b
+Base HEAD auditée avant commit de clôture Group Actions:
+        f4246758c24dc7098bde726064aa7a89189e616e
 ```
 
 État fonctionnel audité au 11/09/2026 :
@@ -49,9 +50,10 @@ Base HEAD auditée avant commit de clôture Flee:
 - `BOT_GROUP_LIFECYCLE_V1` livré pour le connect/disconnect bulk borné du groupe réel ;
 - `CREATOR_ADDCLASS_V1` livré comme adaptateur AddClass spécialisé, sans exécuteur Playerbots générique ;
 - `FLEE_ORDER_V1` livré et runtime validé ;
+- `GROUP_ACTION_V1` livré avec allowlist fermée DRINK / RELEASE / REVIVE / SUMMON et appels natifs Playerbots ;
 - `BotMatchesAttackAudience` reste autoritaire pour les audiences de rôle ;
 - `FLEE_ORDER_ITEM` retourne les résultats nominatifs bornés avant `FLEE_ORDER_ACK` ;
-- `src\MultiBotBridge.cpp` final Flee : `55E29034A51BAACFBC2E97B129E245A85AE32A586D737B8576F74E6DF0A0ECF5` ;
+- `src\MultiBotBridge.cpp` final Group Actions : `E43FCB40DF864AFAE8A12D6CC3EC0FBFA82E6B5C58EAAB49E1F3B3C2204596B0` ;
 - aucun exécuteur Playerbots générique n'a été ajouté.
 
 ### Playerbots
@@ -208,6 +210,7 @@ Livré ou déjà migré selon les familles validées :
 - `STAY_ORDER_V1` ;
 - `ATTACK_ORDER_V1` ;
 - `FLEE_ORDER_V1`, y compris ALL / TARGET / Tank / Healer / DPS / Melee / Ranged avec feedback nominatif chatless ;
+- `GROUP_ACTION_V1` pour `drink`, `release`, `revive` et `summon`, runtime validé sans fallback chat automatique ;
 - plusieurs contrôles combat/non-combat.
 
 ### Creator — AddClass spécialisé
@@ -708,13 +711,12 @@ Le bulk lifecycle et Flee sont retirés de la file active.
 
 L'audit `Units / lifecycle legacy cleanup` du 06/09/2026 a confirmé qu'un nettoyage est possible, mais il reste volontairement reporté afin de ne pas retirer trop tôt des fallbacks/parsers encore utiles pendant la migration chatless.
 
-Après clôture Flee du 11/09/2026, l'ordre recommandé devient :
+Après clôture Group Actions du 11/09/2026, l'ordre recommandé devient :
 
-1. Group Actions (`drink`, `release`, `revive`, `summon`) ;
-2. RTSC ;
-3. Quest interactions (`accept *`, `talk`, `los`, gameobject use, reward choice) ;
-4. actions bots ordinaires restantes (maintenance, autogear, Hunter pet controls, spell cast) ;
-5. nettoyage final global des fallbacks/parsers chat devenus morts, **incluant le cleanup Units / lifecycle legacy déjà audité**.
+1. RTSC ;
+2. Quest interactions (`accept *`, `talk`, `los`, gameobject use, reward choice) ;
+3. actions bots ordinaires restantes (maintenance, autogear, Hunter pet controls, spell cast) ;
+4. nettoyage final global des fallbacks/parsers chat devenus morts, **incluant le cleanup Units / lifecycle legacy déjà audité**.
 
 Ne pas déclarer le projet fully chatless tant que les occurrences restantes de `SendChatMessage` n'ont pas été classées et validées.
 
@@ -803,7 +805,84 @@ SHA-256 030F44635E435E41B5A056A77F5975B8F67A7785EF9BFB21536DD7423E32D16D
 FINAL_STATUS=OK
 ```
 
-Le prochain chantier actif est **Group Actions** : `drink`, `release`, `revive`, `summon`.
+Le chantier **Group Actions** est désormais clôturé via `GROUP_ACTION_V1`; le prochain chantier actif est **RTSC**.
+
+---
+
+## 7ter. Clôture Group Actions Chatless — 11/09/2026
+
+### Capacité livrée
+
+```text
+GROUP_ACTION_V1
+```
+
+Périmètre volontairement fermé :
+
+```text
+DRINK   -> Playerbots "drink"
+RELEASE -> Playerbots "release"
+REVIVE  -> Playerbots "spirit healer"
+SUMMON  -> Playerbots "summon"
+```
+
+Architecture validée :
+
+```text
+Group Actions UI
+  -> MultiBot.ActionToGroup(exact action)
+  -> RUN~GROUP_ACTION~token~ACTION
+  -> validation Bridge + scope groupe/raid + security + rate/replay
+  -> PlayerbotAI::DoSpecificAction(native action)
+  -> GROUP_ACTION_ACK
+```
+
+Garanties de clôture :
+
+- aucune commande Playerbots arbitraire acceptée par cet endpoint ;
+- allowlist serveur fermée aux quatre actions auditées ;
+- scope borné à 40 bots et protections group-order existantes réutilisées ;
+- contrôle `PLAYERBOT_SECURITY_ALLOW_ALL` conservé côté Bridge ;
+- `revive` utilise l'action native `spirit healer` au lieu de réimplémenter le lifecycle de résurrection ;
+- fallback PARTY/RAID conservé uniquement si `MultiBot.allowLegacyChatFallback == true` ;
+- tentative structurée non rétrogradée silencieusement vers le chat ;
+- `Core\MultiBotComm.lua` reste à **199 locals** au niveau chunk principal ;
+- Playerbots resté strictement read-only.
+
+Validation runtime :
+
+```text
+worldserver build = OK
+server start      = OK
+DRINK             = VALIDATED
+RELEASE           = VALIDATED
+REVIVE            = VALIDATED
+SUMMON            = VALIDATED
+GROUP_ACTION_ACK  = OBSERVED
+legacy chat spam  = NOT OBSERVED
+```
+
+Audit final :
+
+```text
+audit-multibot-group-action-v1-final-v1b-2026-09-11-201814.zip
+SHA-256 52B58083BF66E29B774ADECB17122EB9C54E56C19918B81F17DFAE12C487E0FF
+FATAL_COUNT=0
+WARNING_COUNT=1
+FINAL_STATUS=OK_WITH_WARNINGS
+```
+
+Le warning unique correspond au `TODO.md` local déjà connu et hors périmètre du chantier.
+
+Hashes code de clôture :
+
+```text
+MultiBotComm.lua   FEEC5C0811B4B9BA2EEC49ECEAB1A23B1C6653BA4A2225D37FC561926BBED4F8
+MultiBotEngine.lua BE19850C472CF85FB69AE3292D8F15DB71EBBB6471E5F93DE4A2A2670FB33DE6
+MultiBotBridge.cpp E43FCB40DF864AFAE8A12D6CC3EC0FBFA82E6B5C58EAAB49E1F3B3C2204596B0
+```
+
+Le prochain chantier actif est désormais **RTSC**.
 
 ---
 
@@ -936,14 +1015,13 @@ Cette décision évite de casser prématurément les rosters, EveryBar, AutoInvi
 
 ### Familles actives à reprendre
 
-Ordre courant après clôture Flee du 11/09/2026 :
+Ordre courant après clôture Group Actions du 11/09/2026 :
 
 ```text
-1. Group Actions: drink / release / revive / summon
-2. RTSC
-3. Quest interactions
-4. remaining ordinary-bot actions
-5. final legacy parser/fallback cleanup
+1. RTSC
+2. Quest interactions
+3. remaining ordinary-bot actions
+4. final legacy parser/fallback cleanup
    including Units / lifecycle legacy cleanup
 ```
 
@@ -1063,7 +1141,8 @@ Repères principaux conservés :
 - ALL et TARGET nominatif validés ; une cible non-bot ne produit plus de fausse confirmation ;
 - audiences Tank / Healer / DPS / Melee / Ranged enrichies par `FLEE_ORDER_ITEM` autoritaire côté Bridge avant `FLEE_ORDER_ACK` ;
 - build `worldserver`, runtime Flee et non-régressions Follow / Stay / Attack validés le 11/09/2026 ;
-- prochaine migration active fixée à Group Actions (`drink`, `release`, `revive`, `summon`) ;
+- Group Actions (`drink`, `release`, `revive`, `summon`) migrées via `GROUP_ACTION_V1`, build/runtime validés le 11/09/2026, audit final fatal-free et Playerbots resté read-only ;
+- prochaine migration active fixée à RTSC ;
 - base HEAD Addon auditée avant commit de clôture Flee : `3d99f0c5607e0195d2c8a0fab86a42e92c7b1a61` ;
 - base HEAD Bridge auditée avant commit de clôture Flee : `77b709007a13975c4898e845aaf04f0ad2fa067b` ;
 - Playerbots `b949b50bfcdd4fab937781bac2d7765e39330e4b` resté strictement read-only.
@@ -1078,6 +1157,7 @@ Cette section conserve uniquement les preuves structurantes utiles à la reprise
 
 | Référence | SHA-256 | Portée |
 | --- | --- | --- |
+| `audit-multibot-group-action-v1-final-v1b-2026-09-11-201814.zip` | `52B58083BF66E29B774ADECB17122EB9C54E56C19918B81F17DFAE12C487E0FF` | Audit final Group Actions : `GROUP_ACTION_V1`, hashes code validés, 199 locals Comm, build/server/runtime DRINK/RELEASE/REVIVE/SUMMON validés, Playerbots clean/read-only ; warning unique `TODO.md` hors périmètre. |
 | `audit-multibot-flee-closeout-docs-current-state-v1-2026-09-11-175432.zip` | `030F44635E435E41B5A056A77F5975B8F67A7785EF9BFB21536DD7423E32D16D` | Audit final Flee + documentation : hashes finaux Addon/Bridge, 199 locals Comm, Flee ALL/TARGET/rôles nominatif validé, Playerbots clean/read-only, état README/ROADMAP inventorié. |
 | `audit-multibot-creator-addclass-final-v1b-2026-09-06-040620.zip` | `601049B069D378410EDE6D8E13BCD5B1DA45786BA8E689B3C0FF1F3D4034D8C6` | Audit final Creator AddClass : hashes post-patch vérifiés, build/runtime Random/Male/Female/DK + auto-group validés, zéro fallback AddClass SAY observé, `init=auto` inchangé, Playerbots clean/read-only. |
 | `audit-multibot-units-lifecycle-legacy-cleanup-current-state-v1-2026-09-06-021846.zip` | `5C7829243DFD362901821D2708E39D76137EF512487E33957E59D742E249D689` | Audit ciblé read-only du cleanup Units/lifecycle : baselines intactes, Playerbots sans écriture, fallbacks lifecycle identifiés, parsers partagés conservés ; décision de reporter le cleanup à la phase finale. |
