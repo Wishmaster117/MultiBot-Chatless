@@ -78,7 +78,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Enchanting** | Dedicated Enchanting Trade Service using the native WoW Trade workflow. |
 | **Quests** | Bridge-backed quest list and structured bot quest abandon. Native quest sharing remains available. |
 | **Loot** | Structured loot profiles and exact persistent always-loot item add/remove. |
-| **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1` and `ATTACK_ORDER_V1` collective orders. Attack keeps the validated Tank / Healer / DPS / Melee / Ranged audiences. |
+| **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1`, `ATTACK_ORDER_V1` and `FLEE_ORDER_V1` collective orders. Attack and Flee keep the validated Tank / Healer / DPS / Melee / Ranged audiences; Flee feedback is chatless and names the authoritative Bridge-selected bots. |
 | **Raidus raid planner** | Persistent 8×5 Working Layout, Saved Layouts, Score/Level/Class sorting, drag/drop, Auto balance, structured Apply and human-safe outside-layout bot removal through `BOT_GROUP_REMOVE_V1`. |
 | **Character information** | Bot skills, reputations, currencies/emblems, spellbook, stats and PvP stats. |
 | **Outfits** | Outfit listing and actions through the Bridge. |
@@ -179,6 +179,32 @@ The legacy AddClass chat producer remains compatibility-fallback-only. `init=aut
 
 ---
 
+# Recent Milestone — Flee Chatless
+
+Flee was migrated, compiled and runtime validated on **11 September 2026** through the dedicated capability:
+
+```text
+FLEE_ORDER_V1
+```
+
+The structured path covers:
+
+- `ALL`;
+- `TARGET`;
+- `TANK`;
+- `HEALER`;
+- `DPS`;
+- `MELEE`;
+- `RANGED`.
+
+The Bridge remains authoritative for role matching and invokes the audited native Playerbots `flee chat shortcut` behavior rather than reimplementing Flee movement/strategy logic in the addon. `ALL` and successful `TARGET` feedback show bot names, while role-scoped Flee receives authoritative per-bot `FLEE_ORDER_ITEM` results before the final `FLEE_ORDER_ACK`.
+
+Normal Playerbots Flee success whispers are filtered client-side only while a matching Flee request is pending. Playerbots error feedback and unrelated human whispers remain visible. Runtime validation covered ALL, controlled TARGET, non-bot TARGET rejection, all role audiences, name feedback, whisper suppression and Follow / Stay / Attack non-regression.
+
+The next active group-action migration is the bounded set `drink`, `release`, `revive` and `summon`.
+
+---
+
 # Bridge Capabilities
 
 The addon negotiates feature capabilities with the Bridge before using newer paths.
@@ -220,6 +246,7 @@ CREATOR_ADDCLASS_V1
 FOLLOW_ORDER_V1
 STAY_ORDER_V1
 ATTACK_ORDER_V1
+FLEE_ORDER_V1
 ```
 
 The exact protocol is an implementation detail of the addon and Bridge. The normal user experience should remain UI-driven.
@@ -279,9 +306,13 @@ The project is **not declared fully chatless yet**. Remaining `SendChatMessage` 
 
 Collective **Follow**, **Stay** and **Attack** are now bridge-first and runtime validated through dedicated structured endpoints. Their exact UI commands are routed before the legacy PARTY/RAID chat fallback, and no generic arbitrary Playerbots command executor is used.
 
+**Flee** is also bridge-first and runtime validated through `FLEE_ORDER_V1`. ALL, TARGET and the Tank / Healer / DPS / Melee / Ranged audiences use the structured path; role names come from authoritative Bridge results and normal Playerbots Flee success whispers are suppressed without hiding unrelated human whispers or Playerbots error feedback.
+
 Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or explicitly legacy-gated. The Faction Banner bulk pair `.playerbot bot add *` / `.playerbot bot remove *` is now also migrated through `BOT_GROUP_LIFECYCLE_V1`, preserving Playerbots' real party/raid semantics and delegating the actual login/logout operations to `PlayerbotMgr`.
 
-Creator `addclass` is now bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. The next active Creator/init sub-path is `init=auto`; deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
+Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
+
+The next active migration in the current group/combat batch is **Group Actions**: `drink`, `release`, `revive` and `summon`, followed by RTSC, quest interactions, remaining ordinary-bot actions and final legacy parser/fallback cleanup.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 

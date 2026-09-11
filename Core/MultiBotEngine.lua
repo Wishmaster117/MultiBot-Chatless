@@ -773,6 +773,28 @@ MultiBot.ActionToTarget = function(pAction, oTarget)
 	local tName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
 
 	if(tName ~= nil and tName ~= "Unknown Entity") then
+		-- MB_FLEE_ORDER_V1_TARGET_ROUTE_BEGIN
+		local normalizedFleeOrder = type(pAction) == "string" and string.lower(pAction) or ""
+		if(normalizedFleeOrder == "flee") then
+			if(MultiBot.bridge
+				and MultiBot.bridge.connected == true
+				and MultiBot.bridge.fleeOrderCapable == true
+				and MultiBot.Comm
+				and type(MultiBot.Comm.RunFleeOrderCommand) == "function") then
+				local token = MultiBot.Comm.RunFleeOrderCommand("TARGET", tName)
+				if(token ~= false and token ~= nil) then
+					return true, "pending", token
+				end
+				return false, "blocked"
+			end
+
+			if(MultiBot.allowLegacyChatFallback ~= true) then
+				if(MultiBot.bridge) then MultiBot.bridge.lastError = "FLEE_ORDER_UNAVAILABLE" end
+				return false, "blocked"
+			end
+		end
+		-- MB_FLEE_ORDER_V1_TARGET_ROUTE_END
+
 		local route = _mbRouteStrategyMutation(pAction, "BOT", tName)
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then
 			return true, "bridge"
@@ -878,6 +900,43 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 		return false, "blocked"
 	end
 	-- MB_ATTACK_ORDER_V1_ROUTE_END
+
+	-- MB_FLEE_ORDER_V1_GROUP_ROUTE_BEGIN
+	local fleeAudience = nil
+	if(normalizedGroupOrder == "flee") then
+		fleeAudience = "ALL"
+	elseif(normalizedGroupOrder == "@tank flee") then
+		fleeAudience = "TANK"
+	elseif(normalizedGroupOrder == "@healer flee") then
+		fleeAudience = "HEALER"
+	elseif(normalizedGroupOrder == "@dps flee") then
+		fleeAudience = "DPS"
+	elseif(normalizedGroupOrder == "@melee flee") then
+		fleeAudience = "MELEE"
+	elseif(normalizedGroupOrder == "@ranged flee") then
+		fleeAudience = "RANGED"
+	end
+
+	if(fleeAudience ~= nil) then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.fleeOrderCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunFleeOrderCommand) == "function") then
+			local token = MultiBot.Comm.RunFleeOrderCommand(fleeAudience, "", onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.allowLegacyChatFallback ~= true) then
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "FLEE_ORDER_UNAVAILABLE" end
+			return false, "blocked"
+		end
+	end
+	-- MB_FLEE_ORDER_V1_GROUP_ROUTE_END
+
 	if(GetNumRaidMembers() > 5) then
 		local route = _mbRouteStrategyMutation(pAction, "RAID", "")
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then

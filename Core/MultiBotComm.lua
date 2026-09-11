@@ -72,6 +72,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["BOT_GROUP_LIFECYCLE_V1"] = "botGroupLifecycleCapable",
   ["CREATOR_ADDCLASS_V1"] = "creatorAddClassCapable",
   ["CREATOR_INIT_AUTO_V1"] = "creatorInitAutoCapable",
+  ["FLEE_ORDER_V1"] = "fleeOrderCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -374,6 +375,7 @@ local function ensureBridgeState()
   state.botGroupLifecycleCapable = state.botGroupLifecycleCapable or false
   state.creatorAddClassCapable = state.creatorAddClassCapable or false
   state.creatorInitAutoCapable = state.creatorInitAutoCapable or false
+  state.fleeOrderCapable = state.fleeOrderCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -2440,6 +2442,495 @@ function Comm.RunAttackOrderCommand(audience, callback)
   return token
 end
 -- MB_ATTACK_ORDER_V1_TX_END
+
+-- MB_FLEE_ORDER_V1_TX_BEGIN
+-- MB_FLEE_CHAT_FEEDBACK_CHATLESS_V1_BEGIN
+-- MB_FLEE_FEEDBACK_DISPLAY_NAMES_V1_BEGIN
+-- MB_FLEE_ROLE_NAMES_AUTHORITATIVE_V1_BEGIN
+function Comm._NormalizeFleeWhisperName(name)
+  name = trim(tostring(name or ""))
+  if name == "" then
+    return ""
+  end
+
+  local dash = string.find(name, "-", 1, true)
+  if dash and dash > 1 then
+    name = string.sub(name, 1, dash - 1)
+  end
+
+  return string.lower(name)
+end
+
+function Comm._BuildFleeWhisperSuppressNames(audience, target, state)
+  local names = {}
+  local displayNames = {}
+  local rosterNames = {}
+  state = type(state) == "table" and state or ensureBridgeState()
+
+  for _, entry in ipairs(state.roster or {}) do
+    if type(entry) == "table" then
+      local key = Comm._NormalizeFleeWhisperName(entry.name)
+      local displayName = trim(entry.name or "")
+      if key ~= "" and displayName ~= "" then
+        rosterNames[key] = displayName
+      end
+    end
+  end
+
+  audience = string.upper(trim(audience or ""))
+  if audience == "TARGET" then
+    local targetKey = Comm._NormalizeFleeWhisperName(target)
+    if targetKey ~= "" and rosterNames[targetKey] then
+      names[targetKey] = true
+      displayNames[1] = rosterNames[targetKey]
+    end
+    return names, displayNames
+  end
+
+  local raidCount = type(GetNumRaidMembers) == "function" and (tonumber(GetNumRaidMembers()) or 0) or 0
+  if raidCount > 0 and type(GetRaidRosterInfo) == "function" then
+    for index = 1, raidCount do
+      local raidName = GetRaidRosterInfo(index)
+      local key = Comm._NormalizeFleeWhisperName(raidName)
+      if key ~= "" and rosterNames[key] and not names[key] then
+        names[key] = true
+        displayNames[#displayNames + 1] = rosterNames[key]
+      end
+    end
+    return names, displayNames
+  end
+
+  local partyCount = type(GetNumPartyMembers) == "function" and (tonumber(GetNumPartyMembers()) or 0) or 0
+  if type(UnitName) == "function" then
+    for index = 1, partyCount do
+      local partyName = UnitName("party" .. tostring(index))
+      local key = Comm._NormalizeFleeWhisperName(partyName)
+      if key ~= "" and rosterNames[key] and not names[key] then
+        names[key] = true
+        displayNames[#displayNames + 1] = rosterNames[key]
+      end
+    end
+  end
+
+  return names, displayNames
+end
+
+function Comm._FleeWhisperFilter(_, event, _, sender)
+  if event ~= "CHAT_MSG_WHISPER" then
+    return false
+  end
+
+  local state = MultiBot and MultiBot.bridge or nil
+  if type(state) ~= "table"
+      or state.connected ~= true
+      or type(state.groupOrderCommands) ~= "table" then
+    return false
+  end
+
+  local senderKey = Comm._NormalizeFleeWhisperName(sender)
+  if senderKey == "" then
+    return false
+  end
+
+  for _, pending in pairs(state.groupOrderCommands) do
+    if type(pending) == "table"
+        and pending.order == "FLEE"
+        and type(pending.suppressNames) == "table"
+        and pending.suppressNames[senderKey] then
+      return true
+    end
+  end
+
+  return false
+end
+
+function Comm._ArmFleeWhisperFilter()
+  if Comm._fleeWhisperFilterInstalled == true then
+    return true
+  end
+
+  if type(ChatFrame_AddMessageEventFilter) ~= "function" then
+    return false
+  end
+
+  ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", Comm._FleeWhisperFilter)
+  Comm._fleeWhisperFilterInstalled = true
+  return true
+end
+
+function Comm._MaybeDisarmFleeWhisperFilter()
+  if Comm._fleeWhisperFilterInstalled ~= true then
+    return
+  end
+
+  local state = MultiBot and MultiBot.bridge or nil
+  if type(state) == "table" and type(state.groupOrderCommands) == "table" then
+    for _, pending in pairs(state.groupOrderCommands) do
+      if type(pending) == "table" and pending.order == "FLEE" then
+        return
+      end
+    end
+  end
+
+  if type(ChatFrame_RemoveMessageEventFilter) == "function" then
+    ChatFrame_RemoveMessageEventFilter("CHAT_MSG_WHISPER", Comm._FleeWhisperFilter)
+    Comm._fleeWhisperFilterInstalled = false
+  end
+end
+
+function Comm._ShowFleeOrderFeedback(result)
+  if type(result) ~= "table" then
+    return
+  end
+
+  local audience = string.upper(trim(result.audience or ""))
+  local target = trim(result.target or "")
+  local matched = tonumber(result.matched) or 0
+  local succeeded = tonumber(result.succeeded) or 0
+  local failed = tonumber(result.failed) or 0
+  local reason = trim(result.reason or "")
+  local feedbackNames = type(result.feedbackNames) == "table" and result.feedbackNames or {}
+
+  if audience == "TARGET" then
+    if reason == "OK"
+        and matched == 1
+        and succeeded == 1
+        and failed == 0
+        and target ~= "" then
+      systemMessage("MultiBot Flee: " .. target)
+    end
+    return
+  end
+
+  if audience == "ALL" then
+    if reason == "OK"
+        and matched > 0
+        and succeeded == matched
+        and failed == 0
+        and #feedbackNames == matched then
+      systemMessage("MultiBot Flee: " .. table.concat(feedbackNames, ", "))
+      return
+    end
+
+    systemMessage("MultiBot Flee [ALL]: " .. tostring(succeeded) .. "/" .. tostring(matched))
+    return
+  end
+
+  if audience == "TANK"
+      or audience == "HEALER"
+      or audience == "DPS"
+      or audience == "MELEE"
+      or audience == "RANGED" then
+    local roleResultNames = type(result.roleResultNames) == "table" and result.roleResultNames or {}
+    if failed == 0
+        and succeeded == matched
+        and matched > 0
+        and #roleResultNames == matched then
+      systemMessage("MultiBot Flee [" .. audience .. "]: " .. table.concat(roleResultNames, ", "))
+    else
+      systemMessage("MultiBot Flee [" .. audience .. "]: " .. tostring(succeeded) .. "/" .. tostring(matched) .. " bots")
+    end
+  end
+end
+-- MB_FLEE_ROLE_NAMES_AUTHORITATIVE_V1_END
+-- MB_FLEE_FEEDBACK_DISPLAY_NAMES_V1_END
+-- MB_FLEE_CHAT_FEEDBACK_CHATLESS_V1_END
+
+function Comm.RunFleeOrderCommand(audience, target, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "FLEE_ORDER_NOT_CONNECTED"
+    return false
+  end
+  if state.fleeOrderCapable ~= true then
+    state.lastError = "FLEE_ORDER_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  audience = string.upper(trim(audience or ""))
+  local audienceValid = audience == "ALL"
+    or audience == "TANK"
+    or audience == "HEALER"
+    or audience == "DPS"
+    or audience == "MELEE"
+    or audience == "RANGED"
+    or audience == "TARGET"
+  if not audienceValid then
+    state.lastError = "FLEE_ORDER_BAD_AUDIENCE"
+    return false
+  end
+
+  target = trim(tostring(target or ""))
+  if audience == "TARGET" then
+    if target == ""
+        or string.len(target) > 64
+        or string.find(target, "~", 1, true)
+        or string.find(target, "\r", 1, true)
+        or string.find(target, "\n", 1, true) then
+      state.lastError = "FLEE_ORDER_BAD_TARGET"
+      return false
+    end
+  elseif target ~= "" then
+    state.lastError = "FLEE_ORDER_BAD_TARGET"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "FLEE_ORDER_BUSY"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-flee-order-" .. tostring(state.groupOrderSeq)
+  local suppressNames, feedbackNames = Comm._BuildFleeWhisperSuppressNames(audience, target, state)
+  state.groupOrderCommands[token] = {
+    order = "FLEE",
+    audience = audience,
+    target = target,
+    suppressNames = suppressNames,
+    feedbackNames = feedbackNames,
+    roleResultNames = {},
+    roleResultSeen = {},
+    roleResultItemCount = 0,
+    roleResultFailedCount = 0,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  Comm._ArmFleeWhisperFilter()
+
+  if not Comm.Send("RUN", "FLEE_ORDER~" .. token .. "~" .. audience .. "~" .. urlEncodeField(target)) then
+    state.groupOrderCommands[token] = nil
+    Comm._MaybeDisarmFleeWhisperFilter()
+    state.lastError = "FLEE_ORDER_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    local pending = bridge.groupOrderCommands[token]
+    if type(pending) ~= "table" or pending.order ~= "FLEE" then
+      return
+    end
+
+    bridge.lastError = "FLEE_ORDER_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      audience = pending.audience,
+      target = pending.target,
+      matched = 0,
+      succeeded = 0,
+      failed = 0,
+      reason = "TIMEOUT",
+    })
+    Comm._MaybeDisarmFleeWhisperFilter()
+  end)
+
+  return token
+end
+
+function Comm.HandleFleeOrderAddonMessage(opcode, payload, state)
+  if opcode ~= "FLEE_ORDER_ITEM" and opcode ~= "FLEE_ORDER_ACK" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  local fields = splitFields(payload or "")
+  state.groupOrderCommands = state.groupOrderCommands or {}
+
+  if opcode == "FLEE_ORDER_ITEM" then
+    if #fields ~= 4 then
+      state.lastError = "FLEE_ORDER_ITEM_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = trim(fields[1])
+    local audience = string.upper(trim(fields[2]))
+    local botName = urlDecodeFieldStrict(fields[3], 64, false)
+    local itemStatus = string.upper(trim(fields[4]))
+    local pending = state.groupOrderCommands[token]
+    local roleAudience = audience == "TANK"
+      or audience == "HEALER"
+      or audience == "DPS"
+      or audience == "MELEE"
+      or audience == "RANGED"
+
+    if not isValidStateToken(token)
+        or not roleAudience
+        or botName == nil
+        or (itemStatus ~= "OK" and itemStatus ~= "ERR")
+        or type(pending) ~= "table"
+        or pending.order ~= "FLEE"
+        or pending.audience ~= audience then
+      state.lastError = "FLEE_ORDER_ITEM_INVALID"
+      return true
+    end
+
+    pending.roleResultNames = type(pending.roleResultNames) == "table" and pending.roleResultNames or {}
+    pending.roleResultSeen = type(pending.roleResultSeen) == "table" and pending.roleResultSeen or {}
+    pending.roleResultItemCount = tonumber(pending.roleResultItemCount) or 0
+    pending.roleResultFailedCount = tonumber(pending.roleResultFailedCount) or 0
+
+    local botKey = Comm._NormalizeFleeWhisperName(botName)
+    if botKey == ""
+        or pending.roleResultSeen[botKey]
+        or pending.roleResultItemCount >= 40 then
+      state.lastError = "FLEE_ORDER_ITEM_INVALID"
+      return true
+    end
+
+    pending.roleResultSeen[botKey] = true
+    pending.roleResultItemCount = pending.roleResultItemCount + 1
+    if itemStatus == "OK" then
+      pending.roleResultNames[#pending.roleResultNames + 1] = botName
+    else
+      pending.roleResultFailedCount = pending.roleResultFailedCount + 1
+    end
+
+    state.connected = true
+    debugPrint("ADDON:RX", opcode, payload or "")
+    return true
+  end
+
+  if #fields ~= 6 then
+    state.lastError = "FLEE_ORDER_ACK_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local audience = string.upper(trim(fields[2]))
+  local matched = parseBoundedInteger(fields[3], 0, 40)
+  local succeeded = parseBoundedInteger(fields[4], 0, 40)
+  local failed = parseBoundedInteger(fields[5], 0, 40)
+  local reason = urlDecodeFieldStrict(fields[6], 64, false)
+  local pending = state.groupOrderCommands[token]
+
+  local audienceValid = audience == "ALL"
+    or audience == "TANK"
+    or audience == "HEALER"
+    or audience == "DPS"
+    or audience == "MELEE"
+    or audience == "RANGED"
+    or audience == "TARGET"
+
+  local countsValid = matched ~= nil
+    and succeeded ~= nil
+    and failed ~= nil
+    and succeeded <= matched
+    and failed <= matched
+    and succeeded + failed == matched
+    and (audience ~= "TARGET" or matched <= 1)
+
+  local reasonValid = reason == "OK"
+    or reason == "BAD_AUDIENCE"
+    or reason == "BAD_TARGET"
+    or reason == "RATE_LIMIT"
+    or reason == "REPLAY"
+    or reason == "NO_GROUP"
+    or reason == "NO_BOTS"
+    or reason == "NOT_ALLOWED"
+    or reason == "NOT_CONTROLLED"
+    or reason == "BOT_LIMIT"
+    or reason == "PARTIAL"
+    or reason == "FAILED"
+
+  if not isValidStateToken(token)
+      or not audienceValid
+      or not countsValid
+      or not reasonValid
+      or type(pending) ~= "table"
+      or pending.order ~= "FLEE"
+      or pending.audience ~= audience then
+    state.lastError = "FLEE_ORDER_ACK_INVALID"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = reason == "OK" and nil or ("FLEE_ORDER_" .. reason)
+  debugPrint("ADDON:RX", opcode, payload or "")
+
+  local status = "failed"
+  if reason == "OK" and matched > 0 and failed == 0 and succeeded == matched then
+    status = "ok"
+  elseif reason == "NO_BOTS" and matched == 0 then
+    status = "empty"
+  elseif succeeded > 0 then
+    status = "partial"
+  end
+
+  local roleAudience = audience == "TANK"
+    or audience == "HEALER"
+    or audience == "DPS"
+    or audience == "MELEE"
+    or audience == "RANGED"
+  local roleResultNames = nil
+  if roleAudience then
+    local itemCount = tonumber(pending.roleResultItemCount) or 0
+    local failedItemCount = tonumber(pending.roleResultFailedCount) or 0
+    local names = type(pending.roleResultNames) == "table" and pending.roleResultNames or {}
+    if itemCount == matched
+        and failedItemCount == failed
+        and #names == succeeded then
+      roleResultNames = names
+    end
+  end
+
+  local result = {
+    status = status,
+    audience = audience,
+    target = pending.target,
+    feedbackNames = pending.feedbackNames,
+    roleResultNames = roleResultNames,
+    matched = matched,
+    succeeded = succeeded,
+    failed = failed,
+    reason = reason,
+  }
+
+  Comm._FinishGroupOrderCommand(token, result)
+  Comm._MaybeDisarmFleeWhisperFilter()
+  Comm._ShowFleeOrderFeedback(result)
+  return true
+end
+
+function Comm.HandleFleeOrderProtocolError(requestType, token, reason, state)
+  if requestType ~= "FLEE_ORDER" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(token or "")
+  reason = trim(reason or "PROTOCOL_ERROR")
+  if reason == "" then
+    reason = "PROTOCOL_ERROR"
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local pending = state.groupOrderCommands[token]
+  if type(pending) ~= "table" or pending.order ~= "FLEE" then
+    return true
+  end
+
+  state.lastError = "FLEE_ORDER_" .. reason
+  Comm._FinishGroupOrderCommand(token, {
+    status = "error",
+    audience = pending.audience,
+    target = pending.target,
+    matched = 0,
+    succeeded = 0,
+    failed = 0,
+    reason = reason,
+  })
+  Comm._MaybeDisarmFleeWhisperFilter()
+  return true
+end
+-- MB_FLEE_ORDER_V1_TX_END
 
 local function finishStrategyMutationCommand(token, result)
   local state = ensureBridgeState()
@@ -5510,6 +6001,7 @@ function Comm.MarkDisconnected(reason)
   local state = ensureBridgeState()
   state.connectionGeneration = state.connectionGeneration + 1
   state.connected = false
+  state.fleeOrderCapable = false
   state.server = nil
   state.protocol = nil
   state.lastError = reason or nil
@@ -8508,6 +9000,12 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   end
   -- MB_SELFBOT_STRATEGY_V1_RX_END
 
+  -- MB_FLEE_ORDER_V1_RX_BEGIN
+  if Comm.HandleFleeOrderAddonMessage(opcode, payload, state) then
+    return true
+  end
+  -- MB_FLEE_ORDER_V1_RX_END
+
   -- MB_ADDON_ALT_ROSTER_LIFECYCLE_V1_RX_BEGIN
   if Comm.HandleAltBotLifecycleAddonMessage(opcode, payload, state) then
     return true
@@ -10646,6 +11144,8 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
         elseif Comm.HandleSelfActionProtocolError(requestType, token, reason, state) then
           return true
         elseif Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state) then
+          return true
+        elseif Comm.HandleFleeOrderProtocolError(requestType, token, reason, state) then
           return true
         elseif Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, state) then
           return true
