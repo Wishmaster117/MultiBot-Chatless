@@ -78,7 +78,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Enchanting** | Dedicated Enchanting Trade Service using the native WoW Trade workflow. |
 | **Quests** | Bridge-backed quest list and structured bot quest abandon. Native quest sharing remains available. |
 | **Loot** | Structured loot profiles and exact persistent always-loot item add/remove. |
-| **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1`, `ATTACK_ORDER_V1`, `FLEE_ORDER_V1` and bounded `GROUP_ACTION_V1`. The Group Actions set `drink` / `release` / `revive` / `summon` now uses native Playerbots actions through the Bridge. |
+| **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1`, `ATTACK_ORDER_V1`, `FLEE_ORDER_V1`, bounded `GROUP_ACTION_V1` and `RTSC_ORDER_V1`. RTSC selection, saved spots and GO/CANCEL now use the Bridge while AEDM movement remains the native WoW/Playerbots spell path. |
 | **Raidus raid planner** | Persistent 8×5 Working Layout, Saved Layouts, Score/Level/Class sorting, drag/drop, Auto balance, structured Apply and human-safe outside-layout bot removal through `BOT_GROUP_REMOVE_V1`. |
 | **Character information** | Bot skills, reputations, currencies/emblems, spellbook, stats and PvP stats. |
 | **Outfits** | Outfit listing and actions through the Bridge. |
@@ -201,7 +201,7 @@ The Bridge remains authoritative for role matching and invokes the audited nativ
 
 Normal Playerbots Flee success whispers are filtered client-side only while a matching Flee request is pending. Playerbots error feedback and unrelated human whispers remain visible. Runtime validation covered ALL, controlled TARGET, non-bot TARGET rejection, all role audiences, name feedback, whisper suppression and Follow / Stay / Attack non-regression.
 
-The bounded Group Actions set `drink`, `release`, `revive` and `summon` has since been migrated through `GROUP_ACTION_V1`. The next active migration is **RTSC**.
+The bounded Group Actions set `drink`, `release`, `revive` and `summon` has since been migrated through `GROUP_ACTION_V1`, and RTSC has now been migrated through `RTSC_ORDER_V1`.
 
 ---
 
@@ -224,7 +224,43 @@ The Bridge keeps a closed action allowlist, revalidates requester/group/bot stat
 
 Runtime validation covered all four actions, including the full `Release -> Revive` ghost/spirit-healer flow. `GROUP_ACTION_ACK` was observed, no automatic legacy PARTY/RAID command chat was observed, `MultiBotComm.lua` remained at **199 top-level locals**, and `mod-playerbots` remained strictly read-only.
 
-The next active migration is **RTSC**, followed by quest interactions, remaining ordinary-bot actions and final legacy parser/fallback cleanup.
+RTSC has since been migrated through `RTSC_ORDER_V1`. The next active migration is **Quest interactions**, followed by remaining ordinary-bot actions and final legacy parser/fallback cleanup.
+
+---
+
+# Recent Milestone — RTSC Chatless
+
+RTSC was migrated, compiled and runtime validated on **12 September 2026** through:
+
+```text
+RTSC_ORDER_V1
+```
+
+The structured endpoint accepts only the audited semantic operations:
+
+```text
+ENABLE
+RESET
+SELECT
+CANCEL
+SAVE
+UNSAVE
+GO
+```
+
+Supported audiences are `ALL`, `TANK`, `HEALER`, `DPS`, `MELEE`, `RANGED`, `MELEE_DPS`, `RANGED_DPS` and `GROUPS`. Group selection uses a bounded bitmask; the current UI exposes groups 1..5, while the protocol validates the mask within its defined 1..31 bound. `SAVE`, `UNSAVE` and `GO` use slots 1..9.
+
+The Bridge delegates RTSC behavior to the native Playerbots `rtsc` action through `PlayerbotAI::DoSpecificAction(...)`. It does **not** receive raw movement coordinates and does not recreate the AEDM packet path. `/cast aedm` remains a native WoW cast handled by Playerbots `SeeSpellAction` / `MoveToSpell`.
+
+Runtime validation covered ENABLE/RESET, all role audiences, groups 1..5, multi-group selection, SAVE/GO/UNSAVE, CANCEL, AEDM movement and the expected Follow-versus-Stay behavior. The RTSC group selector Lua pattern hotfix was also validated with no recurring Lua error. `MultiBotComm.lua` remains at **199 top-level locals**, and `mod-playerbots` remained strictly read-only.
+
+Canonical final audit:
+
+```text
+audit-multibot-rtsc-order-v1-final-v1b-2026-09-12-122116.zip
+SHA-256 FDE1388AD4F297A1552CD64F2805DB20CFC97F6A6CBA0050F71B484DD40FD297
+FINAL_STATUS=OK
+```
 
 ---
 
@@ -271,6 +307,7 @@ STAY_ORDER_V1
 ATTACK_ORDER_V1
 FLEE_ORDER_V1
 GROUP_ACTION_V1
+RTSC_ORDER_V1
 ```
 
 The exact protocol is an implementation detail of the addon and Bridge. The normal user experience should remain UI-driven.
@@ -336,7 +373,7 @@ Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or expli
 
 Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
 
-The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is now bridge-first and runtime validated through `GROUP_ACTION_V1`. The next active migration is **RTSC**, followed by quest interactions, remaining ordinary-bot actions and final legacy parser/fallback cleanup.
+The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is now also bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The next active migration is **Quest interactions**, followed by remaining ordinary-bot actions and final legacy parser/fallback cleanup.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 

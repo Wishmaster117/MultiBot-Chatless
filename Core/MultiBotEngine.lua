@@ -968,6 +968,154 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 		end
 	end
 	-- MB_GROUP_ACTION_V1_ROUTE_END
+	-- MB_RTSC_ORDER_V1_ROUTE_BEGIN
+	local rtscOperation = nil
+	local rtscAudience = "ALL"
+	local rtscGroupMask = 0
+	local rtscSlot = 0
+	local rtscLike = normalizedGroupOrder == "rtsc"
+		or string.sub(normalizedGroupOrder, 1, 5) == "rtsc "
+		or string.find(normalizedGroupOrder, " rtsc ", 1, true) ~= nil
+
+	if(normalizedGroupOrder == "rtsc") then
+		rtscOperation = "ENABLE"
+	elseif(normalizedGroupOrder == "rtsc reset") then
+		rtscOperation = "RESET"
+	elseif(normalizedGroupOrder == "rtsc select") then
+		rtscOperation = "SELECT"
+	elseif(normalizedGroupOrder == "rtsc cancel") then
+		rtscOperation = "CANCEL"
+	else
+		local directSaveSlot = string.match(normalizedGroupOrder, "^rtsc save ([1-9])$")
+		local directUnsaveSlot = string.match(normalizedGroupOrder, "^rtsc unsave ([1-9])$")
+		local directGoSlot = string.match(normalizedGroupOrder, "^rtsc go ([1-9])$")
+
+		if(directSaveSlot) then
+			rtscOperation = "SAVE"
+			rtscSlot = tonumber(directSaveSlot) or 0
+		elseif(directUnsaveSlot) then
+			rtscOperation = "UNSAVE"
+			rtscSlot = tonumber(directUnsaveSlot) or 0
+		elseif(directGoSlot) then
+			rtscOperation = "GO"
+			rtscSlot = tonumber(directGoSlot) or 0
+		else
+			local role = string.match(normalizedGroupOrder, "^@([%a]+) rtsc select$")
+			local roleGo, roleGoSlot = string.match(normalizedGroupOrder, "^@([%a]+) rtsc go ([1-9])$")
+
+			if(not role and roleGo) then
+				role = roleGo
+				rtscSlot = tonumber(roleGoSlot) or 0
+			end
+
+			if(role) then
+				if(role == "tank") then
+					rtscAudience = "TANK"
+				elseif(role == "healer") then
+					rtscAudience = "HEALER"
+				elseif(role == "dps") then
+					rtscAudience = "DPS"
+				elseif(role == "melee") then
+					rtscAudience = "MELEE"
+				elseif(role == "ranged") then
+					rtscAudience = "RANGED"
+				elseif(role == "meleedps") then
+					rtscAudience = "MELEE_DPS"
+				elseif(role == "rangeddps") then
+					rtscAudience = "RANGED_DPS"
+				else
+					rtscAudience = nil
+				end
+
+				if(rtscAudience) then
+					rtscOperation = roleGo and "GO" or "SELECT"
+				end
+			else
+				local groupSpec = string.match(normalizedGroupOrder, "^@group([%d,%-]+) rtsc select$")
+				local groupGoSpec, groupGoSlot = string.match(normalizedGroupOrder, "^@group([%d,%-]+) rtsc go ([1-9])$")
+
+				if(not groupSpec and groupGoSpec) then
+					groupSpec = groupGoSpec
+					rtscSlot = tonumber(groupGoSlot) or 0
+				end
+
+				if(groupSpec) then
+					local seenGroups = {}
+					local groupMaskValid = true
+
+					for part in string.gmatch(groupSpec, "[^,]+") do
+						local rangeStart, rangeEnd = string.match(part, "^(%d+)%-(%d+)$")
+						if(rangeStart and rangeEnd) then
+							rangeStart = tonumber(rangeStart)
+							rangeEnd = tonumber(rangeEnd)
+							if(not rangeStart or not rangeEnd
+								or rangeStart < 1 or rangeEnd > 5 or rangeStart > rangeEnd) then
+								groupMaskValid = false
+								break
+							end
+
+							for groupIndex = rangeStart, rangeEnd do
+								seenGroups[groupIndex] = true
+							end
+						else
+							local groupIndex = tonumber(part)
+							if(not groupIndex or groupIndex < 1 or groupIndex > 5) then
+								groupMaskValid = false
+								break
+							end
+							seenGroups[groupIndex] = true
+						end
+					end
+
+					if(groupMaskValid) then
+						for groupIndex = 1, 5 do
+							if(seenGroups[groupIndex]) then
+								rtscGroupMask = rtscGroupMask + (2 ^ (groupIndex - 1))
+							end
+						end
+					end
+
+					if(groupMaskValid and rtscGroupMask > 0) then
+						rtscAudience = "GROUPS"
+						rtscOperation = groupGoSpec and "GO" or "SELECT"
+					end
+				end
+			end
+		end
+	end
+
+	if(rtscOperation ~= nil) then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.rtscOrderCapable == true) then
+			if(not MultiBot.Comm or type(MultiBot.Comm.RunRtscOrderCommand) ~= "function") then
+				MultiBot.bridge.lastError = "RTSC_ORDER_CLIENT_UNAVAILABLE"
+				return false, "blocked"
+			end
+
+			local token = MultiBot.Comm.RunRtscOrderCommand(
+				rtscOperation,
+				rtscAudience,
+				rtscGroupMask,
+				rtscSlot,
+				onComplete)
+
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+
+			return false, "blocked"
+		end
+
+		if(MultiBot.allowLegacyChatFallback ~= true) then
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "RTSC_ORDER_UNAVAILABLE" end
+			return false, "blocked"
+		end
+	elseif(rtscLike and MultiBot.allowLegacyChatFallback ~= true) then
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "RTSC_ORDER_INVALID" end
+		return false, "blocked"
+	end
+	-- MB_RTSC_ORDER_V1_ROUTE_END
 
 	if(GetNumRaidMembers() > 5) then
 		local route = _mbRouteStrategyMutation(pAction, "RAID", "")

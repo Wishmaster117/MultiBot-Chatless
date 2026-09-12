@@ -1,7 +1,7 @@
 ﻿# Multibot Chatless + Bridge — Roadmap
 
 **Statut : active**
-**Dernière synchronisation : 11/09/2026**
+**Dernière synchronisation : 12/09/2026**
 
 Cette roadmap est la **source de vérité technique** du projet.
 Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontairement plus courts.
@@ -17,11 +17,11 @@ Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontaireme
 ```text
 Repo:   L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot
 Branch: feature/group-orders-chatless
-Base HEAD auditée avant commit de clôture Group Actions:
-        dbc48ad2e85c8a2b5a48df4447155062c11ab52b
+Base HEAD auditée avant commit de clôture RTSC:
+        a82e9835783850aee9019ffa15a58c8081435248
 ```
 
-État fonctionnel audité au 11/09/2026 :
+État fonctionnel audité au 12/09/2026 :
 
 - Follow / Stay / Attack livrés et runtime validés ;
 - lifecycle unitaire des rosters, AutoInvite structuré et Raidus lifecycle livrés ;
@@ -29,21 +29,23 @@ Base HEAD auditée avant commit de clôture Group Actions:
 - Faction Banner bulk group lifecycle livré via `BOT_GROUP_LIFECYCLE_V1` ;
 - Creator `addclass` livré via `CREATOR_ADDCLASS_V1` ;
 - Flee livré via `FLEE_ORDER_V1`, avec feedback chatless et noms ALL / TARGET / rôles validés ;
-- `Core\MultiBotComm.lua` final Group Actions : `FEEC5C0811B4B9BA2EEC49ECEAB1A23B1C6653BA4A2225D37FC561926BBED4F8` ;
-- `MultiBotComm.lua` reste à **199 locals** au niveau chunk principal ;
 - Group Actions (`drink`, `release`, `revive`, `summon`) livrées et runtime validées via `GROUP_ACTION_V1` ;
-- prochain chantier actif : RTSC.
+- RTSC livré via `RTSC_ORDER_V1`, incluant audiences, groupes, SAVE/GO/UNSAVE/CANCEL et AEDM natif validés ;
+- `Core\MultiBotComm.lua` final RTSC : `312741C60FDFFB49ACEF351C9B99204B510DD58510C8E23D3C8C21BEA4F1981F` ;
+- `Core\MultiBotEngine.lua` final RTSC + hotfix group pattern : `1449F78EAA4BB2F6C7AC547F6D534B912834937482AED71CB692BEC5C68ECE59` ;
+- `MultiBotComm.lua` reste à **199 locals** au niveau chunk principal ;
+- prochain chantier actif : Quest interactions.
 
 ### Bridge
 
 ```text
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge
 Branch: feature/group-orders-chatless
-Base HEAD auditée avant commit de clôture Group Actions:
-        f4246758c24dc7098bde726064aa7a89189e616e
+Base HEAD auditée avant commit de clôture RTSC:
+        d8447fbf1ffc75945657313110f82c50b11608a9
 ```
 
-État fonctionnel audité au 11/09/2026 :
+État fonctionnel audité au 12/09/2026 :
 
 - endpoints Follow / Stay / Attack livrés ;
 - `BOT_GROUP_REMOVE_V1` livré pour le cleanup Raidus sécurisé ;
@@ -51,9 +53,13 @@ Base HEAD auditée avant commit de clôture Group Actions:
 - `CREATOR_ADDCLASS_V1` livré comme adaptateur AddClass spécialisé, sans exécuteur Playerbots générique ;
 - `FLEE_ORDER_V1` livré et runtime validé ;
 - `GROUP_ACTION_V1` livré avec allowlist fermée DRINK / RELEASE / REVIVE / SUMMON et appels natifs Playerbots ;
+- `RTSC_ORDER_V1` livré comme adaptateur borné vers l'action native Playerbots `rtsc`, sans transport de coordonnées AEDM ;
 - `BotMatchesAttackAudience` reste autoritaire pour les audiences de rôle ;
 - `FLEE_ORDER_ITEM` retourne les résultats nominatifs bornés avant `FLEE_ORDER_ACK` ;
-- `src\MultiBotBridge.cpp` final Group Actions : `E43FCB40DF864AFAE8A12D6CC3EC0FBFA82E6B5C58EAAB49E1F3B3C2204596B0` ;
+- `src\MultiBotBridge.cpp` final RTSC avant cleanup warnings : `3F6EE3470DB5B535AB187185C8D7A3EA18D69F6DA14C5ADAEA8D75528A7DA354` ;
+- `src\MultiBotBridge.cpp` courant après cleanup warnings validé Windows : `668A46994456CBD71B56C319CE0D16D6E21F092BD02237311B7C0ADCFDD10C23` ;
+- cleanup warnings : surcharge de base `OnPlayerCanUseChat` réexposée via `using`, helper mort `GetGuildBankWithdrawRemaining` supprimé ;
+- disparition des deux warnings GCC correspondants à confirmer au prochain build Linux ;
 - aucun exécuteur Playerbots générique n'a été ajouté.
 
 ### Playerbots
@@ -211,6 +217,7 @@ Livré ou déjà migré selon les familles validées :
 - `ATTACK_ORDER_V1` ;
 - `FLEE_ORDER_V1`, y compris ALL / TARGET / Tank / Healer / DPS / Melee / Ranged avec feedback nominatif chatless ;
 - `GROUP_ACTION_V1` pour `drink`, `release`, `revive` et `summon`, runtime validé sans fallback chat automatique ;
+- `RTSC_ORDER_V1` pour ENABLE / RESET / SELECT / CANCEL / SAVE / UNSAVE / GO, audiences rôles et groupes, avec AEDM natif conservé ;
 - plusieurs contrôles combat/non-combat.
 
 ### Creator — AddClass spécialisé
@@ -711,12 +718,11 @@ Le bulk lifecycle et Flee sont retirés de la file active.
 
 L'audit `Units / lifecycle legacy cleanup` du 06/09/2026 a confirmé qu'un nettoyage est possible, mais il reste volontairement reporté afin de ne pas retirer trop tôt des fallbacks/parsers encore utiles pendant la migration chatless.
 
-Après clôture Group Actions du 11/09/2026, l'ordre recommandé devient :
+Après clôture RTSC du 12/09/2026, l'ordre recommandé devient :
 
-1. RTSC ;
-2. Quest interactions (`accept *`, `talk`, `los`, gameobject use, reward choice) ;
-3. actions bots ordinaires restantes (maintenance, autogear, Hunter pet controls, spell cast) ;
-4. nettoyage final global des fallbacks/parsers chat devenus morts, **incluant le cleanup Units / lifecycle legacy déjà audité**.
+1. Quest interactions (`accept *`, `talk`, `los`, gameobject use, reward choice) ;
+2. actions bots ordinaires restantes (maintenance, autogear, Hunter pet controls, spell cast) ;
+3. nettoyage final global des fallbacks/parsers chat devenus morts, **incluant le cleanup Units / lifecycle legacy déjà audité**.
 
 Ne pas déclarer le projet fully chatless tant que les occurrences restantes de `SendChatMessage` n'ont pas été classées et validées.
 
@@ -882,7 +888,168 @@ MultiBotEngine.lua BE19850C472CF85FB69AE3292D8F15DB71EBBB6471E5F93DE4A2A2670FB33
 MultiBotBridge.cpp E43FCB40DF864AFAE8A12D6CC3EC0FBFA82E6B5C58EAAB49E1F3B3C2204596B0
 ```
 
-Le prochain chantier actif est désormais **RTSC**.
+RTSC a depuis été clôturé via `RTSC_ORDER_V1`; le prochain chantier actif est **Quest interactions**.
+
+---
+
+## 7quater. Clôture RTSC Chatless — 12/09/2026
+
+### Capacité livrée
+
+```text
+RTSC_ORDER_V1
+```
+
+Requête structurée :
+
+```text
+RTSC_ORDER~token~OP~AUDIENCE~GROUP_MASK~SLOT
+```
+
+ACK :
+
+```text
+RTSC_ORDER_ACK~token~OP~AUDIENCE~GROUP_MASK~SLOT~matched~succeeded~failed~reason
+```
+
+Opérations autorisées :
+
+```text
+ENABLE
+RESET
+SELECT
+CANCEL
+SAVE
+UNSAVE
+GO
+```
+
+Audiences autorisées :
+
+```text
+ALL
+TANK
+HEALER
+DPS
+MELEE
+RANGED
+MELEE_DPS
+RANGED_DPS
+GROUPS
+```
+
+`GROUP_MASK` vaut `0` hors `GROUPS`. Pour `GROUPS`, le protocole valide un masque borné ; l'UI actuelle expose les groupes 1..5. `SLOT` vaut `1..9` pour SAVE / UNSAVE / GO et `0` pour les autres opérations.
+
+### Architecture Playerbots conservée
+
+Le Bridge ne réimplémente pas RTSC. Il adapte la requête structurée vers l'action native auditée :
+
+```cpp
+botAI->DoSpecificAction("rtsc", Event("rtsc", nativeParam, requester), true);
+```
+
+`ENABLE` conserve la sémantique native du sort `RTSC_MOVE_SPELL 30758` avec postcondition vérifiée. `SELECT` tient compte de la postcondition native `RTSC selected`.
+
+Règle AEDM canonique :
+
+```text
+/cast aedm
+-> cast WoW natif
+-> Playerbots SeeSpellAction
+-> MoveToSpell
+```
+
+Le Bridge :
+
+```text
+raw coordinates      -> NO
+SpellCastTargets RTSC-> NO
+MoveToSpell clone    -> NO
+AEDM reimplementation-> NO
+```
+
+Le comportement runtime observé reste natif : un bot en Follow peut revenir vers le master après le déplacement ; un bot en Stay conserve la destination RTSC.
+
+Les mutations `co/nc +rtsc,+guard,?` restent volontairement sur `STRATEGY_MUTATION_V1` et ne sont pas remigrées.
+
+### Validation runtime
+
+Validé en jeu :
+
+- ENABLE / RESET ;
+- SELECT ALL ;
+- TANK / HEALER / DPS ;
+- MELEE / RANGED ;
+- MELEE_DPS / RANGED_DPS ;
+- GROUPS 1..5 ;
+- sélections multi-groupes ;
+- SAVE / GO / UNSAVE ;
+- CANCEL ;
+- AEDM natif ;
+- comportement Follow / Stay ;
+- absence de transport legacy visible `rtsc ...` en PARTY/RAID sur le chemin structuré ;
+- hotfix du pattern Lua `@group` validé sans récurrence de l'erreur `malformed pattern`.
+
+`MultiBotComm.lua` reste à **199 locals** au niveau chunk principal. Playerbots est resté strictement read-only.
+
+### Hashes code de clôture RTSC
+
+```text
+MultiBotComm.lua
+312741C60FDFFB49ACEF351C9B99204B510DD58510C8E23D3C8C21BEA4F1981F
+
+MultiBotEngine.lua
+1449F78EAA4BB2F6C7AC547F6D534B912834937482AED71CB692BEC5C68ECE59
+
+MultiBotBridge.cpp — RTSC final avant cleanup warnings
+3F6EE3470DB5B535AB187185C8D7A3EA18D69F6DA14C5ADAEA8D75528A7DA354
+
+MultiBotBridge.cpp — courant après cleanup warnings
+668A46994456CBD71B56C319CE0D16D6E21F092BD02237311B7C0ADCFDD10C23
+```
+
+### Audit final RTSC
+
+```text
+audit-multibot-rtsc-order-v1-final-v1b-2026-09-12-122116.zip
+SHA-256 FDE1388AD4F297A1552CD64F2805DB20CFC97F6A6CBA0050F71B484DD40FD297
+FATAL_COUNT=0
+WARNING_COUNT=0
+FINAL_STATUS=OK
+```
+
+Les deux `FATAL` du premier script d'audit final étaient des faux positifs de l'audit lui-même : deux références `RunRtscOrderCommand` correspondaient à une garde + un appel réel, et les quatre `SpellCastTargets` du Bridge étaient tous hors du bloc RTSC.
+
+### Cleanup warnings Bridge post-RTSC
+
+Deux warnings GCC observés sur Linux dans `MultiBotBridge.cpp` ont été audités puis corrigés **sur l'arbre Windows** :
+
+- `PlayerScript::OnPlayerCanUseChat(...4 args...)` masqué par les overloads Bridge : correction par `using PlayerScript::OnPlayerCanUseChat;` ;
+- `GetGuildBankWithdrawRemaining(...)` définition-only : helper mort supprimé.
+
+Validation Windows :
+
+```text
+Build worldserver: 3 succeeded, 0 failed
+Bridge runtime: OK
+RTSC smoke test: OK
+Guild Bank smoke test: OK
+normal chat smoke test: OK
+crash regression: none observed
+```
+
+Audit final du hotfix :
+
+```text
+audit-multibot-bridge-compile-warnings-final-v1-2026-09-12-134628.zip
+SHA-256 07BF5E6107A6C6198737FF5029FF65D9B183B019D327D8B699DA097DAAF60D35
+LIVE_EQUALS_EXACT_TWO_CHANGE_TRANSFORMATION=YES
+FATAL_COUNT=0
+WARNING_COUNT=0
+FINAL_STATUS=OK
+```
+
+La disparition effective des deux warnings GCC reste à confirmer au prochain build Linux de cette branche. Le warning `mod-lfr` sur son paramètre `reload` est hors périmètre MultiBot.
 
 ---
 
@@ -1015,13 +1182,12 @@ Cette décision évite de casser prématurément les rosters, EveryBar, AutoInvi
 
 ### Familles actives à reprendre
 
-Ordre courant après clôture Group Actions du 11/09/2026 :
+Ordre courant après clôture RTSC du 12/09/2026 :
 
 ```text
-1. RTSC
-2. Quest interactions
-3. remaining ordinary-bot actions
-4. final legacy parser/fallback cleanup
+1. Quest interactions
+2. remaining ordinary-bot actions
+3. final legacy parser/fallback cleanup
    including Units / lifecycle legacy cleanup
 ```
 
@@ -1142,9 +1308,15 @@ Repères principaux conservés :
 - audiences Tank / Healer / DPS / Melee / Ranged enrichies par `FLEE_ORDER_ITEM` autoritaire côté Bridge avant `FLEE_ORDER_ACK` ;
 - build `worldserver`, runtime Flee et non-régressions Follow / Stay / Attack validés le 11/09/2026 ;
 - Group Actions (`drink`, `release`, `revive`, `summon`) migrées via `GROUP_ACTION_V1`, build/runtime validés le 11/09/2026, audit final fatal-free et Playerbots resté read-only ;
-- prochaine migration active fixée à RTSC ;
-- base HEAD Addon auditée avant commit de clôture Flee : `3d99f0c5607e0195d2c8a0fab86a42e92c7b1a61` ;
-- base HEAD Bridge auditée avant commit de clôture Flee : `77b709007a13975c4898e845aaf04f0ad2fa067b` ;
+- RTSC migré via `RTSC_ORDER_V1` le 12/09/2026, audiences/groupes/SAVE/GO/UNSAVE/CANCEL et AEDM natif validés ;
+- hotfix Lua du sélecteur `@group` validé ;
+- audit final RTSC v1b : fatal-free, 199 locals Comm, Playerbots clean/read-only ;
+- cleanup warnings Bridge post-RTSC appliqué sur Windows : `OnPlayerCanUseChat` base overload réexposé et helper guild-bank mort supprimé ;
+- build Windows du hotfix : 3 succès, 0 échec ; runtime Bridge/RTSC/Guild Bank/chat normal validé ;
+- confirmation GCC/Linux des deux warnings Bridge encore à effectuer au prochain build Linux ;
+- prochaine migration active fixée à Quest interactions ;
+- base HEAD Addon auditée avant commit de clôture RTSC : `a82e9835783850aee9019ffa15a58c8081435248` ;
+- base HEAD Bridge auditée avant commit de clôture RTSC : `d8447fbf1ffc75945657313110f82c50b11608a9` ;
 - Playerbots `b949b50bfcdd4fab937781bac2d7765e39330e4b` resté strictement read-only.
 
 Les détails de branches anciennes ne doivent plus être présentés comme état courant dans les README.
@@ -1157,6 +1329,8 @@ Cette section conserve uniquement les preuves structurantes utiles à la reprise
 
 | Référence | SHA-256 | Portée |
 | --- | --- | --- |
+| `audit-multibot-rtsc-order-v1-final-v1b-2026-09-12-122116.zip` | `FDE1388AD4F297A1552CD64F2805DB20CFC97F6A6CBA0050F71B484DD40FD297` | Audit final RTSC : `RTSC_ORDER_V1`, hotfix group pattern présent, 199 locals Comm, audiences/groupes/SAVE/GO/UNSAVE/CANCEL/AEDM validés, Playerbots clean/read-only, zéro fatal/warning. |
+| `audit-multibot-bridge-compile-warnings-final-v1-2026-09-12-134628.zip` | `07BF5E6107A6C6198737FF5029FF65D9B183B019D327D8B699DA097DAAF60D35` | Audit final du cleanup warnings Bridge post-RTSC : transformation byte-exact limitée au `using PlayerScript::OnPlayerCanUseChat;` et à la suppression du helper mort, build/runtime Windows validés ; revalidation GCC/Linux encore attendue. |
 | `audit-multibot-group-action-v1-final-v1b-2026-09-11-201814.zip` | `52B58083BF66E29B774ADECB17122EB9C54E56C19918B81F17DFAE12C487E0FF` | Audit final Group Actions : `GROUP_ACTION_V1`, hashes code validés, 199 locals Comm, build/server/runtime DRINK/RELEASE/REVIVE/SUMMON validés, Playerbots clean/read-only ; warning unique `TODO.md` hors périmètre. |
 | `audit-multibot-flee-closeout-docs-current-state-v1-2026-09-11-175432.zip` | `030F44635E435E41B5A056A77F5975B8F67A7785EF9BFB21536DD7423E32D16D` | Audit final Flee + documentation : hashes finaux Addon/Bridge, 199 locals Comm, Flee ALL/TARGET/rôles nominatif validé, Playerbots clean/read-only, état README/ROADMAP inventorié. |
 | `audit-multibot-creator-addclass-final-v1b-2026-09-06-040620.zip` | `601049B069D378410EDE6D8E13BCD5B1DA45786BA8E689B3C0FF1F3D4034D8C6` | Audit final Creator AddClass : hashes post-patch vérifiés, build/runtime Random/Male/Female/DK + auto-group validés, zéro fallback AddClass SAY observé, `init=auto` inchangé, Playerbots clean/read-only. |

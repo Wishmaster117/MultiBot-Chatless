@@ -74,6 +74,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["CREATOR_INIT_AUTO_V1"] = "creatorInitAutoCapable",
   ["FLEE_ORDER_V1"] = "fleeOrderCapable",
   ["GROUP_ACTION_V1"] = "groupActionCapable",
+  ["RTSC_ORDER_V1"] = "rtscOrderCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -378,6 +379,7 @@ local function ensureBridgeState()
   state.creatorInitAutoCapable = state.creatorInitAutoCapable or false
   state.fleeOrderCapable = state.fleeOrderCapable or false
   state.groupActionCapable = state.groupActionCapable or false
+  state.rtscOrderCapable = state.rtscOrderCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -2107,6 +2109,7 @@ state.selfActionCapable = false
     state.lootRuleItemCapable = false
     state.groupRollCapable = false
     state.groupActionCapable = false
+    state.rtscOrderCapable = false
     state.enchantTradeCapable = false
     state.questAbandonCapable = false
     state.talentApplyCapable = false
@@ -2450,6 +2453,152 @@ function Comm.RunGroupActionCommand(action, callback)
   return token
 end
 -- MB_GROUP_ACTION_V1_TX_END
+-- MB_RTSC_ORDER_V1_TX_BEGIN
+function Comm.RunRtscOrderCommand(operation, audience, groupMask, slot, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "RTSC_ORDER_NOT_CONNECTED"
+    return false
+  end
+  if state.rtscOrderCapable ~= true then
+    state.lastError = "RTSC_ORDER_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  operation = string.upper(trim(operation or ""))
+  audience = string.upper(trim(audience or ""))
+  groupMask = parseBoundedInteger(tostring(groupMask or ""), 0, 31)
+  slot = parseBoundedInteger(tostring(slot or ""), 0, 9)
+
+  local operationValid = operation == "ENABLE"
+    or operation == "RESET"
+    or operation == "SELECT"
+    or operation == "CANCEL"
+    or operation == "SAVE"
+    or operation == "UNSAVE"
+    or operation == "GO"
+
+  local audienceValid = audience == "ALL"
+    or audience == "TANK"
+    or audience == "HEALER"
+    or audience == "DPS"
+    or audience == "MELEE"
+    or audience == "RANGED"
+    or audience == "MELEE_DPS"
+    or audience == "RANGED_DPS"
+    or audience == "GROUPS"
+
+  if not operationValid then
+    state.lastError = "RTSC_ORDER_BAD_OP"
+    return false
+  end
+  if not audienceValid then
+    state.lastError = "RTSC_ORDER_BAD_AUDIENCE"
+    return false
+  end
+  if groupMask == nil then
+    state.lastError = "RTSC_ORDER_BAD_GROUP_MASK"
+    return false
+  end
+  if slot == nil then
+    state.lastError = "RTSC_ORDER_BAD_SLOT"
+    return false
+  end
+
+  local targeted = operation == "SELECT" or operation == "GO"
+  if targeted then
+    if audience == "GROUPS" then
+      if groupMask < 1 or groupMask > 31 then
+        state.lastError = "RTSC_ORDER_BAD_GROUP_MASK"
+        return false
+      end
+    elseif groupMask ~= 0 then
+      state.lastError = "RTSC_ORDER_BAD_GROUP_MASK"
+      return false
+    end
+  else
+    if audience ~= "ALL" then
+      state.lastError = "RTSC_ORDER_BAD_COMBINATION"
+      return false
+    end
+    if groupMask ~= 0 then
+      state.lastError = "RTSC_ORDER_BAD_GROUP_MASK"
+      return false
+    end
+  end
+
+  local slotRequired = operation == "SAVE" or operation == "UNSAVE" or operation == "GO"
+  if slotRequired then
+    if slot < 1 or slot > 9 then
+      state.lastError = "RTSC_ORDER_BAD_SLOT"
+      return false
+    end
+  elseif slot ~= 0 then
+    state.lastError = "RTSC_ORDER_BAD_SLOT"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "RTSC_ORDER_BUSY"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-rtsc-order-" .. tostring(state.groupOrderSeq)
+  state.groupOrderCommands[token] = {
+    order = "RTSC",
+    operation = operation,
+    audience = audience,
+    groupMask = groupMask,
+    slot = slot,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "RTSC_ORDER~" .. token
+    .. "~" .. operation
+    .. "~" .. audience
+    .. "~" .. tostring(groupMask)
+    .. "~" .. tostring(slot)
+
+  if not Comm.Send("RUN", payload) then
+    state.groupOrderCommands[token] = nil
+    state.lastError = "RTSC_ORDER_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    local pending = bridge.groupOrderCommands[token]
+    if type(pending) ~= "table"
+        or pending.order ~= "RTSC"
+        or pending.operation ~= operation
+        or pending.audience ~= audience
+        or pending.groupMask ~= groupMask
+        or pending.slot ~= slot then
+      return
+    end
+
+    bridge.lastError = "RTSC_ORDER_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      reason = "TIMEOUT",
+      operation = operation,
+      audience = audience,
+      groupMask = groupMask,
+      slot = slot,
+    })
+  end)
+
+  return token
+end
+-- MB_RTSC_ORDER_V1_TX_END
 -- MB_ATTACK_ORDER_V1_TX_BEGIN
 function Comm.RunAttackOrderCommand(audience, callback)
   local state = ensureBridgeState()
@@ -6386,6 +6535,7 @@ state.selfActionCapable = false
   state.lootRuleItemCapable = false
   state.groupRollCapable = false
   state.groupActionCapable = false
+  state.rtscOrderCapable = false
   state.enchantTradeCapable = false
   state.questAbandonCapable = false
   state.talentApplyCapable = false
@@ -11063,6 +11213,106 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
   -- MB_GROUP_ACTION_V1_RX_END
+  -- MB_RTSC_ORDER_V1_RX_BEGIN
+  if opcode == "RTSC_ORDER_ACK" then
+    local fields = splitFields(payload or "")
+    if #fields ~= 9 then
+      state.lastError = "RTSC_ORDER_ACK_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = fields[1]
+    local operation = string.upper(trim(fields[2]))
+    local audience = string.upper(trim(fields[3]))
+    local groupMask = parseBoundedInteger(fields[4], 0, 31)
+    local slot = parseBoundedInteger(fields[5], 0, 9)
+    local matched = parseBoundedInteger(fields[6], 0, 40)
+    local succeeded = parseBoundedInteger(fields[7], 0, 40)
+    local failed = parseBoundedInteger(fields[8], 0, 40)
+    local reason = urlDecodeFieldStrict(fields[9], 64, false)
+
+    state.groupOrderCommands = state.groupOrderCommands or {}
+    local pending = state.groupOrderCommands[token]
+
+    local operationValid = operation == "ENABLE"
+      or operation == "RESET"
+      or operation == "SELECT"
+      or operation == "CANCEL"
+      or operation == "SAVE"
+      or operation == "UNSAVE"
+      or operation == "GO"
+
+    local audienceValid = audience == "ALL"
+      or audience == "TANK"
+      or audience == "HEALER"
+      or audience == "DPS"
+      or audience == "MELEE"
+      or audience == "RANGED"
+      or audience == "MELEE_DPS"
+      or audience == "RANGED_DPS"
+      or audience == "GROUPS"
+
+    local countsValid = matched ~= nil
+      and succeeded ~= nil
+      and failed ~= nil
+      and succeeded <= matched
+      and failed <= matched
+      and succeeded + failed == matched
+
+    local reasonValid = reason == "OK"
+      or reason == "BAD_TOKEN"
+      or reason == "BAD_OP"
+      or reason == "BAD_AUDIENCE"
+      or reason == "BAD_GROUP_MASK"
+      or reason == "BAD_SLOT"
+      or reason == "BAD_COMBINATION"
+      or reason == "RATE_LIMIT"
+      or reason == "REPLAY"
+      or reason == "NO_GROUP"
+      or reason == "NO_BOTS"
+      or reason == "BOT_LIMIT"
+      or reason == "PARTIAL"
+      or reason == "FAILED"
+
+    if not isValidStateToken(token)
+        or not operationValid
+        or not audienceValid
+        or groupMask == nil
+        or slot == nil
+        or not countsValid
+        or not reasonValid
+        or type(pending) ~= "table"
+        or pending.order ~= "RTSC"
+        or pending.operation ~= operation
+        or pending.audience ~= audience
+        or pending.groupMask ~= groupMask
+        or pending.slot ~= slot then
+      state.lastError = "RTSC_ORDER_ACK_INVALID"
+      return true
+    end
+
+    state.connected = true
+    if reason == "OK" then
+      state.lastError = nil
+    else
+      state.lastError = "RTSC_ORDER_" .. reason
+    end
+
+    Comm._FinishGroupOrderCommand(token, {
+      status = reason == "OK" and "ok" or "error",
+      reason = reason,
+      operation = operation,
+      audience = audience,
+      groupMask = groupMask,
+      slot = slot,
+      matched = matched,
+      succeeded = succeeded,
+      failed = failed,
+    })
+
+    return true
+  end
+  -- MB_RTSC_ORDER_V1_RX_END
   -- MB_ATTACK_ORDER_V1_RX_BEGIN
   if opcode == "ATTACK_ORDER_ACK" then
     local fields = splitFields(payload or "")
@@ -11391,6 +11641,7 @@ state.selfActionCapable = false
   state.lootRuleItemCapable = false
   state.groupRollCapable = false
   state.groupActionCapable = false
+  state.rtscOrderCapable = false
   state.enchantTradeCapable = false
   state.questAbandonCapable = false
   state.talentApplyCapable = false
