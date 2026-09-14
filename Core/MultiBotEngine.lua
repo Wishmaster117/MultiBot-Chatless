@@ -968,6 +968,48 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 		end
 	end
 	-- MB_GROUP_ACTION_V1_ROUTE_END
+	-- MB_QUEST_ACCEPT_ALL_V1_ROUTE_BEGIN
+	if(normalizedGroupOrder == "accept *") then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.questAcceptAllCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunQuestAcceptAllCommand) == "function") then
+			local token = MultiBot.Comm.RunQuestAcceptAllCommand(onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.allowLegacyChatFallback ~= true) then
+			if(MultiBot.bridge) then
+				MultiBot.bridge.lastError = "QUEST_ACCEPT_ALL_UNAVAILABLE"
+			end
+			return false, "blocked"
+		end
+	end
+	-- MB_QUEST_ACCEPT_ALL_V1_ROUTE_END
+	-- MB_QUEST_TALK_V1_ROUTE_BEGIN
+	if(normalizedGroupOrder == "talk") then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.questTalkCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunQuestTalkCommand) == "function") then
+			local token = MultiBot.Comm.RunQuestTalkCommand(onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.bridge) then
+			MultiBot.bridge.lastError = "QUEST_TALK_UNAVAILABLE"
+		end
+		return false, "blocked"
+	end
+	-- MB_QUEST_TALK_V1_ROUTE_END
 	-- MB_RTSC_ORDER_V1_ROUTE_BEGIN
 	local rtscOperation = nil
 	local rtscAudience = "ALL"

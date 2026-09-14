@@ -75,6 +75,11 @@ local CAPABILITY_STATE_FIELDS = {
   ["FLEE_ORDER_V1"] = "fleeOrderCapable",
   ["GROUP_ACTION_V1"] = "groupActionCapable",
   ["RTSC_ORDER_V1"] = "rtscOrderCapable",
+  ["QUEST_ACCEPT_ALL_V1"] = "questAcceptAllCapable",
+  ["QUEST_TALK_V1"] = "questTalkCapable",
+  ["QUEST_GAMEOBJECT_USE_V1"] = "questGameObjectUseCapable",
+  ["QUEST_REWARD_V1"] = "questRewardCapable",
+  ["QUEST_REWARD_POLICY_V1"] = "questRewardPolicyCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -380,6 +385,7 @@ local function ensureBridgeState()
   state.fleeOrderCapable = state.fleeOrderCapable or false
   state.groupActionCapable = state.groupActionCapable or false
   state.rtscOrderCapable = state.rtscOrderCapable or false
+  state.questAcceptAllCapable = state.questAcceptAllCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -2110,6 +2116,7 @@ state.selfActionCapable = false
     state.groupRollCapable = false
     state.groupActionCapable = false
     state.rtscOrderCapable = false
+    state.questAcceptAllCapable = false
     state.enchantTradeCapable = false
     state.questAbandonCapable = false
     state.talentApplyCapable = false
@@ -2453,6 +2460,346 @@ function Comm.RunGroupActionCommand(action, callback)
   return token
 end
 -- MB_GROUP_ACTION_V1_TX_END
+-- MB_QUEST_ACCEPT_ALL_V1_TX_BEGIN
+function Comm.RunQuestAcceptAllCommand(callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "QUEST_ACCEPT_ALL_NOT_CONNECTED"
+    return false
+  end
+  if state.questAcceptAllCapable ~= true then
+    state.lastError = "QUEST_ACCEPT_ALL_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "QUEST_ACCEPT_ALL_BUSY"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000))
+    .. "-quest-accept-all-" .. tostring(state.groupOrderSeq)
+  local feedbackNames = Comm._BuildFleeWhisperSuppressNames("ALL", "", state)
+
+  state.groupOrderCommands[token] = {
+    order = "QUEST_ACCEPT_ALL",
+    feedbackNames = feedbackNames,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("RUN", "QUEST_ACCEPT_ALL~" .. token) then
+    state.groupOrderCommands[token] = nil
+    state.lastError = "QUEST_ACCEPT_ALL_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    local pending = bridge.groupOrderCommands[token]
+    if type(pending) ~= "table" or pending.order ~= "QUEST_ACCEPT_ALL" then
+      return
+    end
+
+    bridge.lastError = "QUEST_ACCEPT_ALL_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      matched = 0,
+      processed = 0,
+      accepted = 0,
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+-- MB_QUEST_ACCEPT_ALL_V1_TX_END
+-- MB_QUEST_TALK_V1_TX_BEGIN
+
+function Comm.RunQuestTalkCommand(callback)
+
+  local state = ensureBridgeState()
+
+  if not state.connected then
+
+    state.lastError = "QUEST_TALK_NOT_CONNECTED"
+
+    return false
+
+  end
+
+  if state.questTalkCapable ~= true then
+
+    state.lastError = "QUEST_TALK_CAPABILITY_UNAVAILABLE"
+
+    return false
+
+  end
+
+
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+
+  local active = 0
+
+  for _ in pairs(state.groupOrderCommands) do
+
+    active = active + 1
+
+  end
+
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+
+    state.lastError = "QUEST_TALK_BUSY"
+
+    return false
+
+  end
+
+
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+
+  local token = tostring(math.floor(safeNow() * 1000))
+
+    .. "-quest-talk-" .. tostring(state.groupOrderSeq)
+
+  local feedbackNames = Comm._BuildFleeWhisperSuppressNames("ALL", "", state)
+
+
+
+  state.groupOrderCommands[token] = {
+
+    order = "QUEST_TALK",
+
+    feedbackNames = feedbackNames,
+
+    callback = type(callback) == "function" and callback or nil,
+
+    startedAt = safeNow(),
+
+  }
+
+
+
+  if not Comm.Send("RUN", "QUEST_TALK~" .. token) then
+
+    state.groupOrderCommands[token] = nil
+
+    state.lastError = "QUEST_TALK_SEND_FAILED"
+
+    return false
+
+  end
+
+
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+
+    local bridge = ensureBridgeState()
+
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+
+    local pending = bridge.groupOrderCommands[token]
+
+    if type(pending) ~= "table" or pending.order ~= "QUEST_TALK" then
+
+      return
+
+    end
+
+
+
+    bridge.lastError = "QUEST_TALK_TIMEOUT~" .. token
+
+    Comm._FinishGroupOrderCommand(token, {
+
+      status = "timeout",
+
+      matched = 0,
+
+      processed = 0,
+
+      interacted = 0,
+
+      reason = "TIMEOUT",
+
+    })
+
+  end)
+
+
+
+  return token
+
+end
+
+-- MB_QUEST_TALK_V1_TX_END
+-- MB_QUEST_GAMEOBJECT_USE_V1_TX_BEGIN
+function Comm.RunQuestGameObjectUseCommand(botName, gameObjectName, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "QUEST_GAMEOBJECT_USE_NOT_CONNECTED"
+    return false
+  end
+  if state.questGameObjectUseCapable ~= true then
+    state.lastError = "QUEST_GAMEOBJECT_USE_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  botName = trim(tostring(botName or ""))
+  gameObjectName = trim(tostring(gameObjectName or ""))
+  if botName == "" or gameObjectName == "" then
+    state.lastError = "QUEST_GAMEOBJECT_USE_BAD_REQUEST"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "QUEST_GAMEOBJECT_USE_BUSY"
+    return false
+  end
+
+  local feedbackName = Comm._NormalizeFleeWhisperName(botName)
+  if feedbackName == "" then
+    state.lastError = "QUEST_GAMEOBJECT_USE_BAD_BOT"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000))
+    .. "-quest-gameobject-use-" .. tostring(state.groupOrderSeq)
+
+  state.groupOrderCommands[token] = {
+    order = "QUEST_GAMEOBJECT_USE",
+    botName = botName,
+    gameObjectName = gameObjectName,
+    feedbackName = feedbackName,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "QUEST_GAMEOBJECT_USE~"
+    .. token .. "~"
+    .. urlEncodeField(botName) .. "~"
+    .. urlEncodeField(gameObjectName)
+
+  if not Comm.Send("RUN", payload) then
+    state.groupOrderCommands[token] = nil
+    state.lastError = "QUEST_GAMEOBJECT_USE_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    local pending = bridge.groupOrderCommands[token]
+    if type(pending) ~= "table" or pending.order ~= "QUEST_GAMEOBJECT_USE" then
+      return
+    end
+
+    bridge.lastError = "QUEST_GAMEOBJECT_USE_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      botName = botName,
+      used = 0,
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+-- MB_QUEST_GAMEOBJECT_USE_V1_TX_END
+-- MB_QUEST_REWARD_V1_TX_BEGIN
+function Comm.RunQuestRewardCommand(botName, itemLink, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "QUEST_REWARD_NOT_CONNECTED"
+    return false
+  end
+  if state.questRewardCapable ~= true then
+    state.lastError = "QUEST_REWARD_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  botName = trim(tostring(botName or ""))
+  itemLink = trim(tostring(itemLink or ""))
+  if botName == "" or itemLink == "" then
+    state.lastError = "QUEST_REWARD_BAD_REQUEST"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "QUEST_REWARD_BUSY"
+    return false
+  end
+
+  local feedbackName = Comm._NormalizeFleeWhisperName(botName)
+  if feedbackName == "" then
+    state.lastError = "QUEST_REWARD_BAD_BOT"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000))
+    .. "-quest-reward-" .. tostring(state.groupOrderSeq)
+
+  state.groupOrderCommands[token] = {
+    order = "QUEST_REWARD",
+    botName = botName,
+    itemLink = itemLink,
+    feedbackName = feedbackName,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "QUEST_REWARD~"
+    .. token .. "~"
+    .. urlEncodeField(botName) .. "~"
+    .. urlEncodeField(itemLink)
+
+  if not Comm.Send("RUN", payload) then
+    state.groupOrderCommands[token] = nil
+    state.lastError = "QUEST_REWARD_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    local pending = bridge.groupOrderCommands[token]
+    if type(pending) ~= "table" or pending.order ~= "QUEST_REWARD" then
+      return
+    end
+
+    bridge.lastError = "QUEST_REWARD_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      botName = botName,
+      rewarded = 0,
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+-- MB_QUEST_REWARD_V1_TX_END
 -- MB_RTSC_ORDER_V1_TX_BEGIN
 function Comm.RunRtscOrderCommand(operation, audience, groupMask, slot, callback)
   local state = ensureBridgeState()
@@ -2736,7 +3083,88 @@ function Comm._BuildFleeWhisperSuppressNames(audience, target, state)
 
   return names, displayNames
 end
+-- MB_QUEST_ACCEPT_ALL_FEEDBACK_ADDON_V2_BEGIN
+function Comm._QuestAcceptAllFeedbackDisplayName(name)
+  name = trim(tostring(name or ""))
+  if name == "" then
+    return ""
+  end
 
+  local dash = string.find(name, "-", 1, true)
+  if dash and dash > 1 then
+    name = string.sub(name, 1, dash - 1)
+  end
+
+  return name
+end
+
+function Comm._QuestAcceptAllFeedbackPrefix(message)
+  message = tostring(message or "")
+  local prefixes = {
+    { "Accepted ", "accepted " },
+    { "Already completed ", "Already completed " },
+    { "Already on ", "Already on " },
+    { "Can't take ", "Can't take " },
+    { "Quest log is full ", "Quest log is full " },
+    { "Bags are full ", "Bags are full " },
+    { "Cannot accept ", "Cannot accept " },
+  }
+
+  for _, pair in ipairs(prefixes) do
+    local sourcePrefix = pair[1]
+    if string.sub(message, 1, string.len(sourcePrefix)) == sourcePrefix then
+      return sourcePrefix, pair[2]
+    end
+  end
+
+  return nil, nil
+end
+
+function Comm.HandleQuestAcceptAllFeedbackAddonMessage(prefix, message, distribution, sender)
+  if type(prefix) ~= "string" or prefix == "" or tostring(message or "") ~= "" then
+    return false
+  end
+
+  if distribution ~= "PARTY" then
+    return false
+  end
+
+  local state = MultiBot and MultiBot.bridge or nil
+  if type(state) ~= "table"
+      or state.connected ~= true
+      or type(state.groupOrderCommands) ~= "table" then
+    return false
+  end
+
+  local senderKey = Comm._NormalizeFleeWhisperName(sender)
+  if senderKey == "" then
+    return false
+  end
+
+  for _, pending in pairs(state.groupOrderCommands) do
+    if type(pending) == "table"
+        and pending.order == "QUEST_ACCEPT_ALL"
+        and type(pending.feedbackNames) == "table"
+        and pending.feedbackNames[senderKey] then
+      local sourcePrefix, displayPrefix = Comm._QuestAcceptAllFeedbackPrefix(prefix)
+      if sourcePrefix == nil then
+        return false
+      end
+
+      local displayName = Comm._QuestAcceptAllFeedbackDisplayName(sender)
+      if displayName == "" then
+        return false
+      end
+
+      local suffix = string.sub(prefix, string.len(sourcePrefix) + 1)
+      systemMessage("[" .. displayName .. "] " .. displayPrefix .. suffix)
+      return true
+    end
+  end
+
+  return false
+end
+-- MB_QUEST_ACCEPT_ALL_FEEDBACK_ADDON_V2_END
 function Comm._FleeWhisperFilter(_, event, _, sender)
   if event ~= "CHAT_MSG_WHISPER" then
     return false
@@ -6536,6 +6964,7 @@ state.selfActionCapable = false
   state.groupRollCapable = false
   state.groupActionCapable = false
   state.rtscOrderCapable = false
+  state.questAcceptAllCapable = false
   state.enchantTradeCapable = false
   state.questAbandonCapable = false
   state.talentApplyCapable = false
@@ -8771,6 +9200,7 @@ end
 local function handleCapabilityMessage(opcode, payload, state)
   if opcode == "CAPS_BEGIN" then
     resetCapabilityFlags(state)
+    state.questRewardPolicy = nil
     state.capabilityBatchActive = true
     state.capabilitiesResolved = false
     debugPrint("ADDON:RX", "CAPS_BEGIN")
@@ -8780,6 +9210,7 @@ local function handleCapabilityMessage(opcode, payload, state)
   if opcode == "CAPS" then
     if not state.capabilityBatchActive then
       resetCapabilityFlags(state)
+      state.questRewardPolicy = nil
     end
 
     for capability in string.gmatch(payload or "", "([^,]+)") do
@@ -8798,6 +9229,29 @@ local function handleCapabilityMessage(opcode, payload, state)
     finishCapabilityResolution(state, "CAPS", payload)
     return true
   end
+
+  -- MB_QUEST_REWARD_POLICY_V1_RX_BEGIN
+  if opcode == "QUEST_REWARD_POLICY" then
+    if state.questRewardPolicyCapable ~= true then
+      state.lastError = "QUEST_REWARD_POLICY_UNEXPECTED"
+      return true
+    end
+
+    local policy = trim(string.upper(tostring(payload or "")))
+    if policy ~= "AUTO" and policy ~= "MANUAL" then
+      state.lastError = "QUEST_REWARD_POLICY_BAD_VALUE"
+      return true
+    end
+
+    state.questRewardPolicy = policy
+    if policy == "AUTO" and MultiBot and MultiBot.reward and MultiBot.reward.Hide then
+      MultiBot.reward:Hide()
+    end
+
+    debugPrint("ADDON:RX", "QUEST_REWARD_POLICY", policy)
+    return true
+  end
+  -- MB_QUEST_REWARD_POLICY_V1_RX_END
 
   if opcode == "CAPS_END" then
     if not state.capabilityBatchActive then
@@ -9088,7 +9542,236 @@ local STRUCTURED_OPCODE_HANDLERS = {
   CRAFT_RECIPE_TARGET_RESULT = handleProfessionRecipeTargetResponse,
 }
 
+-- MB_QUEST_TALK_V1_FEEDBACK_BEGIN
+
+function Comm._QuestTalkFeedbackDisplayName(name)
+
+  name = trim(tostring(name or ""))
+
+  if name == "" then
+
+    return ""
+
+  end
+
+
+
+  local dash = string.find(name, "-", 1, true)
+
+  if dash and dash > 1 then
+
+    name = string.sub(name, 1, dash - 1)
+
+  end
+
+
+
+  return name
+
+end
+
+
+
+function Comm.HandleQuestTalkFeedbackAddonMessage(prefix, message, distribution, sender)
+
+  if type(prefix) ~= "string" or prefix == "" or tostring(message or "") ~= "" then
+
+    return false
+
+  end
+
+
+
+  if distribution ~= "PARTY" then
+
+    return false
+
+  end
+
+
+
+  local state = MultiBot and MultiBot.bridge or nil
+
+  if type(state) ~= "table"
+
+      or state.connected ~= true
+
+      or type(state.groupOrderCommands) ~= "table" then
+
+    return false
+
+  end
+
+
+
+  local senderKey = Comm._NormalizeFleeWhisperName(sender)
+
+  if senderKey == "" then
+
+    return false
+
+  end
+
+
+
+  for _, pending in pairs(state.groupOrderCommands) do
+
+    if type(pending) == "table"
+
+        and pending.order == "QUEST_TALK"
+
+        and type(pending.feedbackNames) == "table"
+
+        and pending.feedbackNames[senderKey] then
+
+      local displayName = Comm._QuestTalkFeedbackDisplayName(sender)
+
+      if displayName == "" then
+
+        return false
+
+      end
+
+
+
+      systemMessage("[" .. displayName .. "] " .. prefix)
+
+      return true
+
+    end
+
+  end
+
+
+
+  return false
+
+end
+
+-- MB_QUEST_TALK_V1_FEEDBACK_END
+
+-- MB_QUEST_GAMEOBJECT_USE_V1_FEEDBACK_BEGIN
+function Comm._QuestGameObjectUseFeedbackDisplayName(name)
+  name = trim(tostring(name or ""))
+  if name == "" then
+    return ""
+  end
+
+  local dash = string.find(name, "-", 1, true)
+  if dash and dash > 1 then
+    name = string.sub(name, 1, dash - 1)
+  end
+
+  return name
+end
+
+function Comm.HandleQuestGameObjectUseFeedbackAddonMessage(prefix, message, distribution, sender)
+  if type(prefix) ~= "string" or prefix == "" or tostring(message or "") ~= "" then
+    return false
+  end
+
+  if distribution ~= "PARTY" then
+    return false
+  end
+
+  local state = MultiBot and MultiBot.bridge or nil
+  if type(state) ~= "table"
+      or state.connected ~= true
+      or type(state.groupOrderCommands) ~= "table" then
+    return false
+  end
+
+  local senderKey = Comm._NormalizeFleeWhisperName(sender)
+  if senderKey == "" then
+    return false
+  end
+
+  for _, pending in pairs(state.groupOrderCommands) do
+    if type(pending) == "table"
+        and pending.order == "QUEST_GAMEOBJECT_USE"
+        and pending.feedbackName == senderKey then
+      local displayName = Comm._QuestGameObjectUseFeedbackDisplayName(sender)
+      if displayName == "" then
+        return false
+      end
+
+      systemMessage("[" .. displayName .. "] " .. prefix)
+      return true
+    end
+  end
+
+  return false
+end
+-- MB_QUEST_GAMEOBJECT_USE_V1_FEEDBACK_END
+-- MB_QUEST_REWARD_V1_FEEDBACK_BEGIN
+function Comm._QuestRewardFeedbackDisplayName(name)
+  name = trim(tostring(name or ""))
+  if name == "" then
+    return ""
+  end
+
+  local dash = string.find(name, "-", 1, true)
+  if dash and dash > 1 then
+    name = string.sub(name, 1, dash - 1)
+  end
+
+  return name
+end
+
+function Comm.HandleQuestRewardFeedbackAddonMessage(prefix, message, distribution, sender)
+  if type(prefix) ~= "string" or prefix == "" or tostring(message or "") ~= "" then
+    return false
+  end
+
+  if distribution ~= "PARTY" then
+    return false
+  end
+
+  local state = MultiBot and MultiBot.bridge or nil
+  if type(state) ~= "table"
+      or state.connected ~= true
+      or type(state.groupOrderCommands) ~= "table" then
+    return false
+  end
+
+  local senderKey = Comm._NormalizeFleeWhisperName(sender)
+  if senderKey == "" then
+    return false
+  end
+
+  for _, pending in pairs(state.groupOrderCommands) do
+    if type(pending) == "table"
+        and pending.order == "QUEST_REWARD"
+        and pending.feedbackName == senderKey then
+      local displayName = Comm._QuestRewardFeedbackDisplayName(sender)
+      if displayName == "" then
+        return false
+      end
+
+      systemMessage("[" .. displayName .. "] " .. prefix)
+      return true
+    end
+  end
+
+  return false
+end
+-- MB_QUEST_REWARD_V1_FEEDBACK_END
 function Comm.HandleAddonMessage(prefix, message, distribution, sender)
+  if Comm.HandleQuestRewardFeedbackAddonMessage(prefix, message, distribution, sender) then
+    return true
+  end
+  if Comm.HandleQuestGameObjectUseFeedbackAddonMessage(prefix, message, distribution, sender) then
+    return true
+  end
+  if Comm.HandleQuestAcceptAllFeedbackAddonMessage(prefix, message, distribution, sender) then
+    return true
+  end
+
+  if Comm.HandleQuestTalkFeedbackAddonMessage(prefix, message, distribution, sender) then
+
+    return true
+
+  end
   if prefix ~= Comm.prefix then
     return false
   end
@@ -11213,6 +11896,270 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
   -- MB_GROUP_ACTION_V1_RX_END
+  -- MB_QUEST_ACCEPT_ALL_V1_RX_BEGIN
+  if opcode == "QUEST_ACCEPT_ALL_ACK" then
+    local fields = splitFields(payload or "")
+    if #fields ~= 5 then
+      state.lastError = "QUEST_ACCEPT_ALL_ACK_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = fields[1]
+    local matched = parseBoundedInteger(fields[2], 0, 40)
+    local processed = parseBoundedInteger(fields[3], 0, 40)
+    local accepted = parseBoundedInteger(fields[4], 0, 1000)
+    local reason = urlDecodeFieldStrict(fields[5], 64, false)
+
+    state.groupOrderCommands = state.groupOrderCommands or {}
+    local pending = state.groupOrderCommands[token]
+
+    local countsValid = matched ~= nil
+      and processed ~= nil
+      and accepted ~= nil
+      and processed <= matched
+      and (processed > 0 or accepted == 0)
+
+    local reasonValid = reason == "OK"
+      or reason == "BAD_TOKEN"
+      or reason == "RATE_LIMIT"
+      or reason == "REPLAY"
+      or reason == "NO_GROUP"
+      or reason == "NO_BOTS"
+      or reason == "BOT_LIMIT"
+      or reason == "PARTIAL"
+      or reason == "FAILED"
+
+    if not isValidStateToken(token)
+        or not countsValid
+        or not reasonValid
+        or type(pending) ~= "table"
+        or pending.order ~= "QUEST_ACCEPT_ALL" then
+      state.lastError = "QUEST_ACCEPT_ALL_ACK_INVALID"
+      return true
+    end
+
+    state.connected = true
+    if reason == "OK" or reason == "NO_BOTS" then
+      state.lastError = nil
+    else
+      state.lastError = "QUEST_ACCEPT_ALL_" .. reason
+    end
+
+    local status = "failed"
+    if reason == "OK" then
+      status = "ok"
+    elseif reason == "NO_BOTS" and matched == 0 then
+      status = "empty"
+    elseif reason == "PARTIAL" or (reason == "BOT_LIMIT" and processed > 0) then
+      status = "partial"
+    end
+
+    Comm._FinishGroupOrderCommand(token, {
+      status = status,
+      matched = matched,
+      processed = processed,
+      accepted = accepted,
+      reason = reason,
+    })
+
+    return true
+  end
+  -- MB_QUEST_ACCEPT_ALL_V1_RX_END
+  -- MB_QUEST_TALK_V1_RX_BEGIN
+
+  if opcode == "QUEST_TALK_ACK" then
+
+    local fields = splitFields(payload or "")
+
+    if #fields ~= 5 then
+
+      state.lastError = "QUEST_TALK_ACK_BAD_FIELD_COUNT"
+
+      return true
+
+    end
+
+
+
+    local token = fields[1]
+
+    local matched = parseBoundedInteger(fields[2], 0, 40)
+
+    local processed = parseBoundedInteger(fields[3], 0, 40)
+
+    local interacted = parseBoundedInteger(fields[4], 0, 40)
+
+    local reason = urlDecodeFieldStrict(fields[5], 64, false)
+
+
+
+    state.groupOrderCommands = state.groupOrderCommands or {}
+
+    local pending = state.groupOrderCommands[token]
+
+
+
+    if token == nil or token == ""
+
+        or matched == nil
+
+        or processed == nil
+
+        or interacted == nil
+
+        or reason == nil
+
+        or type(pending) ~= "table"
+
+        or pending.order ~= "QUEST_TALK" then
+
+      state.lastError = "QUEST_TALK_ACK_INVALID"
+
+      return true
+
+    end
+
+
+
+    local status = "error"
+
+    if reason == "OK" then
+
+      status = "ok"
+
+    elseif interacted > 0 then
+
+      status = "partial"
+
+    end
+
+
+
+    if reason == "OK" then
+
+      state.lastError = nil
+
+    else
+
+      state.lastError = "QUEST_TALK_" .. reason
+
+    end
+
+
+
+    Comm._FinishGroupOrderCommand(token, {
+
+      status = status,
+
+      matched = matched,
+
+      processed = processed,
+
+      interacted = interacted,
+
+      reason = reason,
+
+    })
+
+
+
+    return true
+
+  end
+
+  -- MB_QUEST_TALK_V1_RX_END
+  -- MB_QUEST_GAMEOBJECT_USE_V1_RX_BEGIN
+  if opcode == "QUEST_GAMEOBJECT_USE_ACK" then
+    local fields = splitFields(payload or "")
+    if #fields ~= 4 then
+      state.lastError = "QUEST_GAMEOBJECT_USE_ACK_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = fields[1]
+    local botName = urlDecodeFieldStrict(fields[2], 64, false)
+    local used = parseBoundedInteger(fields[3], 0, 1)
+    local reason = urlDecodeFieldStrict(fields[4], 64, false)
+
+    if not botName or used == nil or not reason then
+      state.lastError = "QUEST_GAMEOBJECT_USE_ACK_BAD_PAYLOAD"
+      return true
+    end
+
+    state.groupOrderCommands = state.groupOrderCommands or {}
+    local pending = state.groupOrderCommands[token]
+    if type(pending) ~= "table" or pending.order ~= "QUEST_GAMEOBJECT_USE" then
+      return true
+    end
+
+    if Comm._NormalizeFleeWhisperName(botName) ~= pending.feedbackName then
+      state.lastError = "QUEST_GAMEOBJECT_USE_ACK_BOT_MISMATCH"
+      return true
+    end
+
+    local status = "failed"
+    if used == 1 and reason == "OK" then
+      status = "ok"
+    else
+      state.lastError = "QUEST_GAMEOBJECT_USE_FAILED~" .. reason
+    end
+
+    Comm._FinishGroupOrderCommand(token, {
+      status = status,
+      botName = botName,
+      used = used,
+      reason = reason,
+    })
+
+    return true
+  end
+  -- MB_QUEST_GAMEOBJECT_USE_V1_RX_END
+  -- MB_QUEST_REWARD_V1_RX_BEGIN
+  if opcode == "QUEST_REWARD_ACK" then
+    local fields = splitFields(payload or "")
+    if #fields ~= 4 then
+      state.lastError = "QUEST_REWARD_ACK_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = fields[1]
+    local botName = urlDecodeFieldStrict(fields[2], 64, false)
+    local rewarded = parseBoundedInteger(fields[3], 0, 1)
+    local reason = urlDecodeFieldStrict(fields[4], 64, false)
+
+    if not botName or rewarded == nil or not reason then
+      state.lastError = "QUEST_REWARD_ACK_BAD_PAYLOAD"
+      return true
+    end
+
+    state.groupOrderCommands = state.groupOrderCommands or {}
+    local pending = state.groupOrderCommands[token]
+    if type(pending) ~= "table" or pending.order ~= "QUEST_REWARD" then
+      return true
+    end
+
+    if Comm._NormalizeFleeWhisperName(botName) ~= pending.feedbackName then
+      state.lastError = "QUEST_REWARD_ACK_BOT_MISMATCH"
+      return true
+    end
+
+    local status = "failed"
+    if rewarded == 1 and reason == "OK" then
+      status = "ok"
+    else
+      state.lastError = "QUEST_REWARD_FAILED~" .. reason
+    end
+
+    Comm._FinishGroupOrderCommand(token, {
+      status = status,
+      botName = botName,
+      rewarded = rewarded,
+      reason = reason,
+    })
+
+    return true
+  end
+  -- MB_QUEST_REWARD_V1_RX_END
   -- MB_RTSC_ORDER_V1_RX_BEGIN
   if opcode == "RTSC_ORDER_ACK" then
     local fields = splitFields(payload or "")
@@ -11642,6 +12589,7 @@ state.selfActionCapable = false
   state.groupRollCapable = false
   state.groupActionCapable = false
   state.rtscOrderCapable = false
+  state.questAcceptAllCapable = false
   state.enchantTradeCapable = false
   state.questAbandonCapable = false
   state.talentApplyCapable = false

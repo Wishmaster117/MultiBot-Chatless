@@ -147,14 +147,42 @@ end
 
 local function applyRewardChoice(pButton)
 	if(pButton == nil or pButton.link == nil) then return end
+	if(type(MultiBot.rewardManualSelectionAllowed) == "function"
+			and not MultiBot.rewardManualSelectionAllowed()) then
+		if(pButton.parent ~= nil and pButton.parent.Hide ~= nil) then
+			pButton.parent:Hide()
+		end
+		return
+	end
+
+	local tBotName = pButton.getName()
+	if(tBotName == nil or tBotName == "") then return end
 
 	pButton.parent:Hide()
-	SendChatMessage("r " .. pButton.link, "WHISPER", nil, pButton.getName())
 
-	local tClickedBot = MultiBot.getBot(pButton.getName())
-	if(tClickedBot ~= nil) then tClickedBot.rewarded = true end
+	local tStarted = MultiBot.Comm
+		and type(MultiBot.Comm.RunQuestRewardCommand) == "function"
+		and MultiBot.Comm.RunQuestRewardCommand(tBotName, pButton.link, function(result)
+			local tClickedBot = MultiBot.getBot(tBotName)
+			if(result ~= nil and result.status == "ok" and result.rewarded == 1) then
+				if(tClickedBot ~= nil) then tClickedBot.rewarded = true end
+				MultiBot.rewardTryClose()
+				return
+			end
 
-	MultiBot.rewardTryClose()
+			if(tClickedBot ~= nil) then tClickedBot.rewarded = false end
+			if(pButton.parent ~= nil and pButton.parent.Show ~= nil) then
+				pButton.parent:Show()
+			end
+		end)
+
+	if(not tStarted) then
+		local tClickedBot = MultiBot.getBot(tBotName)
+		if(tClickedBot ~= nil) then tClickedBot.rewarded = false end
+		if(pButton.parent ~= nil and pButton.parent.Show ~= nil) then
+			pButton.parent:Show()
+		end
+	end
 end
 
 MultiBot.rewardSetClassIconSize = function(size)
@@ -209,6 +237,20 @@ end
 MultiBot.rewardCollectQuestChoices = collectQuestChoices
 MultiBot.rewardCollectEligibleUnits = collectEligibleUnits
 
+MultiBot.rewardManualSelectionAllowed = function()
+	local tBridge = MultiBot and MultiBot.bridge or nil
+	if(type(tBridge) ~= "table" or tBridge.connected ~= true) then
+		return true
+	end
+	if(tBridge.capabilitiesResolved ~= true) then
+		return false
+	end
+	if(tBridge.questRewardPolicyCapable ~= true) then
+		return true
+	end
+	return (tBridge.questRewardPolicy == "MANUAL")
+end
+
 MultiBot.rewardTryClose = function()
 	local tReward = MultiBot.rewardEnsureState()
 	if(tReward == nil) then return end
@@ -247,6 +289,11 @@ end
 MultiBot.rewardReopenIfAvailable = function()
 	local tReward = MultiBot.rewardEnsureState()
 	if(tReward == nil) then return false end
+	if(type(MultiBot.rewardManualSelectionAllowed) == "function"
+			and not MultiBot.rewardManualSelectionAllowed()) then
+		tReward:Hide()
+		return false
+	end
 	if(not MultiBot.rewardHasRenderableData()) then return false end
 
 	MultiBot.rewardRefreshPager()
@@ -365,6 +412,25 @@ MultiBot.setRewards = function(attempt, token)
 	if(token == nil) then
 		rewardCollectToken = rewardCollectToken + 1
 		token = rewardCollectToken
+	end
+
+	if(type(MultiBot.rewardManualSelectionAllowed) == "function"
+			and not MultiBot.rewardManualSelectionAllowed()) then
+		tReward:Hide()
+
+		local tBridge = MultiBot and MultiBot.bridge or nil
+		if(type(tBridge) == "table"
+				and tBridge.connected == true
+				and tBridge.capabilitiesResolved ~= true) then
+			scheduleRewardCollectRetry(attempt, token)
+			return
+		end
+
+		tReward.rewards = {}
+		tReward.units = {}
+		MultiBot.rewardResetPagination()
+		MultiBot.rewardClearPage()
+		return
 	end
 
 	local expectedChoices

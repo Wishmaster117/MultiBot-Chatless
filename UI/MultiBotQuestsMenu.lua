@@ -481,14 +481,19 @@ function MultiBot.InitializeQuestsMenu(tRight)
                 UIErrorsFrame:AddMessage(MultiBot.L("tips.quests.gobselectboterror"), 1, 0.2, 0.2, 1)
                 return
             end
-            SendChatMessage("u " .. normalized, "WHISPER", nil, bot)
+            if not (MultiBot.Comm
+                and type(MultiBot.Comm.RunQuestGameObjectUseCommand) == "function"
+                and MultiBot.Comm.RunQuestGameObjectUseCommand(bot, normalized)) then
+                if MultiBot.bridge then
+                    MultiBot.bridge.lastError = "QUEST_GAMEOBJECT_USE_UNAVAILABLE"
+                end
+            end
         end)
     end
     gobSearchButton.doLeft = function()
-        if MultiBot.RequestGameObjectResults and MultiBot.RequestGameObjectResults() then
-            return
+        if MultiBot.RequestGameObjectResults then
+            MultiBot.RequestGameObjectResults()
         end
-        MultiBot.ActionToGroup("los")
     end
     tRight.buttons["BotUseGOB"] = gobButton
     tRight.buttons["BotUseGOBName"] = gobNameButton

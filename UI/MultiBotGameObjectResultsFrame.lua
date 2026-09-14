@@ -95,10 +95,15 @@ function MultiBot.RequestGameObjectResults()
         return false
     end
 
+    local requestToken = comm.RequestGameObjects()
+    if not requestToken then
+        return false
+    end
+
     clearTableInPlace(ensureGameObjectStore())
     frame:SetLoading()
     frame:Show()
-    return comm.RequestGameObjects() and true or false
+    return true
 end
 
 function MultiBot.OnBridgeGameObjectsDone()
