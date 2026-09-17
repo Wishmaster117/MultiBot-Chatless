@@ -2788,7 +2788,10 @@ MultiBot.SellAllBots = function(pCommand)
 end
 
 -- MULTIBOT: MAINTENANCE ALL BOTS --
--- Envoie la commande "maintenance" à tous les bots listés dans l’onglet "Units".
+-- MB_MAINTENANCE_ALL_CHATLESS_V1_BEGIN
+-- Exécute Maintenance sur le snapshot exact des boutons de l’onglet Units.
+-- Une seule requête est active à la fois et les bots sont espacés afin de
+-- respecter la limite serveur BOT_MAINTENANCE_V1 (4 requêtes / 10 secondes).
 MultiBot.MaintenanceAllBots = function()
 	local frames = MultiBot.frames
 	if not frames then return 0 end
@@ -2803,27 +2806,124 @@ MultiBot.MaintenanceAllBots = function()
 		return 0
 	end
 
+	if type(MultiBot._maintenanceAllQueue) == "table"
+		and MultiBot._maintenanceAllQueue.active then
+		return 0
+	end
+
+	if type(MultiBot.TimerAfter) ~= "function" then
+		return 0
+	end
+
 	CancelTrade()
 
-	local count = 0
-
+	local targets = {}
 	for key, btn in pairs(units.buttons) do
 		if type(btn) == "table" then
 			local botName = btn.name or (btn.getName and btn.getName()) or key
 			if botName and botName ~= "" then
-				SendChatMessage("maintenance", "WHISPER", nil, botName)
-				count = count + 1
+				targets[#targets + 1] = botName
 			end
 		end
 	end
 
-	-- Si une fenêtre d’inventaire est ouverte, on peut la rafraîchir pour refléter d’éventuels changements
-	if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
-		MultiBot.RefreshInventory(0.5)
+	local count = #targets
+	if count == 0 then
+		if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
+			MultiBot.RefreshInventory(0.5)
+		end
+		return 0
 	end
 
+	local queue = {
+		active = true,
+		targets = targets,
+		index = 1,
+		total = count,
+		completed = 0,
+		succeeded = 0,
+		failed = 0,
+	}
+	MultiBot._maintenanceAllQueue = queue
+
+	local function finishQueue()
+		if MultiBot._maintenanceAllQueue ~= queue then
+			return
+		end
+
+		queue.active = false
+
+		if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
+			MultiBot.RefreshInventory(0.5)
+		end
+	end
+
+	local runNext
+
+	local function scheduleNext()
+		MultiBot.TimerAfter(3.0, function()
+			if MultiBot._maintenanceAllQueue == queue and queue.active then
+				runNext()
+			end
+		end)
+	end
+
+	local function completeOne(result)
+		if MultiBot._maintenanceAllQueue ~= queue or not queue.active then
+			return
+		end
+
+		queue.completed = queue.completed + 1
+		if type(result) == "table" and result.status == "ok" then
+			queue.succeeded = queue.succeeded + 1
+		else
+			queue.failed = queue.failed + 1
+		end
+
+		queue.index = queue.index + 1
+		if queue.index > queue.total then
+			finishQueue()
+		else
+			scheduleNext()
+		end
+	end
+
+	runNext = function()
+		if MultiBot._maintenanceAllQueue ~= queue or not queue.active then
+			return
+		end
+
+		if queue.index > queue.total then
+			finishQueue()
+			return
+		end
+
+		local botName = queue.targets[queue.index]
+		local comm = MultiBot and MultiBot.Comm or nil
+		local playerName = type(UnitName) == "function" and UnitName("player") or nil
+		local token = false
+
+		if playerName and botName == playerName then
+			if comm and type(comm.RunSelfAction) == "function" then
+				token = comm.RunSelfAction("MAINTENANCE", "", completeOne)
+			end
+		elseif comm and type(comm.RunBotMaintenance) == "function" then
+			token = comm.RunBotMaintenance(botName, completeOne)
+		end
+
+		if not token then
+			completeOne({
+				status = "error",
+				botName = botName,
+				reason = MultiBot and MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE",
+			})
+		end
+	end
+
+	runNext()
 	return count
 end
+-- MB_MAINTENANCE_ALL_CHATLESS_V1_END
 
 MultiBot.addSelf = function(pClass, pName)
   local units = MultiBot.frames["MultiBar"].frames["Units"]
