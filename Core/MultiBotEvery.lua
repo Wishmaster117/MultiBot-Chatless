@@ -355,7 +355,24 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
             if isSelfBot then
                 runEverySelfAction("MAINTENANCE", "")
             else
-                SendChatMessage("maintenance", "WHISPER", nil, b.getName())
+                local comm = MultiBot and MultiBot.Comm or nil
+                local botName = b.getName and b.getName() or ""
+                if not (comm and type(comm.RunBotMaintenance) == "function") then
+                    if showEveryMessage then
+                        showEveryMessage(MultiBot.L("selfaction.bridge_unavailable"))
+                    end
+                else
+                    local token = comm.RunBotMaintenance(botName, function(result)
+                        if type(result) == "table" and result.status ~= "ok" and showEveryMessage then
+                            local reasonText = selfActionReasonText(result.reason)
+                            showEveryMessage(string.format(MultiBot.L("selfaction.failed"), reasonText))
+                        end
+                    end)
+                    if not token and showEveryMessage then
+                        local reason = MultiBot and MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE"
+                        showEveryMessage(string.format(MultiBot.L("selfaction.send_failed"), selfActionReasonText(reason)))
+                    end
+                end
             end
         end
         },

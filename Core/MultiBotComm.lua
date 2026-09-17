@@ -81,6 +81,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["QUEST_REWARD_V1"] = "questRewardCapable",
   ["QUEST_REWARD_POLICY_V1"] = "questRewardPolicyCapable",
   ["AUTOGEAR_OPTIONS_V1"] = "autogearOptionsCapable",
+  ["BOT_MAINTENANCE_V1"] = "botMaintenanceCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -387,6 +388,7 @@ local function ensureBridgeState()
   state.groupActionCapable = state.groupActionCapable or false
   state.rtscOrderCapable = state.rtscOrderCapable or false
   state.questAcceptAllCapable = state.questAcceptAllCapable or false
+  state.botMaintenanceCapable = state.botMaintenanceCapable or false
   state.botTargetResolveCapable = state.botTargetResolveCapable or false
   state.botTargetResolveSeq = tonumber(state.botTargetResolveSeq) or 0
   state.botTargetResolveCommands = type(state.botTargetResolveCommands) == "table" and state.botTargetResolveCommands or {}
@@ -396,6 +398,8 @@ local function ensureBridgeState()
   state.botLifecycleCommands = type(state.botLifecycleCommands) == "table" and state.botLifecycleCommands or {}
   state.creatorAddClassCommands = type(state.creatorAddClassCommands) == "table" and state.creatorAddClassCommands or {}
   state.creatorInitAutoCommands = type(state.creatorInitAutoCommands) == "table" and state.creatorInitAutoCommands or {}
+  state.botMaintenanceSeq = tonumber(state.botMaintenanceSeq) or 0
+  state.botMaintenanceCommands = type(state.botMaintenanceCommands) == "table" and state.botMaintenanceCommands or {}
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -2099,6 +2103,7 @@ maybeResolveCapabilityFallback = function(generation)
     state.strategyMutationCapable = false
 state.selfStrategyCapable = false
 state.selfActionCapable = false
+state.botMaintenanceCapable = false
     state.outfitCapable = false
     state.inventoryCapable = false
     state.inventoryExactCapable = false
@@ -6949,6 +6954,7 @@ function Comm.MarkDisconnected(reason)
   state.strategyMutationCapable = false
 state.selfStrategyCapable = false
 state.selfActionCapable = false
+state.botMaintenanceCapable = false
   state.outfitCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
@@ -7011,6 +7017,17 @@ state.selfActionCapable = false
     end
   end
   state.selfActionCommands = {}
+
+  for token, pending in pairs(state.botMaintenanceCommands or {}) do
+    if type(pending) == "table" and type(pending.callback) == "function" then
+      pending.callback({
+        status = "error",
+        botName = pending.botName,
+        reason = "DISCONNECTED",
+      })
+    end
+  end
+  state.botMaintenanceCommands = {}
 
   local pendingTokens = {}
   for token in pairs(state.strategyMutationCommands or {}) do
@@ -8944,6 +8961,136 @@ function Comm.HandleInventoryBuybackAddonMessage(opcode, payload, state)
 end
 -- MB_VENDOR_BUYBACK_V1_RX_HELPER_END
 
+-- MB_BOT_MAINTENANCE_V1_BEGIN
+function Comm.RunBotMaintenance(name, callback)
+  local state = ensureBridgeState()
+  name = trim(name or "")
+
+  if name == "" then
+    state.lastError = "BOT_MAINTENANCE_BAD_BOT_NAME"
+    return false
+  end
+  if not state.connected then
+    state.lastError = "BOT_MAINTENANCE_NOT_CONNECTED"
+    return false
+  end
+  if state.botMaintenanceCapable ~= true then
+    state.lastError = "BOT_MAINTENANCE_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  state.botMaintenanceCommands = type(state.botMaintenanceCommands) == "table" and state.botMaintenanceCommands or {}
+  if countTableEntries(state.botMaintenanceCommands) >= 32 then
+    state.lastError = "BOT_MAINTENANCE_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  state.botMaintenanceSeq = (tonumber(state.botMaintenanceSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-bot-maintenance-" .. tostring(state.botMaintenanceSeq)
+  state.botMaintenanceCommands[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "BOT_MAINTENANCE~" .. urlEncodeField(name) .. "~" .. token
+  if not Comm.Send("RUN", payload) then
+    state.botMaintenanceCommands[token] = nil
+    state.lastError = "BOT_MAINTENANCE_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(10.0, function()
+    local bridge = ensureBridgeState()
+    local pending = bridge.botMaintenanceCommands and bridge.botMaintenanceCommands[token] or nil
+    if type(pending) ~= "table" then
+      return
+    end
+
+    bridge.botMaintenanceCommands[token] = nil
+    bridge.lastError = "BOT_MAINTENANCE_TIMEOUT"
+    if type(pending.callback) == "function" then
+      pending.callback({
+        status = "timeout",
+        botName = pending.botName,
+        reason = "TIMEOUT",
+      })
+    end
+  end)
+
+  return token
+end
+
+function Comm.HandleBotMaintenanceAddonMessage(opcode, payload, state)
+  if opcode ~= "BOT_MAINTENANCE_ACK" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  local fields = splitFields(payload or "")
+  if #fields ~= 4 then
+    state.lastError = "BOT_MAINTENANCE_ACK_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local botName = urlDecodeFieldStrict(fields[2], 64, false)
+  local status = string.upper(trim(fields[3]))
+  local reason = urlDecodeFieldStrict(fields[4], 64, false)
+  local pending = state.botMaintenanceCommands and state.botMaintenanceCommands[token] or nil
+
+  if not isValidStateToken(token)
+      or botName == nil
+      or (status ~= "OK" and status ~= "ERR")
+      or reason == nil
+      or type(pending) ~= "table"
+      or string.lower(botName) ~= pending.botNameKey then
+    state.lastError = "BOT_MAINTENANCE_ACK_INVALID"
+    return true
+  end
+
+  state.botMaintenanceCommands[token] = nil
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("BOT_MAINTENANCE_" .. reason)
+  debugPrint("ADDON:RX", "BOT_MAINTENANCE_ACK", token, botName, status, reason)
+
+  if type(pending.callback) == "function" then
+    pending.callback({
+      status = status == "OK" and "ok" or "failed",
+      botName = botName,
+      reason = reason,
+    })
+  end
+
+  return true
+end
+
+function Comm.HandleBotMaintenanceProtocolError(requestType, token, reason, state)
+  if requestType ~= "BOT_MAINTENANCE" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(token)
+  local pending = state.botMaintenanceCommands and state.botMaintenanceCommands[token] or nil
+  if type(pending) ~= "table" then
+    return true
+  end
+
+  state.botMaintenanceCommands[token] = nil
+  local failureReason = reason or "PROTOCOL_ERROR"
+  state.lastError = "BOT_MAINTENANCE_" .. failureReason
+  if type(pending.callback) == "function" then
+    pending.callback({
+      status = "error",
+      botName = pending.botName,
+      reason = failureReason,
+    })
+  end
+  return true
+end
+-- MB_BOT_MAINTENANCE_V1_END
 -- MB_SELFBOT_ACTION_V1_BEGIN
 function Comm.RunSelfAction(action, argument, callback)
   local state = ensureBridgeState()
@@ -12482,6 +12629,10 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if Comm.HandleBotMaintenanceAddonMessage(opcode, payload, state) then
+    return true
+  end
+
   if opcode == "ERR" then
     state.lastError = payload
     debugPrint("ADDON:RX", "ERR", payload or "")
@@ -12495,6 +12646,8 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
       requestType = requestType and string.upper(trim(requestType)) or nil
       if requestType and isValidStateToken(token) and reason then
         if Comm.HandleSelfBotProtocolError(requestType, token, reason, state) then
+          return true
+        elseif Comm.HandleBotMaintenanceProtocolError(requestType, token, reason, state) then
           return true
         elseif Comm.HandleSelfActionProtocolError(requestType, token, reason, state) then
           return true
@@ -12580,6 +12733,7 @@ function Comm.OnPlayerEnteringWorld()
   state.strategyMutationCapable = false
 state.selfStrategyCapable = false
 state.selfActionCapable = false
+state.botMaintenanceCapable = false
   state.outfitCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
