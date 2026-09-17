@@ -1,12 +1,10 @@
 ﻿# Multibot Chatless + Bridge — Roadmap
 
 **Statut : active**
-**Dernière synchronisation : 12/09/2026**
+**Dernière synchronisation : 17/09/2026**
 
 Cette roadmap est la **source de vérité technique** du projet.
 Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontairement plus courts.
-
-`TODO.md` est un fichier local séparé et n'est pas utilisé comme source de vérité de cette roadmap.
 
 ---
 
@@ -17,60 +15,52 @@ Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontaireme
 ```text
 Repo:   L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot
 Branch: feature/group-orders-chatless
-Base HEAD auditée avant commit de clôture RTSC:
-        a82e9835783850aee9019ffa15a58c8081435248
+HEAD pré-commit documentation:
+        e628195dcc7eddf54372e4f6517a56903a73fc45
 ```
 
-État fonctionnel audité au 12/09/2026 :
+État fonctionnel audité au 17/09/2026 :
 
-- Follow / Stay / Attack livrés et runtime validés ;
-- lifecycle unitaire des rosters, AutoInvite structuré et Raidus lifecycle livrés ;
-- Raidus Working Layout persistant + Safe Group Remove + Empty Layout Apply livrés et runtime validés ;
-- Faction Banner bulk group lifecycle livré via `BOT_GROUP_LIFECYCLE_V1` ;
+- Follow / Stay / Attack, Flee, Group Actions et RTSC livrés et runtime validés ;
+- lifecycle rosters, Raidus Safe Apply et bulk group lifecycle livrés ;
 - Creator `addclass` livré via `CREATOR_ADDCLASS_V1` ;
-- Flee livré via `FLEE_ORDER_V1`, avec feedback chatless et noms ALL / TARGET / rôles validés ;
-- Group Actions (`drink`, `release`, `revive`, `summon`) livrées et runtime validées via `GROUP_ACTION_V1` ;
-- RTSC livré via `RTSC_ORDER_V1`, incluant audiences, groupes, SAVE/GO/UNSAVE/CANCEL et AEDM natif validés ;
-- `Core\MultiBotComm.lua` final RTSC : `312741C60FDFFB49ACEF351C9B99204B510DD58510C8E23D3C8C21BEA4F1981F` ;
-- `Core\MultiBotEngine.lua` final RTSC + hotfix group pattern : `1449F78EAA4BB2F6C7AC547F6D534B912834937482AED71CB692BEC5C68ECE59` ;
-- `MultiBotComm.lua` reste à **199 locals** au niveau chunk principal ;
-- prochain chantier actif : Quest interactions.
+- Creator `init=auto` livré via `CREATOR_INIT_AUTO_V1` pour TARGET/GROUP ;
+- Quest interactions structurées présentes via `QUEST_ACCEPT_ALL_V1`, `QUEST_TALK_V1`, `QUEST_GAMEOBJECT_USE_V1`, `QUEST_REWARD_V1` et `QUEST_REWARD_POLICY_V1` ;
+- correctif GameObject search structured-only/loading-gate inclus dans le HEAD Addon ;
+- Autogear options livré via `AUTOGEAR_OPTIONS_V1` : lifecycle silencieux, 8 locales × 49 clés, UI AceGUI et deferred-open runtime validés ;
+- `Features\MultiBotAutogear.lua` final runtime validé : `1843AF73ADFBD2C527E8CE50BA7C127541090E9A56ACB36473404DB3EB74BEAB` ;
+- `Core\MultiBotComm.lua` working tree pré-commit : `F649A91E30856D8889C74D33FDBD9647C9D4F6C7E20524A27DACD8DCB76EE81F` ;
+- prochain chantier fonctionnel : actions bots ordinaires restantes, puis cleanup final legacy.
 
 ### Bridge
 
 ```text
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge
 Branch: feature/group-orders-chatless
-Base HEAD auditée avant commit de clôture RTSC:
-        d8447fbf1ffc75945657313110f82c50b11608a9
+HEAD pré-commit documentation:
+        3cf1f0a057401e41ff05ce6e9853f892f49c3605
 ```
 
-État fonctionnel audité au 12/09/2026 :
+État fonctionnel audité au 17/09/2026 :
 
-- endpoints Follow / Stay / Attack livrés ;
-- `BOT_GROUP_REMOVE_V1` livré pour le cleanup Raidus sécurisé ;
-- `BOT_GROUP_LIFECYCLE_V1` livré pour le connect/disconnect bulk borné du groupe réel ;
-- `CREATOR_ADDCLASS_V1` livré comme adaptateur AddClass spécialisé, sans exécuteur Playerbots générique ;
-- `FLEE_ORDER_V1` livré et runtime validé ;
-- `GROUP_ACTION_V1` livré avec allowlist fermée DRINK / RELEASE / REVIVE / SUMMON et appels natifs Playerbots ;
-- `RTSC_ORDER_V1` livré comme adaptateur borné vers l'action native Playerbots `rtsc`, sans transport de coordonnées AEDM ;
-- `BotMatchesAttackAudience` reste autoritaire pour les audiences de rôle ;
-- `FLEE_ORDER_ITEM` retourne les résultats nominatifs bornés avant `FLEE_ORDER_ACK` ;
-- `src\MultiBotBridge.cpp` final RTSC avant cleanup warnings : `3F6EE3470DB5B535AB187185C8D7A3EA18D69F6DA14C5ADAEA8D75528A7DA354` ;
-- `src\MultiBotBridge.cpp` courant après cleanup warnings validé Windows : `668A46994456CBD71B56C319CE0D16D6E21F092BD02237311B7C0ADCFDD10C23` ;
-- cleanup warnings : surcharge de base `OnPlayerCanUseChat` réexposée via `using`, helper mort `GetGuildBankWithdrawRemaining` supprimé ;
-- disparition des deux warnings GCC correspondants à confirmer au prochain build Linux ;
-- aucun exécuteur Playerbots générique n'a été ajouté.
+- endpoints group/lifecycle et ordres collectifs précédemment validés conservés ;
+- `CREATOR_ADDCLASS_V1` et `CREATOR_INIT_AUTO_V1` présents comme adaptateurs spécialisés ;
+- les cinq capacités Quest structurées sont livrées côté Bridge ;
+- `AUTOGEAR_OPTIONS_V1` fournit limites serveur et workflow `INFO/PLAN/APPLY` avec revalidation serveur ;
+- aucun exécuteur Playerbots générique n'a été ajouté ;
+- `src\MultiBotBridge.cpp` working tree pré-commit : `A4B5B6FA845C7F732C82C569852C4D9D43BD53A9105BB8750911FF02C0BFF7EE`.
 
 ### Playerbots
 
 ```text
-Repo: L:\AC_PB\azerothcore-wotlk\modules\mod-playerbots
-HEAD: b949b50bfcdd4fab937781bac2d7765e39330e4b
-Mode: STRICT READ ONLY
+Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-playerbots
+Remote: https://github.com/mod-playerbots/mod-playerbots
+Branch: master
+HEAD:   b6696bdbd3740e575598d167d69f39f68cc0b907
+Mode:   STRICT READ ONLY
 ```
 
-**Règle absolue :** aucune modification de `mod-playerbots` dans ce projet.
+**Règle absolue :** aucune modification de `mod-playerbots` dans ce projet. Pour compiler le Bridge, utiliser la révision courante de `master` du dépôt officiel `mod-playerbots/mod-playerbots`; le SHA ci-dessus est la révision validée le 17/09/2026.
 
 ### Architecture
 
@@ -218,6 +208,8 @@ Livré ou déjà migré selon les familles validées :
 - `FLEE_ORDER_V1`, y compris ALL / TARGET / Tank / Healer / DPS / Melee / Ranged avec feedback nominatif chatless ;
 - `GROUP_ACTION_V1` pour `drink`, `release`, `revive` et `summon`, runtime validé sans fallback chat automatique ;
 - `RTSC_ORDER_V1` pour ENABLE / RESET / SELECT / CANCEL / SAVE / UNSAVE / GO, audiences rôles et groupes, avec AEDM natif conservé ;
+- `QUEST_ACCEPT_ALL_V1`, `QUEST_TALK_V1`, `QUEST_GAMEOBJECT_USE_V1`, `QUEST_REWARD_V1`, `QUEST_REWARD_POLICY_V1` ;
+- `AUTOGEAR_OPTIONS_V1` pour le workflow Autogear options/confirmation/apply ;
 - plusieurs contrôles combat/non-combat.
 
 ### Creator — AddClass spécialisé
@@ -249,8 +241,18 @@ Garanties validées :
 - auto-group, roster et EveryBar non régressés ;
 - aucun `.playerbot bot addclass ...` SAY observé avec `MultiBot.allowLegacyChatFallback == false` ;
 - fallback chat historique conservé uniquement derrière `allowLegacyChatFallback` ;
-- `init=auto` volontairement inchangé et hors périmètre de ce patch ;
+- `init=auto` a ensuite été migré séparément via `CREATOR_INIT_AUTO_V1` ;
 - Playerbots resté strictement read-only.
+
+### Creator — Init Auto spécialisé
+
+Livré après AddClass via :
+
+```text
+CREATOR_INIT_AUTO_V1
+```
+
+Le protocole expose uniquement `TARGET` ou `GROUP`. Le Bridge applique validation, rate-limit et anti-rejeu, puis délègue à `PlayerbotMgr::ProcessBotCommand("init=auto", ...)` pour conserver les règles Playerbots. Le mode groupe retourne les compteurs initialized/skipped/failed. Aucun exécuteur Playerbots générique n'est exposé.
 
 ---
 
@@ -419,7 +421,7 @@ Units / lifecycle legacy cleanup
 -> regroupé avec le cleanup final des fallbacks/parsers chat
 ```
 
-Aucun cleanup lifecycle n'est donc appliqué à ce stade. Le sous-chemin Creator `addclass` a depuis été migré via `CREATOR_ADDCLASS_V1`; le prochain chantier fonctionnel actif est désormais **Creator `init=auto`**.
+Aucun cleanup lifecycle n'est donc appliqué à ce stade. À la date de cet audit, le sous-chemin Creator `addclass` venait d'être migré via `CREATOR_ADDCLASS_V1` et Creator `init=auto` était le chantier suivant. Creator `init=auto` a depuis été clôturé via `CREATOR_INIT_AUTO_V1`; le cleanup lifecycle reste différé jusqu'au cleanup final.
 
 ---
 
@@ -718,10 +720,10 @@ Le bulk lifecycle et Flee sont retirés de la file active.
 
 L'audit `Units / lifecycle legacy cleanup` du 06/09/2026 a confirmé qu'un nettoyage est possible, mais il reste volontairement reporté afin de ne pas retirer trop tôt des fallbacks/parsers encore utiles pendant la migration chatless.
 
-Après clôture RTSC du 12/09/2026, l'ordre recommandé devient :
+Après clôture Quest + Autogear du 17/09/2026, l'ordre recommandé devient :
 
-1. Quest interactions (`accept *`, `talk`, `los`, gameobject use, reward choice) ;
-2. actions bots ordinaires restantes (maintenance, autogear, Hunter pet controls, spell cast) ;
+1. actions bots ordinaires restantes (maintenance, Hunter pet controls, spell cast) ;
+2. reliquats techniques explicitement différés selon priorité ;
 3. nettoyage final global des fallbacks/parsers chat devenus morts, **incluant le cleanup Units / lifecycle legacy déjà audité**.
 
 Ne pas déclarer le projet fully chatless tant que les occurrences restantes de `SendChatMessage` n'ont pas été classées et validées.
@@ -811,7 +813,7 @@ SHA-256 030F44635E435E41B5A056A77F5975B8F67A7785EF9BFB21536DD7423E32D16D
 FINAL_STATUS=OK
 ```
 
-Le chantier **Group Actions** est désormais clôturé via `GROUP_ACTION_V1`; le prochain chantier actif est **RTSC**.
+À la clôture **Group Actions** du 11/09/2026, le chantier suivant était **RTSC**. RTSC a depuis été clôturé via `RTSC_ORDER_V1`.
 
 ---
 
@@ -871,14 +873,13 @@ legacy chat spam  = NOT OBSERVED
 Audit final :
 
 ```text
-audit-multibot-group-action-v1-final-v1b-2026-09-11-201814.zip
+audit-multibot-group-action-v1-final-v1c-2026-09-11-201814.zip
 SHA-256 52B58083BF66E29B774ADECB17122EB9C54E56C19918B81F17DFAE12C487E0FF
 FATAL_COUNT=0
 WARNING_COUNT=1
 FINAL_STATUS=OK_WITH_WARNINGS
 ```
 
-Le warning unique correspond au `TODO.md` local déjà connu et hors périmètre du chantier.
 
 Hashes code de clôture :
 
@@ -888,7 +889,7 @@ MultiBotEngine.lua BE19850C472CF85FB69AE3292D8F15DB71EBBB6471E5F93DE4A2A2670FB33
 MultiBotBridge.cpp E43FCB40DF864AFAE8A12D6CC3EC0FBFA82E6B5C58EAAB49E1F3B3C2204596B0
 ```
 
-RTSC a depuis été clôturé via `RTSC_ORDER_V1`; le prochain chantier actif est **Quest interactions**.
+À la clôture **RTSC** du 12/09/2026, le chantier suivant était **Quest interactions**. Les interactions Quest structurées ont depuis été clôturées via les cinq capacités `QUEST_*` listées ci-dessous.
 
 ---
 
@@ -1011,7 +1012,7 @@ MultiBotBridge.cpp — courant après cleanup warnings
 ### Audit final RTSC
 
 ```text
-audit-multibot-rtsc-order-v1-final-v1b-2026-09-12-122116.zip
+audit-multibot-rtsc-order-v1-final-v1c-2026-09-12-122116.zip
 SHA-256 FDE1388AD4F297A1552CD64F2805DB20CFC97F6A6CBA0050F71B484DD40FD297
 FATAL_COUNT=0
 WARNING_COUNT=0
@@ -1050,6 +1051,64 @@ FINAL_STATUS=OK
 ```
 
 La disparition effective des deux warnings GCC reste à confirmer au prochain build Linux de cette branche. Le warning `mod-lfr` sur son paramètre `reload` est hors périmètre MultiBot.
+
+---
+
+## 7quinquies. Clôture Quest interactions structurées — 14/09/2026
+
+Capacités livrées :
+
+```text
+QUEST_ACCEPT_ALL_V1
+QUEST_TALK_V1
+QUEST_GAMEOBJECT_USE_V1
+QUEST_REWARD_V1
+QUEST_REWARD_POLICY_V1
+```
+
+Le Bridge conserve l'autorité sur le requester, le contrôle bot, les limites et les résultats. L'Addon utilise des requêtes structurées pour accept-all, talk, GameObject use et reward, et reçoit la politique de reward serveur. Le correctif Addon du 14/09 rend également la recherche GameObject structured-only avec loading gate.
+
+Playerbots reste strictement read-only.
+
+---
+
+## 7sexies. Clôture Autogear options / i18n / AceGUI / deferred-open — 17/09/2026
+
+Capacité livrée :
+
+```text
+AUTOGEAR_OPTIONS_V1
+```
+
+État final validé :
+
+- limites qualité/iLvl autoritaires côté Bridge ;
+- modes valeurs serveur / qualité / match iLvl joueur / iLvl personnalisé ;
+- reset explicite de l'équipement porté ;
+- workflow `AUTOGEAR_INFO → AUTOGEAR_PLAN → confirmation → AUTOGEAR_APPLY` ;
+- lifecycle silent-reset sans faux warning de login/reload ;
+- i18n officielle `MultiBot.L` avec **49 clés × 8 locales** ;
+- fenêtre AceGUI cohérente avec les fenêtres modernes MultiBot ;
+- deferred-open : refus initial (ex. bot < niveau 5) affiché en alerte sans ouvrir de fenêtre vide ;
+- runtime final : bot valide `Viz` OK, bot bas niveau `Heal` refusé proprement ;
+- Playerbots inchangé/read-only.
+
+Hashes finaux :
+
+```text
+Features\MultiBotAutogear.lua  1843AF73ADFBD2C527E8CE50BA7C127541090E9A56ACB36473404DB3EB74BEAB
+src\MultiBotBridge.cpp          A4B5B6FA845C7F732C82C569852C4D9D43BD53A9105BB8750911FF02C0BFF7EE
+```
+
+Audits finaux :
+
+```text
+audit-multibot-autogear-i18n-final-v1c-2026-09-15-161909.zip
+SHA-256 996FE5B1C27EDA7AE91A0CA89B1FE188D6A76C75081118E3D1A89559E6E3EC4C
+
+audit-multibot-autogear-ui-deferred-open-final-v1-2026-09-17-190701.zip
+SHA-256 EA5F49B9ABFE74501D825704B16510F9B24AB6D879F043A1F44D43D24C00D0B9
+```
 
 ---
 
@@ -1182,16 +1241,18 @@ Cette décision évite de casser prématurément les rosters, EveryBar, AutoInvi
 
 ### Familles actives à reprendre
 
-Ordre courant après clôture RTSC du 12/09/2026 :
+Ordre courant après clôture Quest + Autogear du 17/09/2026 :
 
 ```text
-1. Quest interactions
-2. remaining ordinary-bot actions
-3. final legacy parser/fallback cleanup
+1. remaining ordinary-bot actions
+   - maintenance
+   - Hunter pet controls
+   - spell cast
+2. final legacy parser/fallback cleanup
    including Units / lifecycle legacy cleanup
 ```
 
-Les listes de quêtes `INCOMPLETED`, `COMPLETED` et `ALL` sont déjà Bridge-first ; ne pas les remigrer. Le reliquat Quest concerne surtout les interactions/commandes encore chat.
+Les interactions Quest structurées et Autogear sont clôturés dans la baseline courante ; ne pas les remettre dans la file active sans nouvel audit ciblé.
 
 ### Classification finale attendue
 
@@ -1302,7 +1363,7 @@ Repères principaux conservés :
 - runtime CONNECT/DISCONNECT bulk validé sans transport chat bulk observé ;
 - audit ciblé Units / lifecycle legacy cleanup exécuté le 06/09/2026 : cleanup utile mais différé jusqu'à la phase finale afin de préserver les fallbacks/parsers encore partagés ;
 - Creator `addclass` migré via `CREATOR_ADDCLASS_V1`, build `worldserver` validé (3 succès, 0 échec) et runtime Random/Male/Female/DK + auto-group validé sans spam `.playerbot bot addclass` en SAY ;
-- audit final Creator AddClass v1b : `CREATOR_ADDCLASS_V1=VALIDATED`, `WARNING_COUNT=0`, `FATAL_COUNT=0`, Playerbots clean/read-only ;
+- audit final Creator AddClass v1c : `CREATOR_ADDCLASS_V1=VALIDATED`, `WARNING_COUNT=0`, `FATAL_COUNT=0`, Playerbots clean/read-only ;
 - Flee migré via `FLEE_ORDER_V1`, puis feedback normal Playerbots rendu chatless sans modifier Playerbots ;
 - ALL et TARGET nominatif validés ; une cible non-bot ne produit plus de fausse confirmation ;
 - audiences Tank / Healer / DPS / Melee / Ranged enrichies par `FLEE_ORDER_ITEM` autoritaire côté Bridge avant `FLEE_ORDER_ACK` ;
@@ -1310,14 +1371,16 @@ Repères principaux conservés :
 - Group Actions (`drink`, `release`, `revive`, `summon`) migrées via `GROUP_ACTION_V1`, build/runtime validés le 11/09/2026, audit final fatal-free et Playerbots resté read-only ;
 - RTSC migré via `RTSC_ORDER_V1` le 12/09/2026, audiences/groupes/SAVE/GO/UNSAVE/CANCEL et AEDM natif validés ;
 - hotfix Lua du sélecteur `@group` validé ;
-- audit final RTSC v1b : fatal-free, 199 locals Comm, Playerbots clean/read-only ;
+- audit final RTSC v1c : fatal-free, 199 locals Comm, Playerbots clean/read-only ;
 - cleanup warnings Bridge post-RTSC appliqué sur Windows : `OnPlayerCanUseChat` base overload réexposé et helper guild-bank mort supprimé ;
 - build Windows du hotfix : 3 succès, 0 échec ; runtime Bridge/RTSC/Guild Bank/chat normal validé ;
 - confirmation GCC/Linux des deux warnings Bridge encore à effectuer au prochain build Linux ;
-- prochaine migration active fixée à Quest interactions ;
-- base HEAD Addon auditée avant commit de clôture RTSC : `a82e9835783850aee9019ffa15a58c8081435248` ;
-- base HEAD Bridge auditée avant commit de clôture RTSC : `d8447fbf1ffc75945657313110f82c50b11608a9` ;
-- Playerbots `b949b50bfcdd4fab937781bac2d7765e39330e4b` resté strictement read-only.
+- Quest interactions structurées livrées côté Addon/Bridge ;
+- Autogear options/i18n/AceGUI/deferred-open clôturé et runtime validé ;
+- prochaines migrations : maintenance, Hunter pet controls, spell cast, puis cleanup final legacy ;
+- HEAD Addon pré-commit documentation du 17/09/2026 : `e628195dcc7eddf54372e4f6517a56903a73fc45` ;
+- HEAD Bridge pré-commit documentation du 17/09/2026 : `3cf1f0a057401e41ff05ce6e9853f892f49c3605` ;
+- Playerbots officiel `master` `b6696bdbd3740e575598d167d69f39f68cc0b907` resté strictement read-only.
 
 Les détails de branches anciennes ne doivent plus être présentés comme état courant dans les README.
 
@@ -1329,15 +1392,17 @@ Cette section conserve uniquement les preuves structurantes utiles à la reprise
 
 | Référence | SHA-256 | Portée |
 | --- | --- | --- |
-| `audit-multibot-rtsc-order-v1-final-v1b-2026-09-12-122116.zip` | `FDE1388AD4F297A1552CD64F2805DB20CFC97F6A6CBA0050F71B484DD40FD297` | Audit final RTSC : `RTSC_ORDER_V1`, hotfix group pattern présent, 199 locals Comm, audiences/groupes/SAVE/GO/UNSAVE/CANCEL/AEDM validés, Playerbots clean/read-only, zéro fatal/warning. |
+| `audit-multibot-autogear-ui-deferred-open-final-v1-2026-09-17-190701.zip` | `EA5F49B9ABFE74501D825704B16510F9B24AB6D879F043A1F44D43D24C00D0B9` | Audit final UI Autogear + deferred-open : chaîne UI/hotfix cohérente, guards i18n/wire/PLAN-APPLY/AceGUI conservés, runtime `Viz`/`Heal` validé, 112 hashes protégés, Playerbots clean/read-only. |
+| `audit-multibot-autogear-i18n-final-v1c-2026-09-15-161909.zip` | `996FE5B1C27EDA7AE91A0CA89B1FE188D6A76C75081118E3D1A89559E6E3EC4C` | Audit final i18n Autogear : 49 clés exactes × 8 locales, `MultiBot.L`, lifecycle hotfix conservé, runtime FR validé, Playerbots clean/read-only. |
+| `audit-multibot-rtsc-order-v1-final-v1c-2026-09-12-122116.zip` | `FDE1388AD4F297A1552CD64F2805DB20CFC97F6A6CBA0050F71B484DD40FD297` | Audit final RTSC : `RTSC_ORDER_V1`, hotfix group pattern présent, 199 locals Comm, audiences/groupes/SAVE/GO/UNSAVE/CANCEL/AEDM validés, Playerbots clean/read-only, zéro fatal/warning. |
 | `audit-multibot-bridge-compile-warnings-final-v1-2026-09-12-134628.zip` | `07BF5E6107A6C6198737FF5029FF65D9B183B019D327D8B699DA097DAAF60D35` | Audit final du cleanup warnings Bridge post-RTSC : transformation byte-exact limitée au `using PlayerScript::OnPlayerCanUseChat;` et à la suppression du helper mort, build/runtime Windows validés ; revalidation GCC/Linux encore attendue. |
-| `audit-multibot-group-action-v1-final-v1b-2026-09-11-201814.zip` | `52B58083BF66E29B774ADECB17122EB9C54E56C19918B81F17DFAE12C487E0FF` | Audit final Group Actions : `GROUP_ACTION_V1`, hashes code validés, 199 locals Comm, build/server/runtime DRINK/RELEASE/REVIVE/SUMMON validés, Playerbots clean/read-only ; warning unique `TODO.md` hors périmètre. |
+| `audit-multibot-group-action-v1-final-v1c-2026-09-11-201814.zip` | `52B58083BF66E29B774ADECB17122EB9C54E56C19918B81F17DFAE12C487E0FF` | Audit final Group Actions : `GROUP_ACTION_V1`, hashes code validés, 199 locals Comm, build/server/runtime DRINK/RELEASE/REVIVE/SUMMON validés, Playerbots clean/read-only. |
 | `audit-multibot-flee-closeout-docs-current-state-v1-2026-09-11-175432.zip` | `030F44635E435E41B5A056A77F5975B8F67A7785EF9BFB21536DD7423E32D16D` | Audit final Flee + documentation : hashes finaux Addon/Bridge, 199 locals Comm, Flee ALL/TARGET/rôles nominatif validé, Playerbots clean/read-only, état README/ROADMAP inventorié. |
-| `audit-multibot-creator-addclass-final-v1b-2026-09-06-040620.zip` | `601049B069D378410EDE6D8E13BCD5B1DA45786BA8E689B3C0FF1F3D4034D8C6` | Audit final Creator AddClass : hashes post-patch vérifiés, build/runtime Random/Male/Female/DK + auto-group validés, zéro fallback AddClass SAY observé, `init=auto` inchangé, Playerbots clean/read-only. |
+| `audit-multibot-creator-addclass-final-v1c-2026-09-06-040620.zip` | `601049B069D378410EDE6D8E13BCD5B1DA45786BA8E689B3C0FF1F3D4034D8C6` | Audit final Creator AddClass : hashes post-patch vérifiés, build/runtime Random/Male/Female/DK + auto-group validés, zéro fallback AddClass SAY observé, `init=auto` inchangé, Playerbots clean/read-only. |
 | `audit-multibot-units-lifecycle-legacy-cleanup-current-state-v1-2026-09-06-021846.zip` | `5C7829243DFD362901821D2708E39D76137EF512487E33957E59D742E249D689` | Audit ciblé read-only du cleanup Units/lifecycle : baselines intactes, Playerbots sans écriture, fallbacks lifecycle identifiés, parsers partagés conservés ; décision de reporter le cleanup à la phase finale. |
 | `audit-multibot-bulk-group-lifecycle-post-push-v1-2026-09-06-013903.zip` | `060586545D36CB4F608E1440593EB98E8F2A547006A9018BB0B853281B7AD2C5` | Clôture post-push : HEAD Addon/Bridge synchronisés, fichiers commités identiques aux hashes runtime validés, Playerbots propre. |
 | `audit-multibot-bulk-group-lifecycle-final-v1-2026-09-06-013117.zip` | `4B3D390A119B4B839C65C9EB4E5A66051F1A23D737D1C329535CF05063D73AB7` | Audit final Bulk Group Lifecycle : build 10/0, runtime CONNECT/DISCONNECT validé, aucun bypass Playerbots, 199 locals Comm. |
-| `audit-multibot-bulk-lifecycle-post-azerothcore-playerbots-update-v1b-2026-09-06-012035.zip` | `52D40CAD2D39A113B48F62D0581ED8D47815EB1CC312611E23D07213D3A6A8AC` | Audit de compatibilité post-update AzerothCore/Playerbots avant runtime : contrats lifecycle critiques inchangés. |
+| `audit-multibot-bulk-lifecycle-post-azerothcore-playerbots-update-v1c-2026-09-06-012035.zip` | `52D40CAD2D39A113B48F62D0581ED8D47815EB1CC312611E23D07213D3A6A8AC` | Audit de compatibilité post-update AzerothCore/Playerbots avant runtime : contrats lifecycle critiques inchangés. |
 | `audit-multibot-bulk-lifecycle-playerbots-cleanup-v1-2026-09-05-234855.zip` | `74F9E0624528EC110B87A498638C9522A6419185935DAD11057347D6216DE46C` | Audit ciblé Playerbots read-only : `LogoutPlayerBot()` et cleanup groupe, confirmation que `remove *` n'impose pas le retrait du slot de groupe. |
 | `audit-multibot-bulk-lifecycle-add-remove-current-state-v1-2026-09-03-181704.zip` | `21E4AA5657777113401C6600D91FD919CBD31D810B5B9B31A64BACCFF3E3BAFB` | Audit initial Bulk Group Lifecycle : producteur Faction Banner, sémantique `*` réelle du groupe et APIs Playerbots nécessaires. |
 | `audit-multibot-docs-post-bulk-roadmap-prior-audit-v1c-2026-09-06-015224.zip` | `1F43023051764733C5B692A793F0BCBBD8D00A8E41325EB5947558FCCD20C1B4` | Audit documentaire read-only post-bulk : snapshots README/ROADMAP actuels et réutilisation de l'historique sans relancer un audit global des commandes. |
@@ -1367,5 +1432,4 @@ Après chaque gros merge :
 4. conserver les audits/hashes utiles dans la roadmap ;
 5. garder les README centrés sur les fonctionnalités et nouveautés visibles ;
 6. synchroniser `docs/RAIDUS_GUIDE.md` lorsqu'un comportement utilisateur Raidus change ;
-7. vérifier que `TODO.md` local n'a pas été écrasé ;
-8. vérifier à nouveau l'intégrité Playerbots read-only.
+7. vérifier à nouveau l'intégrité Playerbots read-only.

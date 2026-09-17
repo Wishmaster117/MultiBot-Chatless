@@ -80,6 +80,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["QUEST_GAMEOBJECT_USE_V1"] = "questGameObjectUseCapable",
   ["QUEST_REWARD_V1"] = "questRewardCapable",
   ["QUEST_REWARD_POLICY_V1"] = "questRewardPolicyCapable",
+  ["AUTOGEAR_OPTIONS_V1"] = "autogearOptionsCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -6649,6 +6650,8 @@ end
 
 function Comm.MarkDisconnected(reason)
   local state = ensureBridgeState()
+  state.autogearOptionsCapable = false
+  if MultiBot.Autogear then MultiBot.Autogear.OnDisconnect() end
   state.connectionGeneration = state.connectionGeneration + 1
   state.connected = false
   state.fleeOrderCapable = false
@@ -9837,6 +9840,10 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if MultiBot.Autogear and MultiBot.Autogear.HandleMessage(opcode, payload) then
+    return true
+  end
+
   if opcode == "WEAPON_ENCHANT" then
     state.connected = true
 
@@ -12554,6 +12561,8 @@ end
 
 function Comm.OnPlayerEnteringWorld()
   local state = ensureBridgeState()
+  state.autogearOptionsCapable = false
+  if MultiBot.Autogear then MultiBot.Autogear.OnDisconnect() end
   state.states = {}
   state.stateRequests = {}
   state.stateActive = {}

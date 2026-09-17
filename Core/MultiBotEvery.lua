@@ -40,7 +40,7 @@ if not StaticPopupDialogs["MULTIBOT_AUTOGEAR_CONFIRM"] then
         if data.selfAction == true then
           runEverySelfAction("AUTOGEAR", "")
         else
-          SendChatMessage("autogear", "WHISPER", nil, data.target)
+          if MultiBot.Autogear then MultiBot.Autogear.Open(data.target) end
         end
       end
     end,
@@ -311,8 +311,12 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 		    MultiBot.ActionToTarget("wipe", b.getName())
           end
 		},
-		{ "Autogear", "inv_misc_enggizmos_30", MultiBot.L("tips.every.autogear"), function(b)
-            StaticPopup_Show("MULTIBOT_AUTOGEAR_CONFIRM", b.getName(), nil, { target = b.getName(), selfAction = isSelfBot })
+		{ "Autogear", "inv_misc_enggizmos_30", isSelfBot and MultiBot.L("tips.every.autogear") or (MultiBot.Autogear and MultiBot.Autogear.Text("button_tip") or "Autogear"), function(b)
+            if isSelfBot then
+              StaticPopup_Show("MULTIBOT_AUTOGEAR_CONFIRM", b.getName(), nil, { target = b.getName(), selfAction = true })
+            elseif MultiBot.Autogear then
+              MultiBot.Autogear.Open(b.getName())
+            end
           end
         },
         -- NEW: Favorite toggle (per-character)

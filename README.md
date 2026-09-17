@@ -65,6 +65,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Bot rosters** | My Bots / Altbots, Group, Guild, Friends and Favorites with online/offline presence and structured lifecycle handling. |
 | **Bot connect / disconnect** | `ALT_ROSTER_V1`, `BOT_LIFECYCLE_V1`, `BOT_TARGET_RESOLVE_V1` and `BOT_GROUP_LIFECYCLE_V1` provide structured discovery, unit lifecycle control and bounded group/raid bulk connect-disconnect from the Faction Banner. Offline EveryBars stay collapsed; online EveryBars expand consistently. |
 | **Creator AddClass** | `CREATOR_ADDCLASS_V1` routes class/gender bot selection through the Bridge. Random, Male, Female and Death Knight paths are runtime validated; existing auto-group and roster refresh behavior is preserved. |
+| **Creator Auto Init** | `CREATOR_INIT_AUTO_V1` routes target and group `init=auto` through the Bridge, which reuses Playerbots authorization and initialization rules instead of accepting a raw command string. |
 | **Bot state & strategies** | Framed bot-state reads and structured strategy mutations for migrated controls, including Warlock selectors. |
 | **Inventory** | Bag-aware exact inventory for Backpack, Bag 1..4 and Keyring, including empty slots and container filtering. |
 | **Item movement** | Whole-stack drag/drop between supported physical inventory slots through the Bridge. |
@@ -76,7 +77,8 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Glyphs** | Glyph display and apply-related workflows integrated with the character UI. |
 | **Professions** | Profession recipe browsing/crafting plus targeted item recipes. |
 | **Enchanting** | Dedicated Enchanting Trade Service using the native WoW Trade workflow. |
-| **Quests** | Bridge-backed quest list and structured bot quest abandon. Native quest sharing remains available. |
+| **Quests** | Bridge-backed quest list and abandon plus structured `QUEST_ACCEPT_ALL_V1`, `QUEST_TALK_V1`, `QUEST_GAMEOBJECT_USE_V1`, `QUEST_REWARD_V1` and `QUEST_REWARD_POLICY_V1` interactions. Native quest sharing remains available where intentionally retained. |
+| **Autogear** | `AUTOGEAR_OPTIONS_V1` exposes server limits, quality/iLvl modes, explicit reset, PLAN → confirmation → APPLY, eight-locale UI, AceGUI presentation and deferred opening for ineligible bots. |
 | **Loot** | Structured loot profiles and exact persistent always-loot item add/remove. |
 | **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1`, `ATTACK_ORDER_V1`, `FLEE_ORDER_V1`, bounded `GROUP_ACTION_V1` and `RTSC_ORDER_V1`. RTSC selection, saved spots and GO/CANCEL now use the Bridge while AEDM movement remains the native WoW/Playerbots spell path. |
 | **Raidus raid planner** | Persistent 8×5 Working Layout, Saved Layouts, Score/Level/Class sorting, drag/drop, Auto balance, structured Apply and human-safe outside-layout bot removal through `BOT_GROUP_REMOVE_V1`. |
@@ -175,7 +177,21 @@ Validated runtime behavior:
 - no `.playerbot bot addclass ...` SAY observed with `MultiBot.allowLegacyChatFallback = false`;
 - no Lua error or crash observed.
 
-The legacy AddClass chat producer remains compatibility-fallback-only. `init=auto` is intentionally unchanged and is the next Creator/init sub-path to audit and migrate.
+The legacy AddClass chat producer remains compatibility-fallback-only. Creator `init=auto` has since been migrated separately through `CREATOR_INIT_AUTO_V1`.
+
+---
+
+# Recent Milestone — Creator Auto Init
+
+Creator `init=auto` was migrated after AddClass through the dedicated capability:
+
+```text
+CREATOR_INIT_AUTO_V1
+```
+
+The addon sends only a bounded semantic mode (`TARGET` or `GROUP`) and, for target mode, the requested bot name. The Bridge revalidates requester/session state, target/control rights, rate limits and replay tokens, then delegates the actual initialization to Playerbots' native `init=auto` behavior.
+
+The group path scans the requester's real group/raid membership, initializes only controlled eligible AddClass bots, and returns structured initialized/skipped/failed counts. No generic Playerbots command executor was added, and the old chat path remains compatibility-fallback-only.
 
 ---
 
@@ -224,7 +240,7 @@ The Bridge keeps a closed action allowlist, revalidates requester/group/bot stat
 
 Runtime validation covered all four actions, including the full `Release -> Revive` ghost/spirit-healer flow. `GROUP_ACTION_ACK` was observed, no automatic legacy PARTY/RAID command chat was observed, `MultiBotComm.lua` remained at **199 top-level locals**, and `mod-playerbots` remained strictly read-only.
 
-RTSC has since been migrated through `RTSC_ORDER_V1`. The next active migration is **Quest interactions**, followed by remaining ordinary-bot actions and final legacy parser/fallback cleanup.
+RTSC has since been migrated through `RTSC_ORDER_V1`. Quest interactions and Autogear are now also closed; the active queue has moved to the remaining ordinary-bot actions and the final legacy parser/fallback cleanup.
 
 ---
 
@@ -261,6 +277,47 @@ audit-multibot-rtsc-order-v1-final-v1b-2026-09-12-122116.zip
 SHA-256 FDE1388AD4F297A1552CD64F2805DB20CFC97F6A6CBA0050F71B484DD40FD297
 FINAL_STATUS=OK
 ```
+
+---
+
+# Recent Milestone — Structured Quest Interactions
+
+The main Quest interaction family is now structured through:
+
+```text
+QUEST_ACCEPT_ALL_V1
+QUEST_TALK_V1
+QUEST_GAMEOBJECT_USE_V1
+QUEST_REWARD_V1
+QUEST_REWARD_POLICY_V1
+```
+
+The Bridge remains authoritative for requester/bot validation and adapts these bounded requests to the audited Playerbots quest actions. Reward policy is sent as authoritative Bridge state, while gameobject use and reward selection use typed target/item data rather than a free-form command channel.
+
+The Addon HEAD also includes the structured-only GameObject search/loading-gate correction used by the Quest workflow.
+
+---
+
+# Recent Milestone — Autogear Options
+
+Autogear options were completed and runtime validated on **17 September 2026** through:
+
+```text
+AUTOGEAR_OPTIONS_V1
+```
+
+The panel now provides:
+
+- authoritative server quality/iLvl limits;
+- server defaults, explicit quality, match-player-iLvl and custom-iLvl modes;
+- explicit reset of worn equipment;
+- `PLAN → confirmation → APPLY` instead of immediate mutation;
+- a silent lifecycle reset that avoids false login/reload warnings;
+- 49 Autogear locale keys in each of the eight loaded locales;
+- an AceGUI window consistent with current MultiBot UI;
+- deferred opening: an ineligible bot such as a character below level 5 receives an alert instead of an empty disabled window.
+
+Runtime validation covered a valid bot (`Viz`) and an ineligible low-level bot (`Heal`). The Bridge remains authoritative for eligibility and Autogear execution.
 
 ---
 
@@ -302,12 +359,19 @@ BOT_TARGET_RESOLVE_V1
 BOT_GROUP_REMOVE_V1
 BOT_GROUP_LIFECYCLE_V1
 CREATOR_ADDCLASS_V1
+CREATOR_INIT_AUTO_V1
 FOLLOW_ORDER_V1
 STAY_ORDER_V1
 ATTACK_ORDER_V1
 FLEE_ORDER_V1
 GROUP_ACTION_V1
 RTSC_ORDER_V1
+QUEST_ACCEPT_ALL_V1
+QUEST_TALK_V1
+QUEST_GAMEOBJECT_USE_V1
+QUEST_REWARD_V1
+QUEST_REWARD_POLICY_V1
+AUTOGEAR_OPTIONS_V1
 ```
 
 The exact protocol is an implementation detail of the addon and Bridge. The normal user experience should remain UI-driven.
@@ -371,9 +435,9 @@ Collective **Follow**, **Stay** and **Attack** are now bridge-first and runtime 
 
 Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or explicitly legacy-gated. The Faction Banner bulk pair `.playerbot bot add *` / `.playerbot bot remove *` is now also migrated through `BOT_GROUP_LIFECYCLE_V1`, preserving Playerbots' real party/raid semantics and delegating the actual login/logout operations to `PlayerbotMgr`.
 
-Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
+Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Creator `init=auto` is also structured through `CREATOR_INIT_AUTO_V1` for bounded target/group initialization. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
 
-The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is now also bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The next active migration is **Quest interactions**, followed by remaining ordinary-bot actions and final legacy parser/fallback cleanup.
+The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is now present through the five `QUEST_*` capabilities, and **Autogear** is completed through `AUTOGEAR_OPTIONS_V1` with its eight-locale AceGUI/deferred-open workflow. Remaining ordinary-bot actions and the final legacy parser/fallback cleanup are the next migration areas.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 
