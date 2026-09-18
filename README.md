@@ -79,6 +79,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Enchanting** | Dedicated Enchanting Trade Service using the native WoW Trade workflow. |
 | **Quests** | Bridge-backed quest list and abandon plus structured `QUEST_ACCEPT_ALL_V1`, `QUEST_TALK_V1`, `QUEST_GAMEOBJECT_USE_V1`, `QUEST_REWARD_V1` and `QUEST_REWARD_POLICY_V1` interactions. Native quest sharing remains available where intentionally retained. |
 | **Autogear** | `AUTOGEAR_OPTIONS_V1` exposes server limits, quality/iLvl modes, explicit reset, PLAN → confirmation → APPLY, eight-locale UI, AceGUI presentation and deferred opening for ineligible bots. |
+| **Hunter Pet** | Structured Hunter pet control through `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` and `HUNTER_PET_LIFECYCLE_V1`: stance/attack/follow/stay, tame by creature ID or family, rename, permanent abandon, temporary dismiss and Call Pet. |
 | **Loot** | Structured loot profiles and exact persistent always-loot item add/remove. |
 | **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1`, `ATTACK_ORDER_V1`, `FLEE_ORDER_V1`, bounded `GROUP_ACTION_V1` and `RTSC_ORDER_V1`. RTSC selection, saved spots and GO/CANCEL now use the Bridge while AEDM movement remains the native WoW/Playerbots spell path. |
 | **Raidus raid planner** | Persistent 8×5 Working Layout, Saved Layouts, Score/Level/Class sorting, drag/drop, Auto balance, structured Apply and human-safe outside-layout bot removal through `BOT_GROUP_REMOVE_V1`. |
@@ -321,6 +322,48 @@ Runtime validation covered a valid bot (`Viz`) and an ineligible low-level bot (
 
 ---
 
+# Recent Milestone — Hunter Pet H1/H2/H3
+
+Hunter Pet controls were completed, compiled where required and runtime validated on **18 September 2026** through three bounded capability families:
+
+```text
+HUNTER_PET_CONTROL_V1
+HUNTER_PET_MANAGE_V1
+HUNTER_PET_LIFECYCLE_V1
+```
+
+The final structured surface covers:
+
+- H1 control: `AGGRESSIVE`, `DEFENSIVE`, `PASSIVE`, `ATTACK`, `FOLLOW`, `STAY`;
+- H2 management: `TAME_ID`, `TAME_FAMILY`, `RENAME`, `ABANDON`;
+- H3 lifecycle: `DISMISS`, `CALL`.
+
+`ABANDON` remains the destructive path. `DISMISS` preserves the current pet with `PET_SAVE_AS_CURRENT` and suppresses Playerbots' non-combat `pet` auto-call strategy only when that strategy was previously enabled. `CALL` uses the Hunter Call Pet spell (`883`) and restores that strategy only when the Bridge disabled it.
+
+The Hunter Quick UI now exposes distinct **Call / Dismiss / Abandon** actions with eight-locale tooltips. Final validation kept `MultiBotComm.lua` at **199 top-level locals**, Hunter Quick at **0 `SendChatMessage` occurrences**, and `mod-playerbots` strictly read-only.
+
+Canonical final audit:
+
+```text
+audit-multibot-hunter-pet-h1-h2-h3-final-v1-2026-09-18-192853.zip
+SHA-256 E4CFFD5763DA3C821830F188C9154E92B952C1AA96FCFC9CD99769300426EE26
+FINAL_STATUS=OK
+```
+
+Final checkpoint:
+
+```text
+checkpoint-multibot-hunter-pet-h1-h2-h3-v1-2026-09-18-193155.zip
+SHA-256 1DFB038072ED1DC75C97334EF666162C14B526185DC52CADCFD49D7D1664D4FD
+manifest 146/146 verified
+8 successful packages
+FINAL_STATUS=OK_WITH_WARNINGS
+```
+
+The checkpoint warning status is documentary only: two historical apply reports were unavailable, while the archive manifest and final source state were fully verified.
+
+---
+
 # Bridge Capabilities
 
 The addon negotiates feature capabilities with the Bridge before using newer paths.
@@ -372,6 +415,9 @@ QUEST_GAMEOBJECT_USE_V1
 QUEST_REWARD_V1
 QUEST_REWARD_POLICY_V1
 AUTOGEAR_OPTIONS_V1
+HUNTER_PET_CONTROL_V1
+HUNTER_PET_MANAGE_V1
+HUNTER_PET_LIFECYCLE_V1
 ```
 
 The exact protocol is an implementation detail of the addon and Bridge. The normal user experience should remain UI-driven.
@@ -437,7 +483,7 @@ Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or expli
 
 Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Creator `init=auto` is also structured through `CREATOR_INIT_AUTO_V1` for bounded target/group initialization. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
 
-The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is now present through the five `QUEST_*` capabilities, and **Autogear** is completed through `AUTOGEAR_OPTIONS_V1` with its eight-locale AceGUI/deferred-open workflow. Remaining ordinary-bot actions and the final legacy parser/fallback cleanup are the next migration areas.
+The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is present through the five `QUEST_*` capabilities, **Autogear** is completed through `AUTOGEAR_OPTIONS_V1`, and **Hunter Pet H1/H2/H3** is completed through `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` and `HUNTER_PET_LIFECYCLE_V1`. The next ordinary-bot migration is spell cast, followed by explicitly deferred technical residuals and the final legacy parser/fallback cleanup.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 

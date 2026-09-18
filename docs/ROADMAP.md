@@ -1,7 +1,7 @@
 ﻿# Multibot Chatless + Bridge — Roadmap
 
 **Statut : active**
-**Dernière synchronisation : 17/09/2026**
+**Dernière synchronisation : 18/09/2026**
 
 Cette roadmap est la **source de vérité technique** du projet.
 Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontairement plus courts.
@@ -16,10 +16,10 @@ Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontaireme
 Repo:   L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot
 Branch: feature/group-orders-chatless
 HEAD pré-commit documentation:
-        e628195dcc7eddf54372e4f6517a56903a73fc45
+        4efce2c126f856ab21e491013a5563b0fc19194d
 ```
 
-État fonctionnel audité au 17/09/2026 :
+État fonctionnel audité au 18/09/2026 :
 
 - Follow / Stay / Attack, Flee, Group Actions et RTSC livrés et runtime validés ;
 - lifecycle rosters, Raidus Safe Apply et bulk group lifecycle livrés ;
@@ -28,9 +28,11 @@ HEAD pré-commit documentation:
 - Quest interactions structurées présentes via `QUEST_ACCEPT_ALL_V1`, `QUEST_TALK_V1`, `QUEST_GAMEOBJECT_USE_V1`, `QUEST_REWARD_V1` et `QUEST_REWARD_POLICY_V1` ;
 - correctif GameObject search structured-only/loading-gate inclus dans le HEAD Addon ;
 - Autogear options livré via `AUTOGEAR_OPTIONS_V1` : lifecycle silencieux, 8 locales × 49 clés, UI AceGUI et deferred-open runtime validés ;
+- Hunter Pet H1/H2/H3 livré et runtime validé via `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` et `HUNTER_PET_LIFECYCLE_V1` ;
+- Hunter Quick final : `UI\MultiBotHunterQuickFrame.lua` `6614C804A4238B6882233E3A212C6CF0BEC19777DB1FC6260375583AC88EF9D9`, zéro `SendChatMessage`, huit locales H3b validées ;
 - `Features\MultiBotAutogear.lua` final runtime validé : `1843AF73ADFBD2C527E8CE50BA7C127541090E9A56ACB36473404DB3EB74BEAB` ;
-- `Core\MultiBotComm.lua` working tree pré-commit : `F649A91E30856D8889C74D33FDBD9647C9D4F6C7E20524A27DACD8DCB76EE81F` ;
-- prochain chantier fonctionnel : actions bots ordinaires restantes, puis cleanup final legacy.
+- `Core\MultiBotComm.lua` working tree pré-commit : `0EE6916C4E8C0299D594ADE3570C9FC86155A4F326FC9DD165156D7E43483DEC` ;
+- prochain chantier fonctionnel : `spell cast`, puis reliquats techniques différés et cleanup final legacy.
 
 ### Bridge
 
@@ -38,17 +40,18 @@ HEAD pré-commit documentation:
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge
 Branch: feature/group-orders-chatless
 HEAD pré-commit documentation:
-        3cf1f0a057401e41ff05ce6e9853f892f49c3605
+        ab891759820a81d99202b73a45b0fc0fc3e2842d
 ```
 
-État fonctionnel audité au 17/09/2026 :
+État fonctionnel audité au 18/09/2026 :
 
 - endpoints group/lifecycle et ordres collectifs précédemment validés conservés ;
 - `CREATOR_ADDCLASS_V1` et `CREATOR_INIT_AUTO_V1` présents comme adaptateurs spécialisés ;
 - les cinq capacités Quest structurées sont livrées côté Bridge ;
 - `AUTOGEAR_OPTIONS_V1` fournit limites serveur et workflow `INFO/PLAN/APPLY` avec revalidation serveur ;
+- Hunter Pet H1/H2/H3 livré côté Bridge via les trois capacités dédiées, avec `DISMISS` temporaire (`PET_SAVE_AS_CURRENT`), `CALL` via le sort 883 et `ABANDON` destructif séparé ;
 - aucun exécuteur Playerbots générique n'a été ajouté ;
-- `src\MultiBotBridge.cpp` working tree pré-commit : `A4B5B6FA845C7F732C82C569852C4D9D43BD53A9105BB8750911FF02C0BFF7EE`.
+- `src\MultiBotBridge.cpp` working tree pré-commit : `5ADAEA8198105EEF24D5EADFAC8A7CC7190DA93F2678BD84F439B799E18F2906`.
 
 ### Playerbots
 
@@ -60,7 +63,7 @@ HEAD:   b6696bdbd3740e575598d167d69f39f68cc0b907
 Mode:   STRICT READ ONLY
 ```
 
-**Règle absolue :** aucune modification de `mod-playerbots` dans ce projet. Pour compiler le Bridge, utiliser la révision courante de `master` du dépôt officiel `mod-playerbots/mod-playerbots`; le SHA ci-dessus est la révision validée le 17/09/2026.
+**Règle absolue :** aucune modification de `mod-playerbots` dans ce projet. Pour compiler le Bridge, utiliser la révision courante de `master` du dépôt officiel `mod-playerbots/mod-playerbots`; le SHA ci-dessus est la révision validée le 18/09/2026.
 
 ### Architecture
 
@@ -720,9 +723,9 @@ Le bulk lifecycle et Flee sont retirés de la file active.
 
 L'audit `Units / lifecycle legacy cleanup` du 06/09/2026 a confirmé qu'un nettoyage est possible, mais il reste volontairement reporté afin de ne pas retirer trop tôt des fallbacks/parsers encore utiles pendant la migration chatless.
 
-Après clôture Quest + Autogear du 17/09/2026, l'ordre recommandé devient :
+Après clôture Maintenance + Hunter Pet H1/H2/H3 au 18/09/2026, l'ordre recommandé devient :
 
-1. actions bots ordinaires restantes (maintenance, Hunter pet controls, spell cast) ;
+1. `spell cast`, dernière action bot ordinaire actuellement prioritaire ;
 2. reliquats techniques explicitement différés selon priorité ;
 3. nettoyage final global des fallbacks/parsers chat devenus morts, **incluant le cleanup Units / lifecycle legacy déjà audité**.
 
@@ -1112,6 +1115,62 @@ SHA-256 EA5F49B9ABFE74501D825704B16510F9B24AB6D879F043A1F44D43D24C00D0B9
 
 ---
 
+## 7septies. Clôture Hunter Pet H1/H2/H3 — 18/09/2026
+
+Capacités livrées :
+
+```text
+HUNTER_PET_CONTROL_V1
+HUNTER_PET_MANAGE_V1
+HUNTER_PET_LIFECYCLE_V1
+```
+
+État final validé :
+
+- H1 control : `AGGRESSIVE`, `DEFENSIVE`, `PASSIVE`, `ATTACK`, `FOLLOW`, `STAY` ;
+- H2 manage : `TAME_ID`, `TAME_FAMILY`, `RENAME`, `ABANDON` ;
+- H3 lifecycle : `DISMISS`, `CALL` ;
+- `ABANDON` reste destructif via `PET_SAVE_AS_DELETED` ;
+- `DISMISS` conserve le pet courant via `PET_SAVE_AS_CURRENT` et désactive temporairement la stratégie Playerbots `pet` en `BOT_STATE_NON_COMBAT` uniquement si elle était active ;
+- `CALL` utilise le sort Hunter `883` et restaure `+pet` uniquement si le Bridge avait retiré la stratégie ;
+- UI Hunter Quick : Call / Dismiss / Abandon distincts, tooltips dans 8 locales ;
+- `MultiBotComm.lua` final à **199 locals** ;
+- Hunter Quick final à **0 `SendChatMessage`** ;
+- H3a compilé, worldserver redémarré et runtime validé ;
+- H3b runtime validé ;
+- `mod-playerbots` strictement read-only.
+
+Hashes finaux pré-commit documentation :
+
+```text
+Core\MultiBotComm.lua           0EE6916C4E8C0299D594ADE3570C9FC86155A4F326FC9DD165156D7E43483DEC
+UI\MultiBotHunterQuickFrame.lua 6614C804A4238B6882233E3A212C6CF0BEC19777DB1FC6260375583AC88EF9D9
+src\MultiBotBridge.cpp          5ADAEA8198105EEF24D5EADFAC8A7CC7190DA93F2678BD84F439B799E18F2906
+```
+
+Audit final :
+
+```text
+audit-multibot-hunter-pet-h1-h2-h3-final-v1-2026-09-18-192853.zip
+SHA-256 E4CFFD5763DA3C821830F188C9154E92B952C1AA96FCFC9CD99769300426EE26
+FINAL_STATUS=OK
+```
+
+Checkpoint final :
+
+```text
+checkpoint-multibot-hunter-pet-h1-h2-h3-v1-2026-09-18-193155.zip
+SHA-256 1DFB038072ED1DC75C97334EF666162C14B526185DC52CADCFD49D7D1664D4FD
+manifest 146/146 verified
+8 successful packages
+6 apply reports copied
+FINAL_STATUS=OK_WITH_WARNINGS
+```
+
+Les deux warnings du checkpoint sont documentaires : deux anciens rapports `apply` ne sont plus présents. Ils ne remettent pas en cause le manifest 146/146, les hashes finaux ni la validation runtime.
+
+---
+
 ## 8. Backlog différé
 
 Ces éléments ne doivent pas interrompre le prochain chantier normal sauf demande explicite.
@@ -1241,18 +1300,16 @@ Cette décision évite de casser prématurément les rosters, EveryBar, AutoInvi
 
 ### Familles actives à reprendre
 
-Ordre courant après clôture Quest + Autogear du 17/09/2026 :
+Ordre courant après clôture Maintenance + Hunter Pet H1/H2/H3 du 18/09/2026 :
 
 ```text
-1. remaining ordinary-bot actions
-   - maintenance
-   - Hunter pet controls
-   - spell cast
-2. final legacy parser/fallback cleanup
+1. spell cast
+2. reliquats techniques explicitement différés selon priorité
+3. final legacy parser/fallback cleanup
    including Units / lifecycle legacy cleanup
 ```
 
-Les interactions Quest structurées et Autogear sont clôturés dans la baseline courante ; ne pas les remettre dans la file active sans nouvel audit ciblé.
+Maintenance, interactions Quest, Autogear et Hunter Pet H1/H2/H3 sont clôturés dans la baseline courante ; ne pas les remettre dans la file active sans nouvel audit ciblé.
 
 ### Classification finale attendue
 
@@ -1377,9 +1434,11 @@ Repères principaux conservés :
 - confirmation GCC/Linux des deux warnings Bridge encore à effectuer au prochain build Linux ;
 - Quest interactions structurées livrées côté Addon/Bridge ;
 - Autogear options/i18n/AceGUI/deferred-open clôturé et runtime validé ;
-- prochaines migrations : maintenance, Hunter pet controls, spell cast, puis cleanup final legacy ;
-- HEAD Addon pré-commit documentation du 17/09/2026 : `e628195dcc7eddf54372e4f6517a56903a73fc45` ;
-- HEAD Bridge pré-commit documentation du 17/09/2026 : `3cf1f0a057401e41ff05ce6e9853f892f49c3605` ;
+- Hunter Pet H1/H2/H3 livré via trois capacités dédiées ; `DISMISS`/`CALL` séparés de l'abandon destructif, UI 8 locales, 199 locals Comm et zéro chat Hunter Quick validés ;
+- audit final Hunter Pet `E4CFFD...EE26` OK et checkpoint `1DFB0380...D4FD` vérifié 146/146 ;
+- Maintenance clôturée ; Hunter Pet H1/H2/H3 clôturé, compilé lorsque requis et runtime validé le 18/09/2026 ; prochaine migration ordinaire : spell cast, puis reliquats différés et cleanup final legacy ;
+- HEAD Addon pré-commit documentation du 18/09/2026 : `4efce2c126f856ab21e491013a5563b0fc19194d` ;
+- HEAD Bridge pré-commit documentation du 18/09/2026 : `ab891759820a81d99202b73a45b0fc0fc3e2842d` ;
 - Playerbots officiel `master` `b6696bdbd3740e575598d167d69f39f68cc0b907` resté strictement read-only.
 
 Les détails de branches anciennes ne doivent plus être présentés comme état courant dans les README.
@@ -1392,6 +1451,8 @@ Cette section conserve uniquement les preuves structurantes utiles à la reprise
 
 | Référence | SHA-256 | Portée |
 | --- | --- | --- |
+| `audit-multibot-hunter-pet-h1-h2-h3-final-v1-2026-09-18-192853.zip` | `E4CFFD5763DA3C821830F188C9154E92B952C1AA96FCFC9CD99769300426EE26` | Audit final Hunter Pet H1/H2/H3 : trois capabilities validées, 199 locals Comm, zéro `SendChatMessage` Hunter Quick, 8 locales, H3 compile/runtime validé, 57 hashes Playerbots clean/read-only. |
+| `checkpoint-multibot-hunter-pet-h1-h2-h3-v1-2026-09-18-193155.zip` | `1DFB038072ED1DC75C97334EF666162C14B526185DC52CADCFD49D7D1664D4FD` | Checkpoint final Hunter Pet : manifest 146/146 vérifié, 8 packages réussis, 6 rapports apply copiés ; `OK_WITH_WARNINGS` uniquement pour 2 rapports historiques absents. |
 | `audit-multibot-autogear-ui-deferred-open-final-v1-2026-09-17-190701.zip` | `EA5F49B9ABFE74501D825704B16510F9B24AB6D879F043A1F44D43D24C00D0B9` | Audit final UI Autogear + deferred-open : chaîne UI/hotfix cohérente, guards i18n/wire/PLAN-APPLY/AceGUI conservés, runtime `Viz`/`Heal` validé, 112 hashes protégés, Playerbots clean/read-only. |
 | `audit-multibot-autogear-i18n-final-v1c-2026-09-15-161909.zip` | `996FE5B1C27EDA7AE91A0CA89B1FE188D6A76C75081118E3D1A89559E6E3EC4C` | Audit final i18n Autogear : 49 clés exactes × 8 locales, `MultiBot.L`, lifecycle hotfix conservé, runtime FR validé, Playerbots clean/read-only. |
 | `audit-multibot-rtsc-order-v1-final-v1c-2026-09-12-122116.zip` | `FDE1388AD4F297A1552CD64F2805DB20CFC97F6A6CBA0050F71B484DD40FD297` | Audit final RTSC : `RTSC_ORDER_V1`, hotfix group pattern présent, 199 locals Comm, audiences/groupes/SAVE/GO/UNSAVE/CANCEL/AEDM validés, Playerbots clean/read-only, zéro fatal/warning. |

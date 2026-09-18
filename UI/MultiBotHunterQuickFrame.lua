@@ -29,11 +29,13 @@ local PET_STANCE_DEFINITIONS = {
 }
 
 local PET_UTILITY_DEFINITIONS = {
-    { label = "Name",    command = "tame name %s",   icon = "inv_scroll_11",         tip = "tips.hunter.pet.name",   action = "search" },
-    { label = "Id",      command = "tame id %s",     icon = "inv_scroll_14",         tip = "tips.hunter.pet.id",     action = "prompt_id" },
-    { label = "Family",  command = "tame family %s", icon = "inv_misc_enggizmos_03", tip = "tips.hunter.pet.family", action = "family" },
-    { label = "Rename",  command = "tame rename %s", icon = "inv_scroll_01",         tip = "tips.hunter.pet.rename", action = "prompt_rename" },
-    { label = "Abandon", command = "tame abandon",   icon = "spell_nature_spiritwolf", tip = "tips.hunter.pet.abandon", action = "direct" },
+    { label = "Name",    manageAction = "TAME_ID",     icon = "inv_scroll_11",             tip = "tips.hunter.pet.name",    action = "search" },
+    { label = "Id",      manageAction = "TAME_ID",     icon = "inv_scroll_14",             tip = "tips.hunter.pet.id",      action = "prompt_id" },
+    { label = "Family",  manageAction = "TAME_FAMILY", icon = "inv_misc_enggizmos_03",     tip = "tips.hunter.pet.family",  action = "family" },
+    { label = "Rename",  manageAction = "RENAME",      icon = "inv_scroll_01",             tip = "tips.hunter.pet.rename",  action = "prompt_rename" },
+    { label = "Call",    manageAction = "CALL",        icon = "ability_hunter_beastcall",  tip = "tips.hunter.pet.call",    action = "direct", lifecycle = true },
+    { label = "Dismiss", manageAction = "DISMISS",     icon = "spell_nature_spiritwolf",   tip = "tips.hunter.pet.dismiss", action = "direct", lifecycle = true },
+    { label = "Abandon", manageAction = "ABANDON",     icon = "ability_hunter_beasttaming", tip = "tips.hunter.pet.abandon", action = "direct" },
 }
 
 local function getAceGUI()
@@ -762,14 +764,18 @@ function HunterQuick:ToggleStrip(row, stripKey)
     row.utilsButton:Show()
 
     local showModes = stripKey == "modes"
+    local stripIsShown = showModes
+        and row.modesStrip and row.modesStrip:IsShown()
+        or (not showModes and row.utilsStrip and row.utilsStrip:IsShown())
+
     if row.modesStrip then
-        if showModes and row.hasPet then row.modesStrip:Show() else row.modesStrip:Hide() end
+        if showModes and row.hasPet and not stripIsShown then row.modesStrip:Show() else row.modesStrip:Hide() end
     end
     if row.utilsStrip then
-        if showModes then row.utilsStrip:Hide() else row.utilsStrip:Show() end
+        if not showModes and not stripIsShown then row.utilsStrip:Show() else row.utilsStrip:Hide() end
     end
 
-    if showModes then
+    if showModes and not stripIsShown then
         self:ApplyStanceVisual(row, row.activeStance)
     end
 
@@ -778,16 +784,17 @@ function HunterQuick:ToggleStrip(row, stripKey)
     end
 end
 
-function HunterQuick:ShowPrompt(formatString, targetName, title)
+function HunterQuick:ShowPrompt(manageAction, targetName, title)
     if type(ShowPrompt) ~= "function" then
         return
     end
 
     ShowPrompt(title or MultiBot.L("info.hunterpeteditentervalue"), function(text)
-        if text and text ~= "" and targetName then
-            SendChatMessage(string.format(formatString, text), "WHISPER", nil, targetName)
+        if text and text ~= "" and targetName
+            and MultiBot.Comm and type(MultiBot.Comm.RunHunterPetManage) == "function" then
+            MultiBot.Comm.RunHunterPetManage(targetName, manageAction, text)
         end
-    end, MultiBot.L("info.hunterpetentersomething"))
+    end, "")
 end
 
 function HunterQuick:EnsureSearchFrame()
@@ -970,7 +977,9 @@ function HunterQuick:EnsureSearchFrame()
                 row.text:SetText(string.format("|cffffd200%-24s|r |cff888888[%s]|r", data.name, getFamilyLabel(data.family)))
                 row:SetScript("OnClick", function()
                     if host.TargetName then
-                        SendChatMessage(("tame id %d"):format(data.id), "WHISPER", nil, host.TargetName)
+                        if MultiBot.Comm and type(MultiBot.Comm.RunHunterPetManage) == "function" then
+                            MultiBot.Comm.RunHunterPetManage(host.TargetName, "TAME_ID", data.id)
+                        end
                     end
                     host:Hide()
                 end)
@@ -1078,7 +1087,9 @@ function HunterQuick:ShowFamilyFrame(targetName)
         row:SetScript("OnClick", function()
             local currentTargetName = frame.TargetName
             if currentTargetName then
-                SendChatMessage(("tame family %s"):format(data.eng), "WHISPER", nil, currentTargetName)
+                if MultiBot.Comm and type(MultiBot.Comm.RunHunterPetManage) == "function" then
+                    MultiBot.Comm.RunHunterPetManage(currentTargetName, "TAME_FAMILY", data.id)
+                end
             end
             frame:Hide()
         end)
@@ -1093,16 +1104,26 @@ function HunterQuick:BuildUtilityAction(row, definition, index)
 
     button:SetScript("OnClick", function()
         if definition.action == "prompt_rename" then
-            self:ShowPrompt(definition.command, row.owner, MultiBot.L("info.hunterpetnewname"))
+            self:ShowPrompt(definition.manageAction, row.owner, MultiBot.L("info.hunterpetnewname"))
             row.utilsStrip:Hide()
         elseif definition.action == "prompt_id" then
-            self:ShowPrompt(definition.command, row.owner, MultiBot.L("info.hunterpetid"))
+            self:ShowPrompt(definition.manageAction, row.owner, MultiBot.L("info.hunterpetid"))
             row.utilsStrip:Hide()
         elseif definition.action == "family" then
             self:ShowFamilyFrame(row.owner)
             row.utilsStrip:Hide()
         elseif definition.action == "direct" then
-            SendChatMessage(definition.command, "WHISPER", nil, row.owner)
+            if definition.lifecycle
+                and (not MultiBot.Comm
+                    or type(MultiBot.Comm.IsHunterPetLifecycleCapable) ~= "function"
+                    or not MultiBot.Comm.IsHunterPetLifecycleCapable()) then
+                row.utilsStrip:Hide()
+                return
+            end
+
+            if MultiBot.Comm and type(MultiBot.Comm.RunHunterPetManage) == "function" then
+                MultiBot.Comm.RunHunterPetManage(row.owner, definition.manageAction, "")
+            end
             row.utilsStrip:Hide()
         else
             local searchFrame = self:EnsureSearchFrame()
@@ -1131,11 +1152,42 @@ function HunterQuick:BuildStanceAction(row, definition, index)
             return
         end
 
-        SendChatMessage("pet " .. definition.key, "WHISPER", nil, row.owner)
-        if definition.persistent then
-            self:ApplyStanceVisual(row, definition.key)
-            self:SetSavedStance(row.owner, definition.key)
+        -- MB_HUNTER_PET_CONTROL_V1_UI_BEGIN
+        if not MultiBot.Comm or type(MultiBot.Comm.RunHunterPetControl) ~= "function" then
+            return
         end
+
+        MultiBot.Comm.RunHunterPetControl(row.owner, definition.key, function(result)
+            if type(result) ~= "table" or result.status ~= "ok" then
+                return
+            end
+
+            local stance = string.lower(tostring(result.stance or ""))
+            if stance == "aggressive" or stance == "defensive" or stance == "passive" then
+                self:ApplyStanceVisual(row, stance)
+                self:SetSavedStance(row.owner, stance)
+            elseif definition.key == "stance" then
+                self:ApplyStanceVisual(row, nil)
+            end
+
+            if definition.key == "stance" and DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                local stanceLabel
+                if stance == "aggressive" then
+                    stanceLabel = MultiBot.L("tips.hunter.pet.aggressive")
+                elseif stance == "defensive" then
+                    stanceLabel = MultiBot.L("tips.hunter.pet.defensive")
+                elseif stance == "passive" then
+                    stanceLabel = MultiBot.L("tips.hunter.pet.passive")
+                elseif stance ~= "" then
+                    stanceLabel = string.upper(stance)
+                else
+                    stanceLabel = "UNKNOWN"
+                end
+
+                DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[MultiBot]|r " .. tostring(row.owner or "") .. ": " .. tostring(stanceLabel))
+            end
+        end)
+        -- MB_HUNTER_PET_CONTROL_V1_UI_END
     end)
 
     return button

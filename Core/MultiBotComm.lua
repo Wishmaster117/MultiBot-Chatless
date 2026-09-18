@@ -82,6 +82,9 @@ local CAPABILITY_STATE_FIELDS = {
   ["QUEST_REWARD_POLICY_V1"] = "questRewardPolicyCapable",
   ["AUTOGEAR_OPTIONS_V1"] = "autogearOptionsCapable",
   ["BOT_MAINTENANCE_V1"] = "botMaintenanceCapable",
+  ["HUNTER_PET_CONTROL_V1"] = "hunterPetControlCapable",
+  ["HUNTER_PET_MANAGE_V1"] = "hunterPetManageCapable",
+  ["HUNTER_PET_LIFECYCLE_V1"] = "hunterPetLifecycleCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -400,6 +403,13 @@ local function ensureBridgeState()
   state.creatorInitAutoCommands = type(state.creatorInitAutoCommands) == "table" and state.creatorInitAutoCommands or {}
   state.botMaintenanceSeq = tonumber(state.botMaintenanceSeq) or 0
   state.botMaintenanceCommands = type(state.botMaintenanceCommands) == "table" and state.botMaintenanceCommands or {}
+  state.hunterPetControlCapable = state.hunterPetControlCapable or false
+  state.hunterPetControlSeq = tonumber(state.hunterPetControlSeq) or 0
+  state.hunterPetControlCommands = type(state.hunterPetControlCommands) == "table" and state.hunterPetControlCommands or {}
+  state.hunterPetManageCapable = state.hunterPetManageCapable or false
+  state.hunterPetLifecycleCapable = state.hunterPetLifecycleCapable or false
+  state.hunterPetManageSeq = tonumber(state.hunterPetManageSeq) or 0
+  state.hunterPetManageCommands = type(state.hunterPetManageCommands) == "table" and state.hunterPetManageCommands or {}
   state.selfBotCapable = state.selfBotCapable or false
   state.selfBotStateSeq = state.selfBotStateSeq or 0
   state.selfBotStateActive = state.selfBotStateActive or nil
@@ -2312,6 +2322,396 @@ local function validateStrategyMutationChanges(changes)
   return table.concat(normalized, ",")
 end
 
+-- MB_HUNTER_PET_CONTROL_V1_TX_BEGIN
+function Comm._FinishHunterPetControlCommand(token, result)
+  local state = ensureBridgeState()
+  state.hunterPetControlCommands = state.hunterPetControlCommands or {}
+
+  local pending = state.hunterPetControlCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.hunterPetControlCommands[token] = nil
+  result = type(result) == "table" and result or {}
+  result.token = token
+  result.botName = result.botName or pending.botName
+  result.action = result.action or pending.action
+
+  if type(pending.callback) == "function" then
+    pending.callback(result)
+  end
+
+  return true
+end
+
+function Comm._HandleHunterPetControlAck(payload)
+  local state = ensureBridgeState()
+  local fields = splitFields(payload or "")
+  if #fields ~= 5 then
+    state.lastError = "HUNTER_PET_CONTROL_ACK_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = fields[1]
+  local botName = urlDecodeFieldStrict(fields[2], 64, false)
+  local action = fields[3]
+  local stance = fields[4]
+  local reason = fields[5]
+  state.hunterPetControlCommands = state.hunterPetControlCommands or {}
+  local pending = state.hunterPetControlCommands[token]
+
+  local actionValid = action == "AGGRESSIVE"
+    or action == "DEFENSIVE"
+    or action == "PASSIVE"
+    or action == "STANCE"
+    or action == "ATTACK"
+    or action == "FOLLOW"
+    or action == "STAY"
+
+  local stanceValid = stance == "AGGRESSIVE"
+    or stance == "DEFENSIVE"
+    or stance == "PASSIVE"
+    or stance == "MIXED"
+    or stance == "UNKNOWN"
+    or stance == "NONE"
+
+  local reasonValid = reason == "OK"
+    or reason == "BAD_ACTION"
+    or reason == "BAD_BOT"
+    or reason == "NO_BOT"
+    or reason == "NOT_ALLOWED"
+    or reason == "NOT_IN_WORLD"
+    or reason == "NOT_HUNTER"
+    or reason == "NO_AI"
+    or reason == "NO_PET"
+    or reason == "PET_DEAD"
+    or reason == "NO_TARGET"
+    or reason == "TARGET_DEAD"
+    or reason == "INVALID_TARGET"
+    or reason == "PVP_PROHIBITED"
+    or reason == "MAP_MISMATCH"
+    or reason == "BAD_TOKEN"
+    or reason == "RATE_LIMIT"
+    or reason == "REPLAY"
+    or reason == "FAILED"
+
+  if not isValidStateToken(token)
+      or not botName
+      or botName == ""
+      or not actionValid
+      or not stanceValid
+      or not reasonValid
+      or type(pending) ~= "table"
+      or string.lower(pending.botName or "") ~= string.lower(botName)
+      or pending.action ~= action then
+    state.lastError = "HUNTER_PET_CONTROL_ACK_INVALID"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = reason == "OK" and nil or ("HUNTER_PET_CONTROL_" .. reason)
+  debugPrint("ADDON:RX", "HUNTER_PET_CONTROL_ACK", payload or "")
+
+  Comm._FinishHunterPetControlCommand(token, {
+    status = reason == "OK" and "ok" or "error",
+    botName = botName,
+    action = action,
+    stance = stance,
+    reason = reason,
+  })
+  return true
+end
+
+function Comm.RunHunterPetControl(botName, action, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "HUNTER_PET_CONTROL_NOT_CONNECTED"
+    return false
+  end
+  if state.hunterPetControlCapable ~= true then
+    state.lastError = "HUNTER_PET_CONTROL_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  botName = trim(tostring(botName or ""))
+  if botName == "" or string.len(botName) > 64 then
+    state.lastError = "HUNTER_PET_CONTROL_BAD_BOT"
+    return false
+  end
+
+  action = string.upper(trim(tostring(action or "")))
+  if action ~= "AGGRESSIVE"
+      and action ~= "DEFENSIVE"
+      and action ~= "PASSIVE"
+      and action ~= "STANCE"
+      and action ~= "ATTACK"
+      and action ~= "FOLLOW"
+      and action ~= "STAY" then
+    state.lastError = "HUNTER_PET_CONTROL_BAD_ACTION"
+    return false
+  end
+
+  state.hunterPetControlCommands = state.hunterPetControlCommands or {}
+  if countTableEntries(state.hunterPetControlCommands) >= 8 then
+    state.lastError = "HUNTER_PET_CONTROL_BUSY"
+    return false
+  end
+
+  state.hunterPetControlSeq = (tonumber(state.hunterPetControlSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000))
+    .. "-hunter-pet-" .. tostring(state.hunterPetControlSeq)
+
+  state.hunterPetControlCommands[token] = {
+    botName = botName,
+    action = action,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "HUNTER_PET_CONTROL~"
+    .. urlEncodeField(botName)
+    .. "~" .. token
+    .. "~" .. action
+
+  if not Comm.Send("RUN", payload) then
+    state.hunterPetControlCommands[token] = nil
+    state.lastError = "HUNTER_PET_CONTROL_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(5.0, function()
+    local bridge = ensureBridgeState()
+    bridge.hunterPetControlCommands = bridge.hunterPetControlCommands or {}
+    local pending = bridge.hunterPetControlCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    bridge.lastError = "HUNTER_PET_CONTROL_TIMEOUT~" .. token
+    Comm._FinishHunterPetControlCommand(token, {
+      status = "timeout",
+      botName = botName,
+      action = action,
+      stance = "UNKNOWN",
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+-- MB_HUNTER_PET_CONTROL_V1_TX_END
+-- MB_HUNTER_PET_MANAGE_V1_TX_BEGIN
+function Comm._FinishHunterPetManageCommand(token, result)
+  local state = ensureBridgeState()
+  state.hunterPetManageCommands = state.hunterPetManageCommands or {}
+
+  local pending = state.hunterPetManageCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.hunterPetManageCommands[token] = nil
+  result = type(result) == "table" and result or {}
+  result.token = token
+  result.botName = result.botName or pending.botName
+  result.action = result.action or pending.action
+
+  if type(pending.callback) == "function" then
+    pending.callback(result)
+  end
+
+  return true
+end
+
+function Comm._HandleHunterPetManageAck(payload)
+  local state = ensureBridgeState()
+  local fields = splitFields(payload or "")
+  if #fields ~= 6 then
+    state.lastError = "HUNTER_PET_MANAGE_ACK_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = fields[1]
+  local botName = urlDecodeFieldStrict(fields[2], 64, false)
+  local action = fields[3]
+  local resultEntry = parseBoundedInteger(fields[4], 0, 4294967295)
+  local resultName = urlDecodeFieldStrict(fields[5], 96, true)
+  local reason = fields[6]
+  state.hunterPetManageCommands = state.hunterPetManageCommands or {}
+  local pending = state.hunterPetManageCommands[token]
+
+  local actionValid = action == "TAME_ID"
+    or action == "TAME_FAMILY"
+    or action == "RENAME"
+    or action == "ABANDON"
+    or action == "DISMISS"
+    or action == "CALL"
+
+  local reasonValid = reason == "OK"
+    or reason == "BAD_ACTION"
+    or reason == "BAD_BOT"
+    or reason == "BAD_ARGUMENT"
+    or reason == "NO_BOT"
+    or reason == "NOT_ALLOWED"
+    or reason == "NOT_IN_WORLD"
+    or reason == "NOT_HUNTER"
+    or reason == "NO_AI"
+    or reason == "MAP_MISMATCH"
+    or reason == "BAD_TOKEN"
+    or reason == "RATE_LIMIT"
+    or reason == "REPLAY"
+    or reason == "LEVEL_TOO_LOW"
+    or reason == "CREATURE_NOT_FOUND"
+    or reason == "NOT_TAMEABLE"
+    or reason == "EXOTIC_REQUIRES_BEAST_MASTERY"
+    or reason == "FAMILY_NOT_FOUND"
+    or reason == "CREATE_FAILED"
+    or reason == "NO_PET"
+    or reason == "NOT_HUNTER_PET"
+    or reason == "BAD_NAME"
+    or reason == "RESERVED_NAME"
+    or reason == "FAILED"
+
+  if not isValidStateToken(token)
+      or not botName
+      or botName == ""
+      or not actionValid
+      or resultEntry == nil
+      or resultName == nil
+      or not reasonValid
+      or type(pending) ~= "table"
+      or string.lower(pending.botName or "") ~= string.lower(botName)
+      or pending.action ~= action then
+    state.lastError = "HUNTER_PET_MANAGE_ACK_INVALID"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = reason == "OK" and nil or ("HUNTER_PET_MANAGE_" .. reason)
+  debugPrint("ADDON:RX", "HUNTER_PET_MANAGE_ACK", payload or "")
+
+  Comm._FinishHunterPetManageCommand(token, {
+    status = reason == "OK" and "ok" or "error",
+    botName = botName,
+    action = action,
+    resultEntry = resultEntry,
+    resultName = resultName,
+    reason = reason,
+  })
+  return true
+end
+
+function Comm.IsHunterPetLifecycleCapable()
+  local state = ensureBridgeState()
+  return state.connected == true
+    and state.hunterPetManageCapable == true
+    and state.hunterPetLifecycleCapable == true
+end
+
+function Comm.RunHunterPetManage(botName, action, argument, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "HUNTER_PET_MANAGE_NOT_CONNECTED"
+    return false
+  end
+  if state.hunterPetManageCapable ~= true then
+    state.lastError = "HUNTER_PET_MANAGE_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  botName = trim(tostring(botName or ""))
+  if botName == "" or string.len(botName) > 64 then
+    state.lastError = "HUNTER_PET_MANAGE_BAD_BOT"
+    return false
+  end
+
+  action = string.upper(trim(tostring(action or "")))
+  if action ~= "TAME_ID"
+      and action ~= "TAME_FAMILY"
+      and action ~= "RENAME"
+      and action ~= "ABANDON"
+      and action ~= "DISMISS"
+      and action ~= "CALL" then
+    state.lastError = "HUNTER_PET_MANAGE_BAD_ACTION"
+    return false
+  end
+
+  if (action == "DISMISS" or action == "CALL")
+      and state.hunterPetLifecycleCapable ~= true then
+    state.lastError = "HUNTER_PET_LIFECYCLE_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  argument = tostring(argument or "")
+  if action == "TAME_ID" or action == "TAME_FAMILY" then
+    local numericArgument = parseBoundedInteger(trim(argument), 1, 4294967295)
+    if numericArgument == nil then
+      state.lastError = "HUNTER_PET_MANAGE_BAD_ARGUMENT"
+      return false
+    end
+    argument = tostring(numericArgument)
+  elseif action == "RENAME" then
+    if argument == "" or string.len(argument) > 12 then
+      state.lastError = "HUNTER_PET_MANAGE_BAD_ARGUMENT"
+      return false
+    end
+  elseif argument ~= "" then
+    state.lastError = "HUNTER_PET_MANAGE_BAD_ARGUMENT"
+    return false
+  end
+
+  state.hunterPetManageCommands = state.hunterPetManageCommands or {}
+  if countTableEntries(state.hunterPetManageCommands) >= 8 then
+    state.lastError = "HUNTER_PET_MANAGE_BUSY"
+    return false
+  end
+
+  state.hunterPetManageSeq = (tonumber(state.hunterPetManageSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000))
+    .. "-hunter-pet-manage-" .. tostring(state.hunterPetManageSeq)
+
+  state.hunterPetManageCommands[token] = {
+    botName = botName,
+    action = action,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "HUNTER_PET_MANAGE~"
+    .. urlEncodeField(botName)
+    .. "~" .. token
+    .. "~" .. action
+    .. "~" .. urlEncodeField(argument)
+
+  if not Comm.Send("RUN", payload) then
+    state.hunterPetManageCommands[token] = nil
+    state.lastError = "HUNTER_PET_MANAGE_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(5.0, function()
+    local bridge = ensureBridgeState()
+    bridge.hunterPetManageCommands = bridge.hunterPetManageCommands or {}
+    local pending = bridge.hunterPetManageCommands[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    bridge.lastError = "HUNTER_PET_MANAGE_TIMEOUT~" .. token
+    Comm._FinishHunterPetManageCommand(token, {
+      status = "timeout",
+      botName = botName,
+      action = action,
+      resultEntry = 0,
+      resultName = "",
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+-- MB_HUNTER_PET_MANAGE_V1_TX_END
 -- MB_FOLLOW_STAY_ORDER_V1_TX_BEGIN
 function Comm._FinishGroupOrderCommand(token, result)
   local state = ensureBridgeState()
@@ -11914,6 +12314,16 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  -- MB_HUNTER_PET_CONTROL_V1_RX_BEGIN
+  if opcode == "HUNTER_PET_CONTROL_ACK" then
+    return Comm._HandleHunterPetControlAck(payload)
+  end
+  -- MB_HUNTER_PET_CONTROL_V1_RX_END
+  -- MB_HUNTER_PET_MANAGE_V1_RX_BEGIN
+  if opcode == "HUNTER_PET_MANAGE_ACK" then
+    return Comm._HandleHunterPetManageAck(payload)
+  end
+  -- MB_HUNTER_PET_MANAGE_V1_RX_END
   -- MB_FOLLOW_STAY_ORDER_V1_RX_BEGIN
   if opcode == "FOLLOW_ORDER_ACK" or opcode == "STAY_ORDER_ACK" then
     local fields = splitFields(payload or "")
