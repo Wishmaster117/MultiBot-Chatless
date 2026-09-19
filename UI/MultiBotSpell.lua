@@ -67,7 +67,8 @@ local function scheduleSpellbookFooterRequest(pButton, pSender)
 		if(tCurrentState.hasRequestedFooter) then return end
 
 		tCurrentState.hasRequestedFooter = true
-		SendChatMessage("stats", "WHISPER", nil, pSender)
+		-- Chatless mode: the legacy footer probe is intentionally suppressed.
+		-- Structured Spellbook snapshots terminate with SB_END from the Bridge.
 	end
 
 	MultiBot.TimerAfter(SPELLBOOK_FOOTER_REQUEST_DELAY, requestFooter)
@@ -117,7 +118,7 @@ MultiBot.getSpellID = function(pInfo)
 	return 0
 end
 
-MultiBot.addSpellById = function(pSpellID, pName)
+MultiBot.addSpellById = function(pSpellID, pName, pIgnored)
 	local tID = tonumber(pSpellID or 0) or 0
 	if(tID == 0) then
 		return false
@@ -137,7 +138,7 @@ MultiBot.addSpellById = function(pSpellID, pName)
 	MultiBot.spellbook.index = MultiBot.spellbook.index + 1
 
 	if(MultiBot.spells[pName] == nil) then MultiBot.spells[pName] = {} end
-	if(MultiBot.spells[pName][tID] == nil) then MultiBot.spells[pName][tID] = true end
+	MultiBot.spells[pName][tID] = pIgnored ~= true
 
 	if(MultiBot.spellbook.index < (SPELLBOOK_PAGE_SIZE + 1)) then
 		MultiBot.setSpell(MultiBot.spellbook.index, tSpell, pName)
@@ -169,9 +170,11 @@ MultiBot.beginSpellbookCollection = function(pName)
     local tWindowTitle = MultiBot.doReplace(MultiBot.L("info.spellbook"), "NAME", pName)
 
 	for key in pairs(tSpellbook.spells) do tSpellbook.spells[key] = nil end
+	MultiBot.spells[pName] = {}
 	if(tSpellbook.setTitle) then tSpellbook:setTitle(tWindowTitle) end
 	tSpellbook.name = pName
 	tSpellbook.index = 0
+	tSpellbook.filterIgnored = false
 	tSpellbook.from = 1
 	tSpellbook.to = SPELLBOOK_PAGE_SIZE
 	tSpellbook.now = 1
@@ -179,6 +182,10 @@ MultiBot.beginSpellbookCollection = function(pName)
 
 	for i = 1, SPELLBOOK_PAGE_SIZE do
 		MultiBot.setSpell(i, nil, pName)
+	end
+
+	if(MultiBot.refreshSpellbookFilterButton) then
+		MultiBot.refreshSpellbookFilterButton()
 	end
 end
 
@@ -189,11 +196,15 @@ MultiBot.finishSpellbookCollection = function()
 		return
 	end
 
-	tSpellbook.now = 1
-	tSpellbook.max = math.max(1, math.ceil((tSpellbook.index or 0) / SPELLBOOK_PAGE_SIZE))
-	tOverlay.setText("Pages", "|cff" .. (getSpellBookUI().PAGE_TEXT_COLOR_HEX or "ffffff") .. tSpellbook.now .. "/" .. tSpellbook.max .. "|r")
-	if(tSpellbook.now == tSpellbook.max) then tOverlay.buttons[">"].doHide() else tOverlay.buttons[">"].doShow() end
-	tOverlay.buttons["<"].doHide()
+	if(MultiBot.refreshSpellbookView) then
+		MultiBot.refreshSpellbookView(true)
+	else
+		tSpellbook.now = 1
+		tSpellbook.max = math.max(1, math.ceil((tSpellbook.index or 0) / SPELLBOOK_PAGE_SIZE))
+		tOverlay.setText("Pages", "|cff" .. (getSpellBookUI().PAGE_TEXT_COLOR_HEX or "ffffff") .. tSpellbook.now .. "/" .. tSpellbook.max .. "|r")
+		if(tSpellbook.now == tSpellbook.max) then tOverlay.buttons[">"].doHide() else tOverlay.buttons[">"].doShow() end
+		tOverlay.buttons["<"].doHide()
+	end
 	tSpellbook:Show()
 end
 
@@ -291,6 +302,7 @@ MultiBot.setSpell = function(pIndex, pSpell, pName)
 		tOverlay.setText("R" .. tIndex, "|cff" .. (getSpellBookUI().RANK_TEXT_COLOR_HEX or "ffcc00") .. pSpell[3] .. "|r")
 		tOverlay.buttons["S" .. tIndex].spell = pSpell[1]
 		tOverlay.buttons["C" .. tIndex].spell = pSpell[1]
+		tOverlay.buttons["C" .. tIndex].ignorePending = false
 		tOverlay.buttons["S" .. tIndex].doShow()
 		tOverlay.buttons["C" .. tIndex].doShow()
 		--tOverlay.texts["T" .. tIndex]:Show()
@@ -298,17 +310,58 @@ MultiBot.setSpell = function(pIndex, pSpell, pName)
 		tOverlay.buttons["C" .. tIndex]:SetChecked(MultiBot.spells[pName][pSpell[1]])
 		tOverlay.buttons["C" .. tIndex].doClick = function(pButton)
 			local tName = pButton.getName()
-			local tAction = ""
-			MultiBot.spells[tName][pButton.spell] = MultiBot.IF(MultiBot.spells[tName][pButton.spell], false, true)
-			pButton:SetChecked(MultiBot.spells[tName][pButton.spell])
-			for id, state in pairs(MultiBot.spells[tName]) do
-				if(state == false) then tAction = tAction .. MultiBot.IF(tAction == "", "ss +", ", +") .. id end
+			local tSpellId = tonumber(pButton.spell or 0) or 0
+			local tAllowed = MultiBot.spells[tName] and MultiBot.spells[tName][tSpellId] == true
+
+			-- CheckButton toggles visually before OnClick. Restore the last
+			-- authoritative server state until the structured ACK arrives.
+			pButton:SetChecked(tAllowed)
+
+			if(pButton.ignorePending or tName == "" or tSpellId == 0) then
+				return
 			end
-			MultiBot.ActionToTarget(MultiBot.IF(tAction == "", "ss -" .. pButton.spell, tAction), tName)
+
+			if(not MultiBot.Comm or type(MultiBot.Comm.RunSpellbookIgnore) ~= "function") then
+				return
+			end
+
+			local tAction = MultiBot.IF(tAllowed, "IGNORE", "ALLOW")
+			pButton.ignorePending = true
+
+			local tToken = MultiBot.Comm.RunSpellbookIgnore(tName, tSpellId, tAction, function(pResult)
+				pButton.ignorePending = false
+
+				if(type(pResult) ~= "table" or pResult.status ~= "ok") then
+					if(pButton.spell == tSpellId and pButton.getName() == tName) then
+						pButton:SetChecked(MultiBot.spells[tName] and MultiBot.spells[tName][tSpellId] == true)
+					end
+					return
+				end
+
+				if(MultiBot.spells[tName] == nil) then
+					MultiBot.spells[tName] = {}
+				end
+
+				MultiBot.spells[tName][tSpellId] = pResult.ignored ~= true
+
+				if(pButton.spell == tSpellId and pButton.getName() == tName) then
+					pButton:SetChecked(MultiBot.spells[tName][tSpellId])
+				end
+
+				if(MultiBot.refreshSpellbookView) then
+					MultiBot.refreshSpellbookView(false)
+				end
+			end)
+
+			if(not tToken) then
+				pButton.ignorePending = false
+				pButton:SetChecked(tAllowed)
+			end
 		end
 	else
 		tOverlay.buttons["S" .. tIndex].spell = 0
 		tOverlay.buttons["C" .. tIndex].spell = 0
+		tOverlay.buttons["C" .. tIndex].ignorePending = false
 		tOverlay.buttons["S" .. tIndex].doHide()
 		tOverlay.buttons["C" .. tIndex].doHide()
 		tOverlay.texts["T" .. tIndex]:Hide()

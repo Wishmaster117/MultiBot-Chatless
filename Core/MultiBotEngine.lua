@@ -447,15 +447,36 @@ MultiBot.LoadPortal = function(pButton, pValue)
 	end
 end
 
+MultiBot.CastSpellbookSpell = function(pName, pSpell)
+	local tComm = MultiBot and MultiBot.Comm or nil
+	if not tComm or type(tComm.RunSpellbookCast) ~= "function" then
+		if tComm and type(tComm.ShowSystemMessage) == "function" then
+			tComm.ShowSystemMessage("[MultiBot] Spellbook [BRIDGE_REQUIRED]")
+		elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+			DEFAULT_CHAT_FRAME:AddMessage("[MultiBot] Spellbook [BRIDGE_REQUIRED]")
+		end
+		return false
+	end
+
+	return tComm.RunSpellbookCast(pName, pSpell) ~= false
+end
+
 MultiBot.SpellToMacro = function(pName, pSpell, pTexture)
 	--local tGlobal, tAmount = GetNumMacros()
 	local _, tAmount = GetNumMacros()
+	local tComm = MultiBot and MultiBot.Comm or nil
 
 	if(pSpell == nil or pSpell == 0) then
-		return SendChatMessage(MultiBot.L("info.spell"), "SAY")
+		if tComm and type(tComm.ShowSystemMessage) == "function" then
+			tComm.ShowSystemMessage("[MultiBot] Spellbook [BAD_SPELL]")
+		end
+		return
 	end
 	if(tAmount == 18) then
-		return SendChatMessage(MultiBot.L("info.macro"), "SAY")
+		if tComm and type(tComm.ShowSystemMessage) == "function" then
+			tComm.ShowSystemMessage("[MultiBot] Spellbook [MACRO_LIMIT]")
+		end
+		return
 	end
 
 	local tMacro = string.sub(pName, 1, 14) .. tAmount
@@ -469,7 +490,8 @@ MultiBot.SpellToMacro = function(pName, pSpell, pTexture)
 		if MultiBot.spellbook and MultiBot.spellbook.icons then
 			icon = MultiBot.spellbook.icons[pTexture] or 1
 		end
-		CreateMacro(tMacro, icon, "/t " .. pName .. " cast " .. pSpell, true)
+		local tBody = "/run MultiBot.CastSpellbookSpell(" .. string.format("%q", tostring(pName or "")) .. "," .. tostring(tonumber(pSpell) or 0) .. ")"
+		CreateMacro(tMacro, icon, tBody, true)
 	end
 	PickupMacro(tMacro)
 end

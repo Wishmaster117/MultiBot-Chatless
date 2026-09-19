@@ -1,7 +1,7 @@
 ﻿# Multibot Chatless + Bridge — Roadmap
 
 **Statut : active**
-**Dernière synchronisation : 18/09/2026**
+**Dernière synchronisation : 19/09/2026**
 
 Cette roadmap est la **source de vérité technique** du projet.
 Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontairement plus courts.
@@ -16,10 +16,10 @@ Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontaireme
 Repo:   L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot
 Branch: feature/group-orders-chatless
 HEAD pré-commit documentation:
-        4efce2c126f856ab21e491013a5563b0fc19194d
+        d593fdaf29b17f2fa6487cbc52e9993fd9e8451c
 ```
 
-État fonctionnel audité au 18/09/2026 :
+État fonctionnel audité au 19/09/2026 :
 
 - Follow / Stay / Attack, Flee, Group Actions et RTSC livrés et runtime validés ;
 - lifecycle rosters, Raidus Safe Apply et bulk group lifecycle livrés ;
@@ -30,9 +30,13 @@ HEAD pré-commit documentation:
 - Autogear options livré via `AUTOGEAR_OPTIONS_V1` : lifecycle silencieux, 8 locales × 49 clés, UI AceGUI et deferred-open runtime validés ;
 - Hunter Pet H1/H2/H3 livré et runtime validé via `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` et `HUNTER_PET_LIFECYCLE_V1` ;
 - Hunter Quick final : `UI\MultiBotHunterQuickFrame.lua` `6614C804A4238B6882233E3A212C6CF0BEC19777DB1FC6260375583AC88EF9D9`, zéro `SendChatMessage`, huit locales H3b validées ;
+- Spellbook Cast / Ignore livré et runtime validé via `SPELLBOOK_CAST_V1` et `SPELLBOOK_IGNORE_V1` ;
+- Spellbook Ignore : feedback succès 8 locales, filtre `Ignorés (N)` / `Tous les sorts`, pagination filtrée et état autoritaire Bridge ;
 - `Features\MultiBotAutogear.lua` final runtime validé : `1843AF73ADFBD2C527E8CE50BA7C127541090E9A56ACB36473404DB3EB74BEAB` ;
-- `Core\MultiBotComm.lua` working tree pré-commit : `0EE6916C4E8C0299D594ADE3570C9FC86155A4F326FC9DD165156D7E43483DEC` ;
-- prochain chantier fonctionnel : `spell cast`, puis reliquats techniques différés et cleanup final legacy.
+- `Core\MultiBotComm.lua` working tree pré-commit : `B5DA10182B40CC9100499C7EB8BE7136D8A08788D8E92C601DC42DB89C3A502D` ;
+- `UI\MultiBotSpell.lua` working tree pré-commit : `F69C69FE0F2F6B0D2CFBEB404B54548AFAC2697FFCA3A21BE33A38C826F9B60E` ;
+- `UI\MultiBotSpellBookFrame.lua` working tree pré-commit : `F86CD2B3ECECBAC0A48BDF98CDAFD9A3FE5096BED554BAD06E337FB4E53CFBA1` ;
+- ordre restant : reliquats techniques explicitement différés, puis cleanup final global legacy.
 
 ### Bridge
 
@@ -40,18 +44,20 @@ HEAD pré-commit documentation:
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge
 Branch: feature/group-orders-chatless
 HEAD pré-commit documentation:
-        ab891759820a81d99202b73a45b0fc0fc3e2842d
+        ceb463d3ce86d065bdcd7b6c1b69c9aa756cbda0
 ```
 
-État fonctionnel audité au 18/09/2026 :
+État fonctionnel audité au 19/09/2026 :
 
 - endpoints group/lifecycle et ordres collectifs précédemment validés conservés ;
 - `CREATOR_ADDCLASS_V1` et `CREATOR_INIT_AUTO_V1` présents comme adaptateurs spécialisés ;
 - les cinq capacités Quest structurées sont livrées côté Bridge ;
 - `AUTOGEAR_OPTIONS_V1` fournit limites serveur et workflow `INFO/PLAN/APPLY` avec revalidation serveur ;
 - Hunter Pet H1/H2/H3 livré côté Bridge via les trois capacités dédiées, avec `DISMISS` temporaire (`PET_SAVE_AS_CURRENT`), `CALL` via le sort 883 et `ABANDON` destructif séparé ;
+- `SPELLBOOK_CAST_V1` et `SPELLBOOK_IGNORE_V1` livrés via des endpoints spécialisés, sans exécuteur Playerbots générique ;
+- Cast utilise le `spellId` structuré et Ignore/Allow ne passe plus par le chemin chat `ss +/-` ;
 - aucun exécuteur Playerbots générique n'a été ajouté ;
-- `src\MultiBotBridge.cpp` working tree pré-commit : `5ADAEA8198105EEF24D5EADFAC8A7CC7190DA93F2678BD84F439B799E18F2906`.
+- `src\MultiBotBridge.cpp` working tree pré-commit : `64627A37BF000704078966728487A0C1BDBA69A1427231B9C99B34C079ED2F0D`.
 
 ### Playerbots
 
@@ -723,11 +729,10 @@ Le bulk lifecycle et Flee sont retirés de la file active.
 
 L'audit `Units / lifecycle legacy cleanup` du 06/09/2026 a confirmé qu'un nettoyage est possible, mais il reste volontairement reporté afin de ne pas retirer trop tôt des fallbacks/parsers encore utiles pendant la migration chatless.
 
-Après clôture Maintenance + Hunter Pet H1/H2/H3 au 18/09/2026, l'ordre recommandé devient :
+Après clôture Maintenance + Hunter Pet H1/H2/H3 puis Spellbook Cast / Ignore au 19/09/2026, l'ordre recommandé devient :
 
-1. `spell cast`, dernière action bot ordinaire actuellement prioritaire ;
-2. reliquats techniques explicitement différés selon priorité ;
-3. nettoyage final global des fallbacks/parsers chat devenus morts, **incluant le cleanup Units / lifecycle legacy déjà audité**.
+1. reliquats techniques explicitement différés selon priorité ;
+2. nettoyage final global des fallbacks/parsers chat devenus morts, **incluant le cleanup Units / lifecycle legacy déjà audité**.
 
 Ne pas déclarer le projet fully chatless tant que les occurrences restantes de `SendChatMessage` n'ont pas été classées et validées.
 
@@ -1171,6 +1176,71 @@ Les deux warnings du checkpoint sont documentaires : deux anciens rapports `appl
 
 ---
 
+## 7octies. Clôture Spellbook Cast / Ignore Chatless — 19/09/2026
+
+Capacités livrées :
+
+```text
+SPELLBOOK_CAST_V1
+SPELLBOOK_IGNORE_V1
+```
+
+### Cast
+
+Le Spellbook envoie désormais le `spellId` sélectionné via un endpoint Bridge dédié. Le résultat revient par ACK structuré et le feedback d'échec utilisateur est localisé. Le chemin normal ne dépend plus d'un whisper `cast` et aucun exécuteur générique `RUN~CAST_SPELL` n'a été introduit.
+
+### Ignore / Allow
+
+La case d'ignorance utilise désormais les opérations structurées `IGNORE` / `ALLOW`. Le Bridge revalide requester, bot contrôlé, état session/world, `spellId` et appartenance au Spellbook avant mutation de l'état Playerbots existant.
+
+Le chemin Spellbook ne contient plus :
+
+```text
+ss +<spellId>
+ss -<spellId>
+Ignored spell list
+```
+
+L'état `ignored` du snapshot serveur reste autoritaire et le feedback succès n'est affiché qu'après ACK.
+
+### UI et i18n
+
+- feedback succès ajout/retrait dans les 8 locales chargées ;
+- bouton footer `Ignorés (N)` / `Tous les sorts` ;
+- bouton visible mais désactivé lorsque `N=0` en vue normale ;
+- grille 3×6 inchangée ;
+- pagination recalculée sur la vue filtrée ;
+- checkbox toujours actionnable en vue filtrée ;
+- retrait du dernier sort ignoré : vue filtrée vide conservée jusqu'au clic `Tous les sorts` ;
+- géométrie finale validée : `125×18`, ancre `TOPRIGHT`, `Y=-270`, `X=12`.
+
+### État final validé
+
+```text
+Core\MultiBotComm.lua
+B5DA10182B40CC9100499C7EB8BE7136D8A08788D8E92C601DC42DB89C3A502D
+
+UI\MultiBotSpell.lua
+F69C69FE0F2F6B0D2CFBEB404B54548AFAC2697FFCA3A21BE33A38C826F9B60E
+
+UI\MultiBotSpellBookFrame.lua
+F86CD2B3ECECBAC0A48BDF98CDAFD9A3FE5096BED554BAD06E337FB4E53CFBA1
+
+Bridge src\MultiBotBridge.cpp
+64627A37BF000704078966728487A0C1BDBA69A1427231B9C99B34C079ED2F0D
+```
+
+Validation :
+
+- `MultiBotComm.lua` reste à **199 locals** au niveau chunk principal ;
+- zéro `ss +` / `ss -` sur le chemin Spellbook ;
+- zéro texte `Ignored spell list` dans le chemin Addon audité ;
+- zéro exécuteur générique `RUN~CAST_SPELL` ;
+- runtime cast / ignore / allow / filtre validé en jeu ;
+- `mod-playerbots` strictement read-only.
+
+---
+
 ## 8. Backlog différé
 
 Ces éléments ne doivent pas interrompre le prochain chantier normal sauf demande explicite.
@@ -1300,16 +1370,15 @@ Cette décision évite de casser prématurément les rosters, EveryBar, AutoInvi
 
 ### Familles actives à reprendre
 
-Ordre courant après clôture Maintenance + Hunter Pet H1/H2/H3 du 18/09/2026 :
+Ordre courant après clôture Maintenance + Hunter Pet H1/H2/H3 puis Spellbook Cast / Ignore du 19/09/2026 :
 
 ```text
-1. spell cast
-2. reliquats techniques explicitement différés selon priorité
-3. final legacy parser/fallback cleanup
+1. reliquats techniques explicitement différés selon priorité
+2. final legacy parser/fallback cleanup
    including Units / lifecycle legacy cleanup
 ```
 
-Maintenance, interactions Quest, Autogear et Hunter Pet H1/H2/H3 sont clôturés dans la baseline courante ; ne pas les remettre dans la file active sans nouvel audit ciblé.
+Maintenance, interactions Quest, Autogear, Hunter Pet H1/H2/H3 et Spellbook Cast / Ignore sont clôturés dans la baseline courante ; ne pas les remettre dans la file active sans nouvel audit ciblé.
 
 ### Classification finale attendue
 
@@ -1436,9 +1505,11 @@ Repères principaux conservés :
 - Autogear options/i18n/AceGUI/deferred-open clôturé et runtime validé ;
 - Hunter Pet H1/H2/H3 livré via trois capacités dédiées ; `DISMISS`/`CALL` séparés de l'abandon destructif, UI 8 locales, 199 locals Comm et zéro chat Hunter Quick validés ;
 - audit final Hunter Pet `E4CFFD...EE26` OK et checkpoint `1DFB0380...D4FD` vérifié 146/146 ;
-- Maintenance clôturée ; Hunter Pet H1/H2/H3 clôturé, compilé lorsque requis et runtime validé le 18/09/2026 ; prochaine migration ordinaire : spell cast, puis reliquats différés et cleanup final legacy ;
-- HEAD Addon pré-commit documentation du 18/09/2026 : `4efce2c126f856ab21e491013a5563b0fc19194d` ;
-- HEAD Bridge pré-commit documentation du 18/09/2026 : `ab891759820a81d99202b73a45b0fc0fc3e2842d` ;
+- Maintenance clôturée ; Hunter Pet H1/H2/H3 clôturé, compilé lorsque requis et runtime validé le 18/09/2026 ;
+- Spellbook Cast / Ignore clôturé et runtime validé le 19/09/2026 via `SPELLBOOK_CAST_V1` et `SPELLBOOK_IGNORE_V1`, avec feedback 8 locales, filtre ignorés et zéro fallback `ss +/-` ;
+- ordre restant : reliquats techniques différés, puis cleanup final global legacy ;
+- HEAD Addon pré-commit documentation du 19/09/2026 : `d593fdaf29b17f2fa6487cbc52e9993fd9e8451c` ;
+- HEAD Bridge pré-commit documentation du 19/09/2026 : `ceb463d3ce86d065bdcd7b6c1b69c9aa756cbda0` ;
 - Playerbots officiel `master` `b6696bdbd3740e575598d167d69f39f68cc0b907` resté strictement read-only.
 
 Les détails de branches anciennes ne doivent plus être présentés comme état courant dans les README.

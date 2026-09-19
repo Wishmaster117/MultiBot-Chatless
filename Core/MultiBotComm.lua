@@ -82,6 +82,8 @@ local CAPABILITY_STATE_FIELDS = {
   ["QUEST_REWARD_POLICY_V1"] = "questRewardPolicyCapable",
   ["AUTOGEAR_OPTIONS_V1"] = "autogearOptionsCapable",
   ["BOT_MAINTENANCE_V1"] = "botMaintenanceCapable",
+  ["SPELLBOOK_CAST_V1"] = "spellbookCastCapable",
+  ["SPELLBOOK_IGNORE_V1"] = "spellbookIgnoreCapable",
   ["HUNTER_PET_CONTROL_V1"] = "hunterPetControlCapable",
   ["HUNTER_PET_MANAGE_V1"] = "hunterPetManageCapable",
   ["HUNTER_PET_LIFECYCLE_V1"] = "hunterPetLifecycleCapable",
@@ -403,6 +405,12 @@ local function ensureBridgeState()
   state.creatorInitAutoCommands = type(state.creatorInitAutoCommands) == "table" and state.creatorInitAutoCommands or {}
   state.botMaintenanceSeq = tonumber(state.botMaintenanceSeq) or 0
   state.botMaintenanceCommands = type(state.botMaintenanceCommands) == "table" and state.botMaintenanceCommands or {}
+  state.spellbookCastCapable = state.spellbookCastCapable or false
+  state.spellbookCastSeq = tonumber(state.spellbookCastSeq) or 0
+  state.spellbookCastCommands = type(state.spellbookCastCommands) == "table" and state.spellbookCastCommands or {}
+  state.spellbookIgnoreCapable = state.spellbookIgnoreCapable or false
+  state.spellbookIgnoreSeq = tonumber(state.spellbookIgnoreSeq) or 0
+  state.spellbookIgnoreCommands = type(state.spellbookIgnoreCommands) == "table" and state.spellbookIgnoreCommands or {}
   state.hunterPetControlCapable = state.hunterPetControlCapable or false
   state.hunterPetControlSeq = tonumber(state.hunterPetControlSeq) or 0
   state.hunterPetControlCommands = type(state.hunterPetControlCommands) == "table" and state.hunterPetControlCommands or {}
@@ -698,6 +706,10 @@ local function systemMessage(message)
   elseif type(print) == "function" then
     print(message)
   end
+end
+
+function Comm.ShowSystemMessage(message)
+  systemMessage(message)
 end
 
 local function buildMessage(opcode, payload)
@@ -2114,6 +2126,8 @@ maybeResolveCapabilityFallback = function(generation)
 state.selfStrategyCapable = false
 state.selfActionCapable = false
 state.botMaintenanceCapable = false
+state.spellbookCastCapable = false
+state.spellbookIgnoreCapable = false
     state.outfitCapable = false
     state.inventoryCapable = false
     state.inventoryExactCapable = false
@@ -6007,6 +6021,432 @@ function Comm.RequestSpellbook(name)
   return true
 end
 
+-- MB_SPELLBOOK_CAST_V1_BEGIN
+function Comm.IsSpellbookCastCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.spellbookCastCapable == true
+end
+
+function Comm.ShowSpellbookCastFeedback(pending, status, targetName, reason)
+  pending = type(pending) == "table" and pending or {}
+  local botName = trim(pending.botName or "")
+  local spellId = tonumber(pending.spellId or 0) or 0
+  local spellName = tostring(spellId)
+  if spellId > 0 and type(GetSpellInfo) == "function" then
+    local localizedName = GetSpellInfo(spellId)
+    if type(localizedName) == "string" and localizedName ~= "" then
+      spellName = localizedName
+    end
+  end
+
+  status = string.upper(trim(status or "ERR"))
+  targetName = trim(targetName or "")
+  reason = string.upper(trim(reason or "UNKNOWN"))
+
+  if status == "OK" then
+    if targetName ~= "" and string.lower(targetName) ~= string.lower(botName) then
+      systemMessage(string.format(
+        L("spellbook.cast.success.target", "[MultiBot] %s casts %s on %s."),
+        botName,
+        spellName,
+        targetName))
+    else
+      systemMessage(string.format(
+        L("spellbook.cast.success.self", "[MultiBot] %s casts %s."),
+        botName,
+        spellName))
+    end
+    return
+  end
+
+  local reasonKey = reason
+  if string.sub(reasonKey, 1, 12) == "CAST_FAILED_" then
+    reasonKey = "UNKNOWN"
+  end
+
+  local reasonText = L(
+    "spellbook.cast.reason." .. reasonKey,
+    L("spellbook.cast.reason.UNKNOWN", "The spell could not be cast."))
+
+  systemMessage(string.format(
+    L("spellbook.cast.failed", "[MultiBot] %s cannot cast %s: %s."),
+    botName,
+    spellName,
+    reasonText))
+end
+function Comm.RunSpellbookCast(name, spellId, callback)
+  local state = ensureBridgeState()
+  name = trim(name or "")
+  spellId = parseBoundedInteger(tostring(spellId or ""), 1, 4294967295)
+
+  if name == "" or spellId == nil then
+    state.lastError = "SPELLBOOK_CAST_BAD_REQUEST"
+    Comm.ShowSpellbookCastFeedback({ botName = name, spellId = spellId or 0 }, "ERR", "", "BAD_REQUEST")
+    return false
+  end
+  if not state.connected then
+    state.lastError = "SPELLBOOK_CAST_NOT_CONNECTED"
+    Comm.ShowSpellbookCastFeedback({ botName = name, spellId = spellId }, "ERR", "", "BRIDGE_REQUIRED")
+    return false
+  end
+  if state.spellbookCastCapable ~= true then
+    state.lastError = "SPELLBOOK_CAST_CAPABILITY_UNAVAILABLE"
+    Comm.ShowSpellbookCastFeedback({ botName = name, spellId = spellId }, "ERR", "", "CAPABILITY_UNAVAILABLE")
+    return false
+  end
+
+  state.spellbookCastCommands = type(state.spellbookCastCommands) == "table" and state.spellbookCastCommands or {}
+  if countTableEntries(state.spellbookCastCommands) >= 16 then
+    state.lastError = "SPELLBOOK_CAST_TOO_MANY_REQUESTS"
+    Comm.ShowSpellbookCastFeedback({ botName = name, spellId = spellId }, "ERR", "", "TOO_MANY_REQUESTS")
+    return false
+  end
+
+  state.spellbookCastSeq = (tonumber(state.spellbookCastSeq) or 0) + 1
+  if state.spellbookCastSeq > 1000000000 then
+    state.spellbookCastSeq = 1
+  end
+
+  local token = "sc" .. tostring(state.spellbookCastSeq) .. tostring(math.floor(safeNow() * 1000))
+  state.spellbookCastCommands[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    spellId = spellId,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "SPELLBOOK_CAST~" .. urlEncodeField(name) .. "~" .. token .. "~" .. tostring(spellId)
+  if not Comm.Send("RUN", payload) then
+    local pending = state.spellbookCastCommands[token]
+    state.spellbookCastCommands[token] = nil
+    state.lastError = "SPELLBOOK_CAST_SEND_FAILED"
+    Comm.ShowSpellbookCastFeedback(pending, "ERR", "", "SEND_FAILED")
+    return false
+  end
+
+  safeDelay(5.0, function()
+    local bridge = ensureBridgeState()
+    local pending = bridge.spellbookCastCommands and bridge.spellbookCastCommands[token] or nil
+    if type(pending) ~= "table" then return end
+
+    bridge.spellbookCastCommands[token] = nil
+    bridge.lastError = "SPELLBOOK_CAST_TIMEOUT"
+    Comm.ShowSpellbookCastFeedback(pending, "ERR", "", "TIMEOUT")
+    if type(pending.callback) == "function" then
+      pending.callback({
+        status = "timeout",
+        botName = pending.botName,
+        spellId = pending.spellId,
+        targetName = "",
+        reason = "TIMEOUT",
+      })
+    end
+  end)
+
+  return token
+end
+
+function Comm.HandleSpellbookCastAddonMessage(opcode, payload, state)
+  if opcode ~= "SPELLBOOK_CAST_ACK" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  local fields = splitFields(payload or "")
+  if #fields ~= 5 then
+    state.lastError = "SPELLBOOK_CAST_ACK_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local spellId = parseBoundedInteger(fields[2], 1, 4294967295)
+  local status = string.upper(trim(fields[3]))
+  local targetName = urlDecodeFieldStrict(fields[4], 64, true)
+  local reason = urlDecodeFieldStrict(fields[5], 64, false)
+  local pending = state.spellbookCastCommands and state.spellbookCastCommands[token] or nil
+
+  if not isValidStateToken(token)
+      or spellId == nil
+      or (status ~= "OK" and status ~= "ERR")
+      or targetName == nil
+      or reason == nil
+      or type(pending) ~= "table"
+      or pending.spellId ~= spellId then
+    state.lastError = "SPELLBOOK_CAST_ACK_INVALID"
+    return true
+  end
+
+  state.spellbookCastCommands[token] = nil
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("SPELLBOOK_CAST_" .. reason)
+  debugPrint("ADDON:RX", "SPELLBOOK_CAST_ACK", token, spellId, status, targetName, reason)
+  Comm.ShowSpellbookCastFeedback(pending, status, targetName, reason)
+
+  if type(pending.callback) == "function" then
+    pending.callback({
+      status = status == "OK" and "ok" or "failed",
+      botName = pending.botName,
+      spellId = spellId,
+      targetName = targetName,
+      reason = reason,
+    })
+  end
+
+  return true
+end
+
+function Comm.HandleSpellbookCastProtocolError(requestType, token, reason, state)
+  if requestType ~= "SPELLBOOK_CAST" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(token)
+  local pending = state.spellbookCastCommands and state.spellbookCastCommands[token] or nil
+  if type(pending) ~= "table" then
+    return true
+  end
+
+  state.spellbookCastCommands[token] = nil
+  local failureReason = reason or "PROTOCOL_ERROR"
+  state.lastError = "SPELLBOOK_CAST_" .. failureReason
+  Comm.ShowSpellbookCastFeedback(pending, "ERR", "", failureReason)
+  if type(pending.callback) == "function" then
+    pending.callback({
+      status = "error",
+      botName = pending.botName,
+      spellId = pending.spellId,
+      targetName = "",
+      reason = failureReason,
+    })
+  end
+  return true
+end
+-- MB_SPELLBOOK_CAST_V1_END
+-- MB_SPELLBOOK_IGNORE_V1_BEGIN
+function Comm.IsSpellbookIgnoreCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.spellbookIgnoreCapable == true
+end
+
+function Comm.ShowSpellbookIgnoreFailure(pending, reason)
+  pending = type(pending) == "table" and pending or {}
+  local botName = trim(pending.botName or "")
+  local spellId = tonumber(pending.spellId or 0) or 0
+  local spellName = tostring(spellId)
+
+  if spellId > 0 and type(GetSpellInfo) == "function" then
+    local localizedName = GetSpellInfo(spellId)
+    if type(localizedName) == "string" and localizedName ~= "" then
+      spellName = localizedName
+    end
+  end
+
+  reason = string.upper(trim(reason or "UNKNOWN"))
+  local reasonText = L(
+    "spellbook.ignore.reason." .. reason,
+    L("spellbook.ignore.reason.UNKNOWN", "The ignored state could not be changed."))
+
+  systemMessage(string.format(
+    L("spellbook.ignore.failed", "[MultiBot] %s could not change the ignored state of %s: %s."),
+    botName,
+    spellName,
+    reasonText))
+end
+
+function Comm.ShowSpellbookIgnoreSuccess(pending, ignored)
+  pending = type(pending) == "table" and pending or {}
+  local botName = trim(pending.botName or "")
+  local spellId = tonumber(pending.spellId or 0) or 0
+  local spellName = tostring(spellId)
+
+  if spellId > 0 and type(GetSpellInfo) == "function" then
+    local localizedName = GetSpellInfo(spellId)
+    if type(localizedName) == "string" and localizedName ~= "" then
+      spellName = localizedName
+    end
+  end
+
+  local messageKey = ignored == true
+    and "spellbook.ignore.success.added"
+    or "spellbook.ignore.success.removed"
+  local message = L(messageKey, "")
+  if type(message) ~= "string" or message == "" then
+    return
+  end
+
+  systemMessage(string.format(message, botName, spellName))
+end
+
+function Comm.RunSpellbookIgnore(name, spellId, action, callback)
+  local state = ensureBridgeState()
+  name = trim(name or "")
+  spellId = parseBoundedInteger(tostring(spellId or ""), 1, 4294967295)
+  action = string.upper(trim(action or ""))
+
+  if name == "" or spellId == nil or (action ~= "IGNORE" and action ~= "ALLOW") then
+    state.lastError = "SPELLBOOK_IGNORE_BAD_REQUEST"
+    Comm.ShowSpellbookIgnoreFailure({ botName = name, spellId = spellId or 0 }, "BAD_REQUEST")
+    return false
+  end
+
+  if not state.connected then
+    state.lastError = "SPELLBOOK_IGNORE_NOT_CONNECTED"
+    Comm.ShowSpellbookIgnoreFailure({ botName = name, spellId = spellId }, "BRIDGE_REQUIRED")
+    return false
+  end
+
+  if state.spellbookIgnoreCapable ~= true then
+    state.lastError = "SPELLBOOK_IGNORE_CAPABILITY_UNAVAILABLE"
+    Comm.ShowSpellbookIgnoreFailure({ botName = name, spellId = spellId }, "CAPABILITY_UNAVAILABLE")
+    return false
+  end
+
+  state.spellbookIgnoreCommands = type(state.spellbookIgnoreCommands) == "table" and state.spellbookIgnoreCommands or {}
+  if countTableEntries(state.spellbookIgnoreCommands) >= 16 then
+    state.lastError = "SPELLBOOK_IGNORE_TOO_MANY_REQUESTS"
+    Comm.ShowSpellbookIgnoreFailure({ botName = name, spellId = spellId }, "TOO_MANY_REQUESTS")
+    return false
+  end
+
+  state.spellbookIgnoreSeq = (tonumber(state.spellbookIgnoreSeq) or 0) + 1
+  if state.spellbookIgnoreSeq > 1000000000 then
+    state.spellbookIgnoreSeq = 1
+  end
+
+  local token = "si" .. tostring(state.spellbookIgnoreSeq) .. tostring(math.floor(safeNow() * 1000))
+  state.spellbookIgnoreCommands[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    spellId = spellId,
+    action = action,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "SPELLBOOK_IGNORE~" .. urlEncodeField(name) .. "~" .. token .. "~" .. tostring(spellId) .. "~" .. action
+  if not Comm.Send("RUN", payload) then
+    local pending = state.spellbookIgnoreCommands[token]
+    state.spellbookIgnoreCommands[token] = nil
+    state.lastError = "SPELLBOOK_IGNORE_SEND_FAILED"
+    Comm.ShowSpellbookIgnoreFailure(pending, "SEND_FAILED")
+    return false
+  end
+
+  safeDelay(5.0, function()
+    local bridge = ensureBridgeState()
+    local pending = bridge.spellbookIgnoreCommands and bridge.spellbookIgnoreCommands[token] or nil
+    if type(pending) ~= "table" then return end
+
+    bridge.spellbookIgnoreCommands[token] = nil
+    bridge.lastError = "SPELLBOOK_IGNORE_TIMEOUT"
+    Comm.ShowSpellbookIgnoreFailure(pending, "TIMEOUT")
+
+    if type(pending.callback) == "function" then
+      pending.callback({
+        status = "timeout",
+        botName = pending.botName,
+        spellId = pending.spellId,
+        action = pending.action,
+        ignored = nil,
+        reason = "TIMEOUT",
+      })
+    end
+  end)
+
+  return token
+end
+
+function Comm.HandleSpellbookIgnoreAddonMessage(opcode, payload, state)
+  if opcode ~= "SPELLBOOK_IGNORE_ACK" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  local fields = splitFields(payload or "")
+  if #fields ~= 6 then
+    state.lastError = "SPELLBOOK_IGNORE_ACK_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local spellId = parseBoundedInteger(fields[2], 1, 4294967295)
+  local action = string.upper(trim(fields[3]))
+  local status = string.upper(trim(fields[4]))
+  local ignored = parseBoundedInteger(fields[5], 0, 1)
+  local reason = urlDecodeFieldStrict(fields[6], 64, false)
+  local pending = state.spellbookIgnoreCommands and state.spellbookIgnoreCommands[token] or nil
+
+  if not isValidStateToken(token)
+      or spellId == nil
+      or (action ~= "IGNORE" and action ~= "ALLOW")
+      or (status ~= "OK" and status ~= "ERR")
+      or ignored == nil
+      or reason == nil
+      or type(pending) ~= "table"
+      or pending.spellId ~= spellId
+      or pending.action ~= action then
+    state.lastError = "SPELLBOOK_IGNORE_ACK_INVALID"
+    return true
+  end
+
+  state.spellbookIgnoreCommands[token] = nil
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("SPELLBOOK_IGNORE_" .. reason)
+  debugPrint("ADDON:RX", "SPELLBOOK_IGNORE_ACK", token, spellId, action, status, ignored, reason)
+
+  if status ~= "OK" then
+    Comm.ShowSpellbookIgnoreFailure(pending, reason)
+  else
+    Comm.ShowSpellbookIgnoreSuccess(pending, ignored == 1)
+  end
+
+  if type(pending.callback) == "function" then
+    pending.callback({
+      status = status == "OK" and "ok" or "failed",
+      botName = pending.botName,
+      spellId = spellId,
+      action = action,
+      ignored = ignored == 1,
+      reason = reason,
+    })
+  end
+
+  return true
+end
+
+function Comm.HandleSpellbookIgnoreProtocolError(requestType, token, reason, state)
+  if requestType ~= "SPELLBOOK_IGNORE" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(token)
+  local pending = state.spellbookIgnoreCommands and state.spellbookIgnoreCommands[token] or nil
+  if type(pending) ~= "table" then
+    return true
+  end
+
+  state.spellbookIgnoreCommands[token] = nil
+  local failureReason = reason or "PROTOCOL_ERROR"
+  state.lastError = "SPELLBOOK_IGNORE_" .. failureReason
+  Comm.ShowSpellbookIgnoreFailure(pending, failureReason)
+
+  if type(pending.callback) == "function" then
+    pending.callback({
+      status = "error",
+      botName = pending.botName,
+      spellId = pending.spellId,
+      action = pending.action,
+      ignored = nil,
+      reason = failureReason,
+    })
+  end
+
+  return true
+end
+-- MB_SPELLBOOK_IGNORE_V1_END
 function Comm.RequestBotSkills(name)
   local state = ensureBridgeState()
   name = trim(name)
@@ -7355,6 +7795,8 @@ function Comm.MarkDisconnected(reason)
 state.selfStrategyCapable = false
 state.selfActionCapable = false
 state.botMaintenanceCapable = false
+  state.spellbookCastCapable = false
+  state.spellbookIgnoreCapable = false
   state.outfitCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
@@ -7428,6 +7870,23 @@ state.botMaintenanceCapable = false
     end
   end
   state.botMaintenanceCommands = {}
+
+  for token, pending in pairs(state.spellbookCastCommands or {}) do
+    if type(pending) == "table" then
+      Comm.ShowSpellbookCastFeedback(pending, "ERR", "", "DISCONNECTED")
+      if type(pending.callback) == "function" then
+        pending.callback({
+          status = "error",
+          botName = pending.botName,
+          spellId = pending.spellId,
+          targetName = "",
+          reason = "DISCONNECTED",
+        })
+      end
+    end
+  end
+  state.spellbookCastCommands = {}
+  state.spellbookIgnoreCommands = {}
 
   local pendingTokens = {}
   for token in pairs(state.strategyMutationCommands or {}) do
@@ -11607,16 +12066,18 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   if opcode == "SB_ITEM" then
     local botName, rest = splitOnce(payload or "", "~")
     local token, spellId = splitOnce(rest or "", "~")
+    spellId, rest = splitOnce(spellId or "", "~")
 
     state.connected = true
     state.lastError = nil
 
-    if getActiveSpellbookRequest(botName, token) then
+    if getActiveSpellbookRequest(botName, token)
+        and (trim(rest or "") == "0" or trim(rest or "") == "1") then
       local spellbook = getSpellbookFrame()
       if spellbook and spellbook.appendSpellId then
-        spellbook:appendSpellId(tonumber(spellId or "0") or 0, trim(botName))
+        spellbook:appendSpellId(tonumber(spellId or "0") or 0, trim(botName), trim(rest or "") == "1")
       elseif MultiBot and MultiBot.addSpellById then
-        MultiBot.addSpellById(tonumber(spellId or "0") or 0, trim(botName))
+        MultiBot.addSpellById(tonumber(spellId or "0") or 0, trim(botName), trim(rest or "") == "1")
       end
     end
 
@@ -13039,6 +13500,14 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     return true
   end
 
+  if Comm.HandleSpellbookCastAddonMessage(opcode, payload, state) then
+    return true
+  end
+
+  if Comm.HandleSpellbookIgnoreAddonMessage(opcode, payload, state) then
+    return true
+  end
+
   if Comm.HandleBotMaintenanceAddonMessage(opcode, payload, state) then
     return true
   end
@@ -13056,6 +13525,10 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
       requestType = requestType and string.upper(trim(requestType)) or nil
       if requestType and isValidStateToken(token) and reason then
         if Comm.HandleSelfBotProtocolError(requestType, token, reason, state) then
+          return true
+        elseif Comm.HandleSpellbookCastProtocolError(requestType, token, reason, state) then
+          return true
+        elseif Comm.HandleSpellbookIgnoreProtocolError(requestType, token, reason, state) then
           return true
         elseif Comm.HandleBotMaintenanceProtocolError(requestType, token, reason, state) then
           return true
@@ -13144,6 +13617,8 @@ function Comm.OnPlayerEnteringWorld()
 state.selfStrategyCapable = false
 state.selfActionCapable = false
 state.botMaintenanceCapable = false
+  state.spellbookCastCapable = false
+  state.spellbookIgnoreCapable = false
   state.outfitCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false

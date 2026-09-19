@@ -83,7 +83,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Loot** | Structured loot profiles and exact persistent always-loot item add/remove. |
 | **Group tools** | Formation, Roll, RTI, Pull Control and Disperse, plus bridge-first `FOLLOW_ORDER_V1`, `STAY_ORDER_V1`, `ATTACK_ORDER_V1`, `FLEE_ORDER_V1`, bounded `GROUP_ACTION_V1` and `RTSC_ORDER_V1`. RTSC selection, saved spots and GO/CANCEL now use the Bridge while AEDM movement remains the native WoW/Playerbots spell path. |
 | **Raidus raid planner** | Persistent 8×5 Working Layout, Saved Layouts, Score/Level/Class sorting, drag/drop, Auto balance, structured Apply and human-safe outside-layout bot removal through `BOT_GROUP_REMOVE_V1`. |
-| **Character information** | Bot skills, reputations, currencies/emblems, spellbook, stats and PvP stats. |
+| **Character information** | Bot skills, reputations, currencies/emblems, spellbook browsing/cast with authoritative ignored-spell management, stats and PvP stats. |
 | **Outfits** | Outfit listing and actions through the Bridge. |
 | **SelfBot** | Dedicated enable/disable, strategy and selected action support. |
 | **Localization** | Eight runtime locales: `enUS`, `enGB`, `frFR`, `esES`, `deDE`, `ruRU`, `zhCN` and `koKR`. |
@@ -364,6 +364,25 @@ The checkpoint warning status is documentary only: two historical apply reports 
 
 ---
 
+# Recent Milestone — Spellbook Cast / Ignore Chatless
+
+Spellbook cast and ignored-spell management were completed and runtime validated on **19 September 2026** through two dedicated capability families:
+
+```text
+SPELLBOOK_CAST_V1
+SPELLBOOK_IGNORE_V1
+```
+
+The cast path sends the selected numeric `spellId` through the dedicated Bridge endpoint and waits for a structured ACK. The normal UI path does not fall back to whisper `cast` and does not use a generic `RUN~CAST_SPELL` executor.
+
+Ignored-spell management uses typed `IGNORE` / `ALLOW` requests backed by Playerbots' existing ignored-spell state. The Addon no longer sends legacy `ss +<id>` / `ss -<id>` commands and does not depend on the historical `Ignored spell list` whisper.
+
+The Spellbook reflects authoritative state returned by the Bridge. Successful ignore/allow ACKs produce localized system feedback in all eight loaded locales. The footer also provides a localized **Ignored (N) / All spells** filter with filtered pagination; the final validated button geometry is `125×18`, `TOPRIGHT`, `Y=-270`, `X=12`.
+
+Runtime validation covered cast, ignore, allow, filtered removal, the empty filtered view after the final ignored spell is allowed, and return to the complete spell list. `MultiBotComm.lua` remains at **199 top-level locals**, and `mod-playerbots` remains strictly read-only.
+
+---
+
 # Bridge Capabilities
 
 The addon negotiates feature capabilities with the Bridge before using newer paths.
@@ -418,6 +437,8 @@ AUTOGEAR_OPTIONS_V1
 HUNTER_PET_CONTROL_V1
 HUNTER_PET_MANAGE_V1
 HUNTER_PET_LIFECYCLE_V1
+SPELLBOOK_CAST_V1
+SPELLBOOK_IGNORE_V1
 ```
 
 The exact protocol is an implementation detail of the addon and Bridge. The normal user experience should remain UI-driven.
@@ -483,7 +504,7 @@ Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or expli
 
 Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Creator `init=auto` is also structured through `CREATOR_INIT_AUTO_V1` for bounded target/group initialization. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
 
-The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is present through the five `QUEST_*` capabilities, **Autogear** is completed through `AUTOGEAR_OPTIONS_V1`, and **Hunter Pet H1/H2/H3** is completed through `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` and `HUNTER_PET_LIFECYCLE_V1`. The next ordinary-bot migration is spell cast, followed by explicitly deferred technical residuals and the final legacy parser/fallback cleanup.
+The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is present through the five `QUEST_*` capabilities, **Autogear** is completed through `AUTOGEAR_OPTIONS_V1`, **Hunter Pet H1/H2/H3** is completed through `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` and `HUNTER_PET_LIFECYCLE_V1`, and **Spellbook Cast / Ignore** is completed through `SPELLBOOK_CAST_V1` and `SPELLBOOK_IGNORE_V1`. The next active work is the explicitly deferred technical residuals, followed by the final legacy parser/fallback cleanup.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 

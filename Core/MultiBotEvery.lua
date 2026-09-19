@@ -588,11 +588,13 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 				return
 			end
 
-			if(MultiBot.allowLegacyChatFallback == true) then
-				tUnits.buttons[MultiBot.spellbook.name].waitFor = "SPELLBOOK"
-				SendChatMessage("spells", "WHISPER", nil, pButton.getName())
-			else
-				tUnits.buttons[MultiBot.spellbook.name].waitFor = ""
+			tUnits.buttons[MultiBot.spellbook.name].waitFor = ""
+			pButton.setDisable()
+			if MultiBot.spellbook and MultiBot.spellbook.Hide then
+				MultiBot.spellbook:Hide()
+			end
+			if tComm and type(tComm.ShowSystemMessage) == "function" then
+				tComm.ShowSystemMessage("[MultiBot] Spellbook: " .. tostring(pButton.getName() or "") .. " [BRIDGE_REQUIRED]")
 			end
 		end
 	end
