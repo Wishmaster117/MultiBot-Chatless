@@ -68,7 +68,7 @@ MultiBot.addRogue = function(pFrame, pCombat, pNormal)
 
 	-- STRATEGIES --
 
-	if(MultiBot.hasStrategy(pCombat, "dps")) then pFrame.getButton("Dps").setEnable() end
+	if(MultiBot.hasStrategy(pCombat, "combat") or MultiBot.hasStrategy(pCombat, "assassin")) then pFrame.getButton("Dps").setEnable() end
 	if(MultiBot.hasStrategy(pCombat, "dps aoe")) then pFrame.getButton("DpsAoe").setEnable() end
 	if(MultiBot.hasStrategy(pCombat, "dps assist")) then pFrame.getButton("DpsAssist").setEnable() end
 	if(MultiBot.hasStrategy(pCombat, "tank assist")) then pFrame.getButton("TankAssist").setEnable() end
