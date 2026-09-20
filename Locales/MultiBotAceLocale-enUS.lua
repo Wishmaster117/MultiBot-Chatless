@@ -1274,6 +1274,8 @@ local enUSValues = {
   ["info.trainer.reason.NO_SPELL"] = "Spell not found.",
   ["info.trainer.reason.NO_MATCHING_SPELL"] = "This spell is no longer available.",
   ["info.trainer.reason.TOO_EXPENSIVE"] = "The bot does not have enough available money.",
+  ["info.trainer.reason.TIMEOUT"] = "The trainer request timed out.",
+  ["info.trainer.reason.DISCONNECTED"] = "The Bridge disconnected during the trainer action.",
   ["info.trainer.reason.UNKNOWN"] = "The server returned an unknown trainer error.",
   ["tips.outfits.equip"] = "Left click: Equip\nRight click: Replace",
   -- Chatless formation query

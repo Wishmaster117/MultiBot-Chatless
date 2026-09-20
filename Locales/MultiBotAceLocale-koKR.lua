@@ -1260,6 +1260,8 @@ local koKRValues = {
   ["info.trainer.reason.NO_SPELL"] = "주문을 찾을 수 없습니다.",
   ["info.trainer.reason.NO_MATCHING_SPELL"] = "이 주문은 더 이상 사용할 수 없습니다.",
   ["info.trainer.reason.TOO_EXPENSIVE"] = "봇의 사용 가능한 돈이 부족합니다.",
+  ["info.trainer.reason.TIMEOUT"] = "trainer 요청 시간이 초과되었습니다.",
+  ["info.trainer.reason.DISCONNECTED"] = "trainer 동작 중 bridge 연결이 끊어졌습니다.",
   ["info.trainer.reason.UNKNOWN"] = "서버가 알 수 없는 상급자 오류를 반환했습니다.",
   ["tips.outfits.equip"] = "왼쪽 클릭: 장착\n오른쪽 클릭: 바꾸기",
   -- Chatless formation query

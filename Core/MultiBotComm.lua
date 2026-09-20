@@ -4691,7 +4691,23 @@ function Comm.RequestTrainer(name)
     return false
   end
 
-  return true
+  safeDelay(8.0, function()
+    local live = ensureBridgeState()
+    local active = live.trainerActive
+    if type(active) ~= "table" or active.token ~= token then
+      return
+    end
+
+    live.trainerActive = nil
+    if MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeEnd then
+      MultiBot.TrainerUI:HandleBridgeEnd(
+        active.botName or name, token, tonumber(active.trainerEntry or 0) or 0,
+        active.trainerName or "", active.spells or {}, "TIMEOUT"
+      )
+    end
+  end)
+
+  return token
 end
 
 function Comm.RunTrainerLearn(name, trainerEntry, spellId)
@@ -4732,7 +4748,23 @@ function Comm.RunTrainerLearn(name, trainerEntry, spellId)
     return false
   end
 
-  return true
+  safeDelay(8.0, function()
+    local live = ensureBridgeState()
+    local command = live.trainerCommands and live.trainerCommands[token] or nil
+    if type(command) ~= "table" then
+      return
+    end
+
+    live.trainerCommands[token] = nil
+    if MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeLearnResult then
+      MultiBot.TrainerUI:HandleBridgeLearnResult(
+        command.botName or name, token, tonumber(command.trainerEntry or trainerEntry) or 0,
+        command.spellId or spellToken, "ERR", "TIMEOUT", 0, 0
+      )
+    end
+  end)
+
+  return token
 end
 
 function Comm.RequestGlyphs(name)
@@ -7787,6 +7819,21 @@ function Comm.MarkDisconnected(reason)
   state.enchantTradeLists = {}
   state.outfitActive = nil
   state.outfitCommands = {}
+  if type(state.trainerActive) == "table" and MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeEnd then
+    MultiBot.TrainerUI:HandleBridgeEnd(
+      state.trainerActive.botName or "", state.trainerActive.token or "",
+      tonumber(state.trainerActive.trainerEntry or 0) or 0, state.trainerActive.trainerName or "",
+      state.trainerActive.spells or {}, "DISCONNECTED"
+    )
+  end
+  for token, command in pairs(state.trainerCommands or {}) do
+    if type(command) == "table" and MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeLearnResult then
+      MultiBot.TrainerUI:HandleBridgeLearnResult(
+        command.botName or "", token, tonumber(command.trainerEntry or 0) or 0,
+        command.spellId or "", "ERR", "DISCONNECTED", 0, 0
+      )
+    end
+  end
   state.trainerActive = nil
   state.trainerCommands = {}
   state.formationCommands = {}
@@ -13675,8 +13722,6 @@ state.botMaintenanceCapable = false
   state.professionRecipeActive = nil
   state.outfitActive = nil
   state.outfitCommands = {}
-  state.trainerActive = nil
-  state.trainerCommands = {}
   state.trainerSpells = {}
   Comm.MarkDisconnected(nil)
   local generation = state.connectionGeneration

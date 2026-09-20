@@ -1295,13 +1295,22 @@ Quatre warnings historiques restent à nettoyer après les chantiers fonctionnel
 
 Ces points sont enregistrés mais ne sont pas le prochain chantier fonctionnel.
 
-### Lifecycle Trainer
+### Lifecycle Trainer — terminé (20/09/2026)
 
-`trainerCommands` doit être audité pour :
+Le lifecycle Trainer est désormais borné et déterministe :
 
-- timeout borné ;
-- résultat `DISCONNECTED` déterministe ;
-- aucun pending UI bloqué après perte de connexion.
+- timeout de 8 s pour la liste et l'apprentissage ;
+- résultat `DISCONNECTED` déterministe et drainage des transactions en cours ;
+- corrélation stricte `requestToken` / `pendingToken` côté UI ;
+- aucun pending UI bloqué après perte de connexion ;
+- `Tout apprendre` traite transitivement les rangs nouvellement débloqués avec une boucle bornée côté Bridge ;
+- communication structurée Addon/Bridge, sans fallback chat sur le chemin Trainer ;
+- Playerbots reste strictement read-only.
+
+Hardening Trainer volontairement différé :
+
+- rate-limit / protection anti-rejeu spécifique aux endpoints Trainer ;
+- revue de parité avec `PlayerbotFactory::IsTrainerSpellAllowedForBot()`.
 
 ### Lifecycle Outfit
 

@@ -1272,6 +1272,8 @@ local esESValues = {
   ["info.trainer.reason.NO_SPELL"] = "Hechizo no encontrado.",
   ["info.trainer.reason.NO_MATCHING_SPELL"] = "Este hechizo ya no está disponible.",
   ["info.trainer.reason.TOO_EXPENSIVE"] = "El bot no tiene suficiente dinero disponible.",
+  ["info.trainer.reason.TIMEOUT"] = "La solicitud al entrenador agotó el tiempo de espera.",
+  ["info.trainer.reason.DISCONNECTED"] = "El bridge se desconectó durante la acción del entrenador.",
   ["info.trainer.reason.UNKNOWN"] = "El servidor devolvió un error desconocido del entrenador.",
   ["tips.outfits.equip"] = "Clic izquierdo: Equipar\nClic derecho: Reemplazar",
   -- Chatless formation query

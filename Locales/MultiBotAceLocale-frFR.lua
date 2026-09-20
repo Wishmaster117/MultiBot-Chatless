@@ -1271,6 +1271,8 @@ local frFRValues = {
   ["info.trainer.reason.NO_SPELL"] = "Sort introuvable.",
   ["info.trainer.reason.NO_MATCHING_SPELL"] = "Ce sort n'est plus disponible.",
   ["info.trainer.reason.TOO_EXPENSIVE"] = "Le bot n'a pas assez d'argent disponible.",
+  ["info.trainer.reason.TIMEOUT"] = "La requête d'entraîneur a expiré.",
+  ["info.trainer.reason.DISCONNECTED"] = "Le bridge s'est déconnecté pendant l'action d'entraîneur.",
   ["info.trainer.reason.UNKNOWN"] = "Le serveur a renvoyé une erreur de maître de classe inconnue.",
   ["tips.outfits.equip"] = "Clic gauche : Équiper\nClic droit : Remplacer",
   -- Chatless formation query

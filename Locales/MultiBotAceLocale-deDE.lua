@@ -1271,6 +1271,8 @@ local deDEValues = {
   ["info.trainer.reason.NO_SPELL"] = "Zauber nicht gefunden.",
   ["info.trainer.reason.NO_MATCHING_SPELL"] = "Dieser Zauber ist nicht mehr verfügbar.",
   ["info.trainer.reason.TOO_EXPENSIVE"] = "Der Bot hat nicht genug verfügbares Geld.",
+  ["info.trainer.reason.TIMEOUT"] = "Zeitüberschreitung bei der Traineranfrage.",
+  ["info.trainer.reason.DISCONNECTED"] = "Die Bridge-Verbindung wurde während der Traineraktion getrennt.",
   ["info.trainer.reason.UNKNOWN"] = "Der Server hat einen unbekannten Lehrerfehler gemeldet.",
   ["tips.outfits.equip"] = "Linksklick: Ausrüsten\nRechtsklick: Ersetzen",
   -- Chatless formation query

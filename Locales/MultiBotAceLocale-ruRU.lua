@@ -1269,6 +1269,8 @@ local ruRUValues = {
   ["info.trainer.reason.NO_SPELL"] = "Заклинание не найдено.",
   ["info.trainer.reason.NO_MATCHING_SPELL"] = "Это заклинание больше недоступно.",
   ["info.trainer.reason.TOO_EXPENSIVE"] = "У бота недостаточно доступных денег.",
+  ["info.trainer.reason.TIMEOUT"] = "Время ожидания запроса тренера истекло.",
+  ["info.trainer.reason.DISCONNECTED"] = "Bridge отключился во время действия тренера.",
   ["info.trainer.reason.UNKNOWN"] = "Сервер вернул неизвестную ошибку тренера.",
   ["tips.outfits.equip"] = "ЛКМ: Надеть\nПКМ: Заменить",
   -- Chatless formation query

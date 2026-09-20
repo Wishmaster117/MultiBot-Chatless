@@ -1269,6 +1269,8 @@ local zhCNValues = {
   ["info.trainer.reason.NO_SPELL"] = "找不到法术。",
   ["info.trainer.reason.NO_MATCHING_SPELL"] = "该法术已不可用。",
   ["info.trainer.reason.TOO_EXPENSIVE"] = "机器人的可用金币不足。",
+  ["info.trainer.reason.TIMEOUT"] = "训练师请求超时。",
+  ["info.trainer.reason.DISCONNECTED"] = "执行训练师操作时 bridge 已断开连接。",
   ["info.trainer.reason.UNKNOWN"] = "服务器返回了未知的训练师错误。",
   ["tips.outfits.equip"] = "左键：装备\n右键：替换",
   -- Chatless formation query
