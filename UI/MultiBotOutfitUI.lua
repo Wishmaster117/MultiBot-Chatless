@@ -699,11 +699,15 @@ function OutfitUI:IsCommandBusy(botName)
     return self.commandBusyBot == botName
 end
 
-function OutfitUI:BeginCommandLock(botName)
-    self.commandBusy      = true
-    self.commandBusyBot   = botName
-    self.pendingRefresh   = false
-    self.commandBusyToken = (self.commandBusyToken or 0) + 1
+function OutfitUI:BeginCommandLock(botName, token)
+    self.commandBusy    = true
+    self.commandBusyBot = botName
+    self.pendingRefresh = false
+    if token ~= nil then
+        self.commandBusyToken = token
+    else
+        self.commandBusyToken = (tonumber(self.commandBusyToken) or 0) + 1
+    end
     self:RenderSelectedOutfit()
     return self.commandBusyToken
 end
@@ -724,15 +728,16 @@ function OutfitUI:EndCommandLock(botName, token, refreshAfter)
     local refreshBot   = self.commandBusyBot or botName or self.botName
     local shouldRefresh = refreshAfter or self.pendingRefresh
 
-    self.commandBusy    = false
-    self.commandBusyBot = nil
-    self.pendingRefresh = false
+    self.commandBusy      = false
+    self.commandBusyBot   = nil
+    self.commandBusyToken = nil
+    self.pendingRefresh   = false
     self:RenderSelectedOutfit()
 
     if shouldRefresh
         and refreshBot and refreshBot ~= ""
-        and MultiBot.inventory
-        and MultiBot.inventory:IsVisible()
+        and self.botName == refreshBot
+        and self:IsVisible()
     then
         self:RequestList(refreshBot)
     end
@@ -953,6 +958,14 @@ function OutfitUI:RequestList(botName)
     self.itemButtons = self.itemButtons or {}
 
     local previousBotName = self.botName
+    if previousBotName and previousBotName ~= "" and previousBotName ~= botName then
+        local previousWaitButton = getUnitWaitButton(previousBotName)
+        if previousWaitButton and previousWaitButton.waitFor == "OUTFITS" then
+            previousWaitButton.waitFor = ""
+        end
+        self.bridgeToken = nil
+        self.pendingBot = nil
+    end
 
     self.botName = botName
     if self.frame and self.frame.setBotName then
@@ -1004,26 +1017,18 @@ function OutfitUI:RequestList(botName)
 
     self.requestToken = (self.requestToken or 0) + 1
     local token = self.requestToken
-    if MultiBot.TimerAfter then
-        MultiBot.TimerAfter(0.8, function()
-            if self.pendingBot == botName and token == self.requestToken then
-                self:FinishList(botName)
-                local refreshWaitButton = getUnitWaitButton(botName)
-                if refreshWaitButton and refreshWaitButton.waitFor == "OUTFITS" then
-                    refreshWaitButton.waitFor = ""
-                end
-            end
-        end)
-    end
 
     if bridgeOutfitCapable then
-        if MultiBot.Comm and MultiBot.Comm.RequestOutfits and MultiBot.Comm.RequestOutfits(botName) then
+        local bridgeToken = MultiBot.Comm and MultiBot.Comm.RequestOutfits and MultiBot.Comm.RequestOutfits(botName) or false
+        if bridgeToken then
+            self.bridgeToken = bridgeToken
             return true
         end
 
         bridgeState.lastError = "OUTFIT_SEND_FAILED"
         self.requestToken = self.requestToken + 1
         self.pendingBot = nil
+        self.bridgeToken = nil
         if previousBotName == botName then
             self.entries = previousEntries
             self.selectedName = previousSelectedName
@@ -1037,25 +1042,33 @@ function OutfitUI:RequestList(botName)
         return false
     end
 
+    if MultiBot.TimerAfter then
+        MultiBot.TimerAfter(0.8, function()
+            if self.pendingBot == botName and token == self.requestToken then
+                self:FinishList(botName)
+                local refreshWaitButton = getUnitWaitButton(botName)
+                if refreshWaitButton and refreshWaitButton.waitFor == "OUTFITS" then
+                    refreshWaitButton.waitFor = ""
+                end
+            end
+        end)
+    end
+
     SendChatMessage("outfit ?", "WHISPER", nil, botName)
     return true
 end
 
 function OutfitUI:HandleBridgeBegin(botName, token)
-    if not botName or botName == "" then
+    if not botName or botName == ""
+        or not token or token == ""
+        or self.pendingBot ~= botName
+        or self.bridgeToken ~= token
+    then
         return false
     end
 
-    self.botName = botName
-    self.pendingBot = botName
-    self.bridgeToken = token
     self.entries = {}
     self.selectedName = nil
-
-    if self.frame and self.frame.setBotName then
-        self.frame:setBotName(botName)
-    end
-
     self:RenderEntryList()
     self:RenderSelectedOutfit()
     self:SetStatus(outfitL("loading"))
@@ -1067,11 +1080,11 @@ function OutfitUI:HandleBridgeLine(botName, token, rawLine)
         return false
     end
 
-    if self.bridgeToken and token and token ~= self.bridgeToken then
+    if not token or token == "" or self.bridgeToken ~= token then
         return false
     end
 
-    if self.pendingBot and self.pendingBot ~= botName then
+    if self.pendingBot ~= botName then
         return false
     end
 
@@ -1084,23 +1097,37 @@ function OutfitUI:HandleBridgeLine(botName, token, rawLine)
     return false
 end
 
-function OutfitUI:HandleBridgeEnd(botName, token)
-    if not botName or botName == "" then
-        return false
-    end
-
-    if self.bridgeToken and token and token ~= self.bridgeToken then
+function OutfitUI:HandleBridgeEnd(botName, token, reason)
+    if not botName or botName == ""
+        or not token or token == ""
+        or self.pendingBot ~= botName
+        or self.bridgeToken ~= token
+    then
         return false
     end
 
     self.bridgeToken = nil
-    self:FinishList(botName)
 
     local waitButton = getUnitWaitButton(botName)
     if waitButton and waitButton.waitFor == "OUTFITS" then
         waitButton.waitFor = ""
     end
 
+    if reason == "TIMEOUT" or reason == "DISCONNECTED" then
+        self.pendingBot = nil
+        self.entries = {}
+        self.selectedName = nil
+        self:RenderEntryList()
+        self:RenderSelectedOutfit()
+        if reason == "TIMEOUT" then
+            self:SetStatus(outfitL("list_timeout"))
+        else
+            self:SetStatus(outfitL("disconnected"))
+        end
+        return true
+    end
+
+    self:FinishList(botName)
     return true
 end
 
@@ -1139,27 +1166,48 @@ local function showOutfitCommandFeedback(commandSuffix, wasCreate)
     end
 end
 
-function OutfitUI:HandleBridgeCommandResult(botName, token, result, commandSuffix, wasCreate)
-    if not botName or botName == "" then
+function OutfitUI:HandleBridgeCommandResult(botName, token, result, commandSuffix, wasCreate, reason)
+    if not botName or botName == ""
+        or not token or token == ""
+        or not self.commandBusy
+        or self.commandBusyBot ~= botName
+        or self.commandBusyToken ~= token
+    then
         return false
     end
 
-    self:EndCommandLock(botName, nil, false)
+    local isCurrentBot = self.botName == botName
+    self:EndCommandLock(botName, token, false)
+
     if result ~= "OK" then
-        self:SetStatus(outfitL("command_failed"))
+        if isCurrentBot then
+            if reason == "TIMEOUT" then
+                self:SetStatus(outfitL("command_timeout"))
+            elseif reason == "DISCONNECTED" then
+                self:SetStatus(outfitL("disconnected"))
+            else
+                self:SetStatus(outfitL("command_failed"))
+            end
+        end
         return false
     end
 
-    self:SetStatus(outfitL("loaded"))
+    if isCurrentBot then
+        self:SetStatus(outfitL("loaded"))
+    end
     showOutfitCommandFeedback(commandSuffix, wasCreate == true)
 
-    local refreshDelay = OUTFIT_UPDATE_REFRESH_DELAY
-    if MultiBot.TimerAfter then
-        MultiBot.TimerAfter(refreshDelay, function()
+    if isCurrentBot then
+        local refreshDelay = OUTFIT_UPDATE_REFRESH_DELAY
+        if MultiBot.TimerAfter then
+            MultiBot.TimerAfter(refreshDelay, function()
+                if self.botName == botName and self:IsVisible() then
+                    self:RequestList(botName)
+                end
+            end)
+        elseif self:IsVisible() then
             self:RequestList(botName)
-        end)
-    else
-        self:RequestList(botName)
+        end
     end
 
     return true
@@ -1236,8 +1284,9 @@ function OutfitUI:RunCommand(commandSuffix, statusText, refreshDelay, persistDel
         and bridgeState.outfitCapable == true
 
     if bridgeOutfitCapable then
-        if MultiBot.Comm and MultiBot.Comm.RunOutfitCommand and MultiBot.Comm.RunOutfitCommand(botName, commandSuffix, persist == true, wasCreate == true) then
-            self:BeginCommandLock(botName)
+        local bridgeToken = MultiBot.Comm and MultiBot.Comm.RunOutfitCommand and MultiBot.Comm.RunOutfitCommand(botName, commandSuffix, persist == true, wasCreate == true) or false
+        if bridgeToken then
+            self:BeginCommandLock(botName, bridgeToken)
             self:SetStatus(statusText)
             return true
         end
@@ -1279,7 +1328,7 @@ function OutfitUI:RunCommand(commandSuffix, statusText, refreshDelay, persistDel
         MultiBot.TimerAfter(refreshDelay, function()
             if commandToken then
                 self:EndCommandLock(botName, commandToken, true)
-            elseif MultiBot.inventory and MultiBot.inventory:IsVisible() then
+            elseif self.botName == botName and self:IsVisible() then
                 self:RequestList(botName)
             end
         end)

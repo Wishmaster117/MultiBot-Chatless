@@ -46,6 +46,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["SELF_STRATEGY_V1"] = "selfStrategyCapable",
   [SELF_ACTION_CAPABILITY] = "selfActionCapable",
   [OUTFIT_CAPABILITY] = "outfitCapable",
+  ["OUTFIT_FRAMING_V1"] = "outfitFramingCapable",
   [INVENTORY_CAPABILITY] = "inventoryCapable",
   [INVENTORY_EXACT_CAPABILITY] = "inventoryExactCapable",
   [INVENTORY_ITEM_MOVE_CAPABILITY] = "inventoryItemMoveCapable",
@@ -363,6 +364,7 @@ local function ensureBridgeState()
   state.selfStrategyCapable = state.selfStrategyCapable or false
   state.selfActionCapable = state.selfActionCapable or false
   state.outfitCapable = state.outfitCapable or false
+  state.outfitFramingCapable = state.outfitFramingCapable or false
   state.inventoryCapable = state.inventoryCapable or false
   state.inventoryExactCapable = state.inventoryExactCapable or false
   state.inventoryItemMoveCapable = state.inventoryItemMoveCapable or false
@@ -2129,6 +2131,7 @@ state.botMaintenanceCapable = false
 state.spellbookCastCapable = false
 state.spellbookIgnoreCapable = false
     state.outfitCapable = false
+    state.outfitFramingCapable = false
     state.inventoryCapable = false
     state.inventoryExactCapable = false
     state.inventoryItemMoveCapable = false
@@ -4623,20 +4626,39 @@ function Comm.RequestOutfits(name)
 
   state.outfitSeq = (tonumber(state.outfitSeq) or 0) + 1
   local token = tostring(math.floor(safeNow() * 1000)) .. "-" .. tostring(state.outfitSeq)
+  local framed = state.outfitFramingCapable == true
   state.outfitActive = {
     botName = name,
     botNameKey = string.lower(name),
     token = token,
     startedAt = safeNow(),
     lines = {},
+    framed = framed,
+    expectedOutfits = nil,
+    completedOutfits = 0,
+    frameOutfits = {},
   }
 
-  if not Comm.Send("GET", "OUTFITS~" .. name .. "~" .. token) then
+  local requestType = framed and "OUTFITS_FRAMED" or "OUTFITS"
+  if not Comm.Send("GET", requestType .. "~" .. name .. "~" .. token) then
     state.outfitActive = nil
     return false
   end
 
-  return true
+  safeDelay(8.0, function()
+    local live = ensureBridgeState()
+    local active = live.outfitActive
+    if type(active) ~= "table" or active.token ~= token then
+      return
+    end
+
+    live.outfitActive = nil
+    if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeEnd then
+      MultiBot.OutfitUI:HandleBridgeEnd(active.botName or name, token, "TIMEOUT")
+    end
+  end)
+
+  return token
 end
 
 function Comm.RunOutfitCommand(name, commandSuffix, persist, wasCreate)
@@ -4664,7 +4686,23 @@ function Comm.RunOutfitCommand(name, commandSuffix, persist, wasCreate)
     return false
   end
 
-  return true
+  safeDelay(8.0, function()
+    local live = ensureBridgeState()
+    local command = live.outfitCommands and live.outfitCommands[token] or nil
+    if type(command) ~= "table" then
+      return
+    end
+
+    live.outfitCommands[token] = nil
+    if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeCommandResult then
+      MultiBot.OutfitUI:HandleBridgeCommandResult(
+        command.botName or name, token, "ERR", command.command or commandSuffix,
+        command.wasCreate == true, "TIMEOUT"
+      )
+    end
+  end)
+
+  return token
 end
 
 function Comm.RequestTrainer(name)
@@ -7817,6 +7855,19 @@ function Comm.MarkDisconnected(reason)
   state.enchantTradeActive = nil
   state.enchantTradeCommands = {}
   state.enchantTradeLists = {}
+  if type(state.outfitActive) == "table" and MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeEnd then
+    MultiBot.OutfitUI:HandleBridgeEnd(
+      state.outfitActive.botName or "", state.outfitActive.token or "", "DISCONNECTED"
+    )
+  end
+  for token, command in pairs(state.outfitCommands or {}) do
+    if type(command) == "table" and MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeCommandResult then
+      MultiBot.OutfitUI:HandleBridgeCommandResult(
+        command.botName or "", token, "ERR", command.command or "",
+        command.wasCreate == true, "DISCONNECTED"
+      )
+    end
+  end
   state.outfitActive = nil
   state.outfitCommands = {}
   if type(state.trainerActive) == "table" and MultiBot.TrainerUI and MultiBot.TrainerUI.HandleBridgeEnd then
@@ -7845,6 +7896,7 @@ state.botMaintenanceCapable = false
   state.spellbookCastCapable = false
   state.spellbookIgnoreCapable = false
   state.outfitCapable = false
+  state.outfitFramingCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
   state.inventoryItemMoveCapable = false
@@ -8959,16 +9011,14 @@ function Comm.ApplyOutfitsBeginPayload(payload)
   botName = trim(urlDecodeField(botName))
   token = trim(token)
 
-  if botName == "" or not getActiveOutfitRequest(botName, token) then
+  local active = getActiveOutfitRequest(botName, token)
+  if botName == "" or not active or active.framed == true then
     return false
   end
 
-  local active = getActiveOutfitRequest(botName, token)
-  if active then
-    active.botName = botName
-    active.botNameKey = string.lower(botName)
-    active.lines = {}
-  end
+  active.botName = botName
+  active.botNameKey = string.lower(botName)
+  active.lines = {}
 
   if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeBegin then
     MultiBot.OutfitUI:HandleBridgeBegin(botName, token)
@@ -8985,7 +9035,7 @@ function Comm.ApplyOutfitsItemPayload(payload)
   token = trim(token)
 
   local active = getActiveOutfitRequest(botName, token)
-  if botName == "" or not active then
+  if botName == "" or not active or active.framed == true then
     return false
   end
 
@@ -9005,7 +9055,8 @@ function Comm.ApplyOutfitsEndPayload(payload)
   botName = trim(urlDecodeField(botName))
   token = trim(token)
 
-  if botName == "" or not getActiveOutfitRequest(botName, token) then
+  local active = getActiveOutfitRequest(botName, token)
+  if botName == "" or not active or active.framed == true then
     return false
   end
 
@@ -9018,6 +9069,151 @@ function Comm.ApplyOutfitsEndPayload(payload)
   return true
 end
 
+function Comm.ApplyOutfitsFramedBeginPayload(payload)
+  local fields = splitFields(payload or "")
+  if #fields ~= 3 then
+    return false
+  end
+
+  local botName = trim(urlDecodeField(fields[1] or ""))
+  local token = trim(fields[2] or "")
+  local outfitCount = parseBoundedInteger(fields[3], 0, 128)
+  local active = getActiveOutfitRequest(botName, token)
+
+  if botName == "" or outfitCount == nil or not active or active.framed ~= true then
+    return false
+  end
+
+  active.botName = botName
+  active.botNameKey = string.lower(botName)
+  active.lines = {}
+  active.expectedOutfits = outfitCount
+  active.completedOutfits = 0
+  active.frameOutfits = {}
+
+  if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeBegin then
+    MultiBot.OutfitUI:HandleBridgeBegin(botName, token)
+  end
+
+  debugPrint("ADDON:RX", "OUTFITS_FBEGIN", botName, outfitCount)
+  return true
+end
+
+function Comm.ApplyOutfitsFramedPartPayload(payload)
+  local fields = splitFields(payload or "")
+  if #fields ~= 6 then
+    return false
+  end
+
+  local botName = trim(urlDecodeField(fields[1] or ""))
+  local token = trim(fields[2] or "")
+  local outfitIndex = parseBoundedInteger(fields[3], 1, 128)
+  local partIndex = parseBoundedInteger(fields[4], 1, 128)
+  local finalFlag = trim(fields[5] or "")
+  local chunk = fields[6] or ""
+  local active = getActiveOutfitRequest(botName, token)
+
+  if botName == ""
+      or not active
+      or active.framed ~= true
+      or type(active.expectedOutfits) ~= "number"
+      or outfitIndex == nil
+      or outfitIndex > active.expectedOutfits
+      or partIndex == nil
+      or (finalFlag ~= "0" and finalFlag ~= "1")
+      or chunk == ""
+      or #chunk > 192 then
+    return false
+  end
+
+  local frame = active.frameOutfits[outfitIndex]
+  if type(frame) ~= "table" then
+    frame = {
+      parts = {},
+      finalFlags = {},
+      finalPart = nil,
+      complete = false,
+      rawLine = nil,
+    }
+    active.frameOutfits[outfitIndex] = frame
+  end
+
+  local existing = frame.parts[partIndex]
+  local existingFinal = frame.finalFlags[partIndex]
+  if existing ~= nil and (existing ~= chunk or existingFinal ~= finalFlag) then
+    return false
+  end
+
+  frame.parts[partIndex] = chunk
+  frame.finalFlags[partIndex] = finalFlag
+
+  if finalFlag == "1" then
+    if frame.finalPart ~= nil and frame.finalPart ~= partIndex then
+      return false
+    end
+    frame.finalPart = partIndex
+  end
+
+  if not frame.complete and frame.finalPart ~= nil then
+    for index = 1, frame.finalPart do
+      if frame.parts[index] == nil then
+        debugPrint("ADDON:RX", "OUTFITS_FPART", botName, outfitIndex, partIndex)
+        return true
+      end
+    end
+
+    frame.rawLine = urlDecodeField(table.concat(frame.parts, "", 1, frame.finalPart))
+    frame.complete = true
+    active.completedOutfits = (tonumber(active.completedOutfits) or 0) + 1
+  end
+
+  debugPrint("ADDON:RX", "OUTFITS_FPART", botName, outfitIndex, partIndex)
+  return true
+end
+
+function Comm.ApplyOutfitsFramedEndPayload(payload)
+  local fields = splitFields(payload or "")
+  if #fields ~= 3 then
+    return false
+  end
+
+  local botName = trim(urlDecodeField(fields[1] or ""))
+  local token = trim(fields[2] or "")
+  local outfitCount = parseBoundedInteger(fields[3], 0, 128)
+  local active = getActiveOutfitRequest(botName, token)
+
+  if botName == ""
+      or outfitCount == nil
+      or not active
+      or active.framed ~= true
+      or active.expectedOutfits ~= outfitCount
+      or (tonumber(active.completedOutfits) or 0) ~= outfitCount then
+    return false
+  end
+
+  for outfitIndex = 1, outfitCount do
+    local frame = active.frameOutfits[outfitIndex]
+    if type(frame) ~= "table" or frame.complete ~= true or type(frame.rawLine) ~= "string" then
+      return false
+    end
+
+    active.lines[#active.lines + 1] = frame.rawLine
+    if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeLine then
+      if MultiBot.OutfitUI:HandleBridgeLine(botName, token, frame.rawLine) == false then
+        return false
+      end
+    end
+  end
+
+  if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeEnd then
+    MultiBot.OutfitUI:HandleBridgeEnd(botName, token)
+  end
+
+  clearActiveOutfitRequest(botName, token)
+  debugPrint("ADDON:RX", "OUTFITS_FEND", botName, outfitCount)
+  return true
+end
+
 function Comm.ApplyOutfitCommandPayload(payload)
   local botName, rest = splitOnce(payload or "", "~")
   local token, result = splitOnce(rest or "", "~")
@@ -9027,19 +9223,17 @@ function Comm.ApplyOutfitCommandPayload(payload)
 
   local state = ensureBridgeState()
   local command = state.outfitCommands and state.outfitCommands[token] or nil
-  if not command then
+  if not command or botName == "" or string.lower(botName) ~= command.botNameKey then
     return false
   end
 
-  command.botName = botName ~= "" and botName or command.botName
-  command.botNameKey = string.lower(command.botName or "")
   command.result = result
+  state.outfitCommands[token] = nil
 
   if MultiBot.OutfitUI and MultiBot.OutfitUI.HandleBridgeCommandResult then
     MultiBot.OutfitUI:HandleBridgeCommandResult(command.botName, token, result, command.command, command.wasCreate == true)
   end
 
-  state.outfitCommands[token] = nil
   debugPrint("ADDON:RX", "OUTFITS_CMD", command.botName, result)
   return true
 end
@@ -11106,6 +11300,24 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
     state.connected = true
     state.lastError = nil
     return Comm.ApplyOutfitsEndPayload(payload)
+  end
+
+  if opcode == "OUTFITS_FBEGIN" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyOutfitsFramedBeginPayload(payload)
+  end
+
+  if opcode == "OUTFITS_FPART" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyOutfitsFramedPartPayload(payload)
+  end
+
+  if opcode == "OUTFITS_FEND" then
+    state.connected = true
+    state.lastError = nil
+    return Comm.ApplyOutfitsFramedEndPayload(payload)
   end
 
   if opcode == "OUTFITS_CMD" then
@@ -13667,6 +13879,7 @@ state.botMaintenanceCapable = false
   state.spellbookCastCapable = false
   state.spellbookIgnoreCapable = false
   state.outfitCapable = false
+  state.outfitFramingCapable = false
   state.inventoryCapable = false
   state.inventoryExactCapable = false
   state.inventoryItemMoveCapable = false
