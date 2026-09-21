@@ -1,0 +1,21 @@
+# .coderabbit.yaml for MultiBot-Chatless
+language: "en-US"
+
+reviews:
+  profile: "chill"
+  high_level_summary: true
+  auto_title_placeholder: "@coderabbitai summary"
+  
+  path_filters:
+    - "!Libs/**"
+    - "!Textures/**"
+    - "!Icons/**"
+    - "!*.md"
+
+  instructions: |
+    - **Response Language**: Write all review comments, summaries, and PR feedback in English.
+    - **Lua Variable Scope**: Flag any missing `local` keywords on variables or functions to prevent polluting the WoW global environment (`_G`).
+    - **WoW 3.3.5a API Compatibility**: Ensure all used WoW API functions exist in the 3.3.5a client build (Wrath of the Lich King) and do not rely on modern Retail WoW APIs.
+    - **Nil Safety**: Ensure tables and arguments received from the server bridge are checked for `nil` before indexing or iterating.
+    - **Linting & Style Standards**: Align review comments with the project's `.luacheckrc` and `stylua.toml` guidelines.
+    - **UI Performance**: Flag heavy loops or unnecessary memory allocations inside frequently executed frame handlers (e.g., `OnUpdate`).
