@@ -530,6 +530,7 @@ local zhCNValues = {
   ["tips.format.circle"] = "圆形阵型\n|cffffffff机器人围绕你排列成圆形。\n机器人的视线朝向外部。|r\n\n|cffff0000左键点击选择圆形阵型|r\n|cff999999(执行命令: 团队, 小队)|r",
   ["tips.format.chaos"] = "混乱阵型\n|cffffffff每个机器人各自跟随你。\n他们会随意排列，视线可以朝向任意方向。|r\n\n|cffff0000左键点击选择混乱阵型|r\n|cff999999(执行命令: 团队, 小队)|r",
   ["tips.format.shield"] = "盾牌阵型\n|cffffffff机器人在前方、左侧和右侧排列。\n机器人的视线方向朝向你。|r\n\n|cffff0000左键点击选择盾牌阵型|r\n|cff999999(执行命令: 团队, 小队)|r",
+   ["tips.format.far"] = "远距离阵型\n|cffffffff机器人在附近时可自由移动。\n离得太远时会返回你身边。|r\n\n|cffff0000左键点击选择|r\n|cff999999(执行: 团队, 小队)|r",
   ["tips.beast.master"] = "兽王控制\n|cffffffff此控制用于 Azerothcore 的 Mod-兽王。\nMod-兽王允许每个角色像猎人一样拥有宠物。\n你的角色可以从白牙那里学习必要的法术。\n白牙必须由游戏管理员放置在世界中。\n执行命令时显示命令的接收者。|r\n\n|cffff0000左键点击显示或隐藏选项|r\n|cff999999(执行命令: 系统)|r",
   ["tips.beast.release"] = "释放野兽\n|cffffffff此命令将释放野兽。|r\n\n|cffff0000左键点击释放野兽|r\n|cff999999(执行命令: 目标, 团队, 小队)|r",
   ["tips.beast.revive"] = "复活野兽\n|cffffffff此命令将复活野兽。|r\n\n|cffff0000左键点击复活野兽|r\n|cff999999(执行命令: 目标, 团队, 小队)|r",

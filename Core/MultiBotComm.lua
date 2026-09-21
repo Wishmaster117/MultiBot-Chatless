@@ -75,6 +75,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["CREATOR_INIT_AUTO_V1"] = "creatorInitAutoCapable",
   ["FLEE_ORDER_V1"] = "fleeOrderCapable",
   ["GROUP_ACTION_V1"] = "groupActionCapable",
+  ["FORMATION_V1"] = "formationCapable",
   ["RTSC_ORDER_V1"] = "rtscOrderCapable",
   ["QUEST_ACCEPT_ALL_V1"] = "questAcceptAllCapable",
   ["QUEST_TALK_V1"] = "questTalkCapable",
@@ -393,6 +394,7 @@ local function ensureBridgeState()
   state.creatorInitAutoCapable = state.creatorInitAutoCapable or false
   state.fleeOrderCapable = state.fleeOrderCapable or false
   state.groupActionCapable = state.groupActionCapable or false
+  state.formationCapable = state.formationCapable or false
   state.rtscOrderCapable = state.rtscOrderCapable or false
   state.questAcceptAllCapable = state.questAcceptAllCapable or false
   state.botMaintenanceCapable = state.botMaintenanceCapable or false
@@ -2148,6 +2150,7 @@ state.spellbookIgnoreCapable = false
     state.lootRuleItemCapable = false
     state.groupRollCapable = false
     state.groupActionCapable = false
+    state.formationCapable = false
     state.rtscOrderCapable = false
     state.questAcceptAllCapable = false
     state.enchantTradeCapable = false
@@ -4402,6 +4405,11 @@ function Comm.RunFormationCommand(scope, target, formation, callback)
     return false
   end
 
+  if state.formationCapable ~= true then
+    state.lastError = "FORMATION_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
   scope = string.upper(trim(scope or "GROUP"))
   target = trim(target or "")
   formation = string.lower(trim(formation or ""))
@@ -4415,6 +4423,7 @@ function Comm.RunFormationCommand(scope, target, formation, callback)
     circle = true,
     chaos = true,
     shield = true,
+    far = true,
   }
 
   if scope ~= "GROUP" or target ~= "" or not allowed[formation] then
@@ -4472,6 +4481,11 @@ function Comm.RequestFormations(callback)
   local state = ensureBridgeState()
 
   if not state.connected then
+    return false
+  end
+
+  if state.formationCapable ~= true then
+    state.lastError = "FORMATION_CAPABILITY_UNAVAILABLE"
     return false
   end
 
@@ -4615,6 +4629,75 @@ function Comm.ApplyFormationsEndPayload(payload)
   end
 
   return true
+end
+
+function Comm.HandleFormationProtocolError(requestType, token, reason, state)
+  state = state or ensureBridgeState()
+  requestType = string.upper(trim(requestType or ""))
+  token = trim(token or "")
+  reason = string.upper(trim(reason or ""))
+
+  if requestType == "FORMATION" then
+    local pending = state.formationCommands and state.formationCommands[token] or nil
+    if type(pending) ~= "table" then
+      return false
+    end
+
+    state.formationCommands[token] = nil
+    state.lastError = "FORMATION_" .. reason
+
+    local result = {
+      status = "error",
+      scope = "GROUP",
+      target = "",
+      token = token,
+      success = 0,
+      failure = 0,
+      formation = pending.formation or "",
+      reason = reason,
+    }
+
+    if type(pending.callback) == "function" then
+      pending.callback(result)
+    end
+
+    if MultiBot.OnFormationCommandApplied then
+      MultiBot.OnFormationCommandApplied(result)
+    end
+
+    return true
+  end
+
+  if requestType == "FORMATIONS" then
+    local active = state.formationQueryActive
+    if type(active) ~= "table" or active.token ~= token then
+      return false
+    end
+
+    state.formationQueryActive = nil
+    state.lastError = "FORMATIONS_" .. reason
+
+    local result = {
+      token = token,
+      status = "unavailable",
+      reason = reason,
+      expected = tonumber(active.expected or 0) or 0,
+      sent = #(active.items or {}),
+      items = active.items or {},
+    }
+
+    if type(active.callback) == "function" then
+      active.callback(result)
+    end
+
+    if MultiBot.OnFormationQueryCompleted then
+      MultiBot.OnFormationQueryCompleted(result)
+    end
+
+    return true
+  end
+
+  return false
 end
 
 function Comm.RequestOutfits(name)
@@ -7889,6 +7972,9 @@ function Comm.MarkDisconnected(reason)
   state.trainerCommands = {}
   state.formationCommands = {}
   state.formationQueryActive = nil
+  if type(MultiBot.InvalidateFormationUI) == "function" then
+    MultiBot.InvalidateFormationUI("bridge-disconnected")
+  end
   state.strategyMutationCapable = false
 state.selfStrategyCapable = false
 state.selfActionCapable = false
@@ -7913,6 +7999,7 @@ state.botMaintenanceCapable = false
   state.lootRuleItemCapable = false
   state.groupRollCapable = false
   state.groupActionCapable = false
+  state.formationCapable = false
   state.rtscOrderCapable = false
   state.questAcceptAllCapable = false
   state.enchantTradeCapable = false
@@ -10444,6 +10531,9 @@ local function finishCapabilityResolution(state, debugOpcode, payload)
   end
   if MultiBot.RefreshEnchantingEveryButtons then
     MultiBot.RefreshEnchantingEveryButtons()
+  end
+  if state.formationCapable == true and type(MultiBot.RefreshFormationAuthoritative) == "function" then
+    MultiBot.RefreshFormationAuthoritative(0)
   end
 end
 
@@ -13791,6 +13881,8 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
           return true
         elseif Comm.HandleBotMaintenanceProtocolError(requestType, token, reason, state) then
           return true
+        elseif Comm.HandleFormationProtocolError(requestType, token, reason, state) then
+          return true
         elseif Comm.HandleSelfActionProtocolError(requestType, token, reason, state) then
           return true
         elseif Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state) then
@@ -13896,6 +13988,7 @@ state.botMaintenanceCapable = false
   state.lootRuleItemCapable = false
   state.groupRollCapable = false
   state.groupActionCapable = false
+  state.formationCapable = false
   state.rtscOrderCapable = false
   state.questAcceptAllCapable = false
   state.enchantTradeCapable = false

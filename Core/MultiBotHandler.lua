@@ -1599,6 +1599,10 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 
 		if event ~= "PLAYER_ENTERING_WORLD" then
 			if event ~= "UNIT_PET" then
+				if MultiBot.InvalidateFormationUI then
+					MultiBot.InvalidateFormationUI("group-roster")
+				end
+
 				local function refreshGroupRosterIndexes()
 					local bridge = MultiBot and MultiBot.bridge
 					if bridge and bridge.connected == true
@@ -1612,10 +1616,16 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 					MultiBot.TimerAfter(0.8, function()
 						refreshGroupRosterIndexes()
 						ReconnectExistingGroupBots(event)
+						if MultiBot.RefreshFormationAuthoritative then
+							MultiBot.RefreshFormationAuthoritative(0.20)
+						end
 					end)
 				else
 					refreshGroupRosterIndexes()
 					ReconnectExistingGroupBots(event)
+					if MultiBot.RefreshFormationAuthoritative then
+						MultiBot.RefreshFormationAuthoritative(0)
+					end
 				end
 			end
 
