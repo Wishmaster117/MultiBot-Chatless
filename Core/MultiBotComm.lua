@@ -89,6 +89,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["HUNTER_PET_CONTROL_V1"] = "hunterPetControlCapable",
   ["HUNTER_PET_MANAGE_V1"] = "hunterPetManageCapable",
   ["HUNTER_PET_LIFECYCLE_V1"] = "hunterPetLifecycleCapable",
+  ["WARLOCK_STONE_STATE_V1"] = "warlockStoneStateCapable",
   [BOT_TARGET_RESOLVE_CAPABILITY] = "botTargetResolveCapable",
   ["SELF_BOT_V1"] = "selfBotCapable",
 }
@@ -126,7 +127,7 @@ local ENCHANT_TRADE_MAX_ACTIVE = 8
 local GROUP_ROLL_MAX_ITEM_LINK_LENGTH = 160
 local STATE_TIMEOUT_SECONDS = 5.0
 local STATES_TIMEOUT_SECONDS = 15.0
-local STRATEGY_MUTATION_TIMEOUT_SECONDS = 10.0
+local STRATEGY_MUTATION_TIMEOUT_SECONDS = 12.0
 Comm._GROUP_ORDER_TIMEOUT_SECONDS = 5.0
 Comm._GROUP_ORDER_MAX_ACTIVE = 8
 local SELF_STRATEGY_MUTATION_TIMEOUT_SECONDS = 10.0
@@ -420,6 +421,7 @@ local function ensureBridgeState()
   state.hunterPetControlCommands = type(state.hunterPetControlCommands) == "table" and state.hunterPetControlCommands or {}
   state.hunterPetManageCapable = state.hunterPetManageCapable or false
   state.hunterPetLifecycleCapable = state.hunterPetLifecycleCapable or false
+  state.warlockStoneStateCapable = state.warlockStoneStateCapable or false
   state.hunterPetManageSeq = tonumber(state.hunterPetManageSeq) or 0
   state.hunterPetManageCommands = type(state.hunterPetManageCommands) == "table" and state.hunterPetManageCommands or {}
   state.selfBotCapable = state.selfBotCapable or false
@@ -449,6 +451,8 @@ local function ensureBridgeState()
   state.selfActionSeq = state.selfActionSeq or 0
   state.selfActionCommands = state.selfActionCommands or {}
   state.weaponEnchantDebugSeq = state.weaponEnchantDebugSeq or 0
+  state.warlockStoneStateSeq = state.warlockStoneStateSeq or 0
+  state.warlockStoneStateRequests = type(state.warlockStoneStateRequests) == "table" and state.warlockStoneStateRequests or {}
   state.details = state.details or {}
   state.professions = state.professions or {}
   state.pvpStats = state.pvpStats or {}
@@ -2213,6 +2217,66 @@ function Comm.RequestWeaponEnchantDebug(name)
     state.lastError = "WEAPON_ENCHANT_SEND_FAILED"
     return false
   end
+
+  return token
+end
+
+function Comm.RequestWarlockStoneState(name, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "WARLOCK_STONE_STATE_NOT_CONNECTED"
+    return false
+  end
+  if state.warlockStoneStateCapable ~= true then
+    state.lastError = "WARLOCK_STONE_STATE_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  name = trim(name)
+  if name == "" or #name > 64 then
+    state.lastError = "WARLOCK_STONE_STATE_BAD_BOT_NAME"
+    return false
+  end
+  if countTableEntries(state.warlockStoneStateRequests) >= 8 then
+    state.lastError = "WARLOCK_STONE_STATE_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  state.warlockStoneStateSeq = (tonumber(state.warlockStoneStateSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-warlock-stone-" .. tostring(state.warlockStoneStateSeq)
+  state.warlockStoneStateRequests[token] = {
+    botName = name,
+    botNameKey = string.lower(name),
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  if not Comm.Send("GET", "WARLOCK_STONE_STATE~" .. urlEncodeField(name) .. "~" .. token) then
+    state.warlockStoneStateRequests[token] = nil
+    state.lastError = "WARLOCK_STONE_STATE_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(5.0, function()
+    local bridge = ensureBridgeState()
+    local pending = bridge.warlockStoneStateRequests[token]
+    if type(pending) ~= "table" then
+      return
+    end
+
+    bridge.warlockStoneStateRequests[token] = nil
+    bridge.lastError = "WARLOCK_STONE_STATE_TIMEOUT"
+    if type(pending.callback) == "function" then
+      pending.callback(false, {
+        token = token,
+        botName = pending.botName,
+        status = "TIMEOUT",
+        kind = "NONE",
+        enchantId = 0,
+        duration = 0,
+      })
+    end
+  end)
 
   return token
 end
@@ -11227,6 +11291,55 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
         offItem = offItem,
         offEnchant = offEnchant,
         offDuration = offDuration,
+      })
+    end
+
+    return true
+  end
+
+  if opcode == "WARLOCK_STONE_STATE" then
+    state.connected = true
+
+    local fields = splitFields(payload)
+    local token = trim(fields[1] or "")
+    local pending = isValidStateToken(token) and state.warlockStoneStateRequests[token] or nil
+    if #fields ~= 6 then
+      state.lastError = "WARLOCK_STONE_STATE_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local botName = urlDecodeFieldStrict(fields[2], 64, false)
+    local status = string.upper(trim(fields[3]))
+    local kind = string.upper(trim(fields[4]))
+    local enchantId = parseBoundedInteger(fields[5], 0, 4294967295)
+    local duration = parseBoundedInteger(fields[6], 0, 4294967295)
+
+    if not isValidStateToken(token)
+        or not botName
+        or (status ~= "OK" and status ~= "RATE_LIMIT" and status ~= "BOT_NOT_VISIBLE" and status ~= "FORBIDDEN")
+        or (kind ~= "NONE" and kind ~= "FIRESTONE" and kind ~= "SPELLSTONE" and kind ~= "OTHER")
+        or enchantId == nil
+        or duration == nil
+        or type(pending) ~= "table"
+        or pending.botNameKey ~= string.lower(botName)
+        or (status == "OK" and kind == "NONE" and enchantId ~= 0)
+        or (status == "OK" and kind ~= "NONE" and enchantId == 0) then
+      state.lastError = "WARLOCK_STONE_STATE_BAD_PAYLOAD"
+      return true
+    end
+
+    state.warlockStoneStateRequests[token] = nil
+    state.lastError = status == "OK" and nil or ("WARLOCK_STONE_STATE_" .. status)
+    debugPrint("ADDON:RX", "WARLOCK_STONE_STATE", payload or "")
+
+    if type(pending.callback) == "function" then
+      pending.callback(status == "OK", {
+        token = token,
+        botName = botName,
+        status = status,
+        kind = kind,
+        enchantId = enchantId,
+        duration = duration,
       })
     end
 

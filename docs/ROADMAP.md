@@ -1,7 +1,7 @@
 ﻿# Multibot Chatless + Bridge — Roadmap
 
 **Statut : active**
-**Dernière synchronisation : 19/09/2026**
+**Dernière synchronisation : 23/09/2026**
 
 Cette roadmap est la **source de vérité technique** du projet.
 Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontairement plus courts.
@@ -15,49 +15,44 @@ Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontaireme
 ```text
 Repo:   L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot
 Branch: feature/group-orders-chatless
-HEAD pré-commit documentation:
-        d593fdaf29b17f2fa6487cbc52e9993fd9e8451c
+HEAD:   36144e183686fa939f58f170a44bcfd21c198fac
 ```
 
-État fonctionnel audité au 19/09/2026 :
+État fonctionnel audité au 23/09/2026 :
 
 - Follow / Stay / Attack, Flee, Group Actions et RTSC livrés et runtime validés ;
 - lifecycle rosters, Raidus Safe Apply et bulk group lifecycle livrés ;
-- Creator `addclass` livré via `CREATOR_ADDCLASS_V1` ;
-- Creator `init=auto` livré via `CREATOR_INIT_AUTO_V1` pour TARGET/GROUP ;
-- Quest interactions structurées présentes via `QUEST_ACCEPT_ALL_V1`, `QUEST_TALK_V1`, `QUEST_GAMEOBJECT_USE_V1`, `QUEST_REWARD_V1` et `QUEST_REWARD_POLICY_V1` ;
-- correctif GameObject search structured-only/loading-gate inclus dans le HEAD Addon ;
-- Autogear options livré via `AUTOGEAR_OPTIONS_V1` : lifecycle silencieux, 8 locales × 49 clés, UI AceGUI et deferred-open runtime validés ;
-- Hunter Pet H1/H2/H3 livré et runtime validé via `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` et `HUNTER_PET_LIFECYCLE_V1` ;
-- Hunter Quick final : `UI\MultiBotHunterQuickFrame.lua` `6614C804A4238B6882233E3A212C6CF0BEC19777DB1FC6260375583AC88EF9D9`, zéro `SendChatMessage`, huit locales H3b validées ;
-- Spellbook Cast / Ignore livré et runtime validé via `SPELLBOOK_CAST_V1` et `SPELLBOOK_IGNORE_V1` ;
-- Spellbook Ignore : feedback succès 8 locales, filtre `Ignorés (N)` / `Tous les sorts`, pagination filtrée et état autoritaire Bridge ;
-- `Features\MultiBotAutogear.lua` final runtime validé : `1843AF73ADFBD2C527E8CE50BA7C127541090E9A56ACB36473404DB3EB74BEAB` ;
-- `Core\MultiBotComm.lua` working tree pré-commit : `B5DA10182B40CC9100499C7EB8BE7136D8A08788D8E92C601DC42DB89C3A502D` ;
-- `UI\MultiBotSpell.lua` working tree pré-commit : `F69C69FE0F2F6B0D2CFBEB404B54548AFAC2697FFCA3A21BE33A38C826F9B60E` ;
-- `UI\MultiBotSpellBookFrame.lua` working tree pré-commit : `F86CD2B3ECECBAC0A48BDF98CDAFD9A3FE5096BED554BAD06E337FB4E53CFBA1` ;
-- ordre restant : reliquats techniques explicitement différés, puis cleanup final global legacy.
+- Creator `addclass` et `init=auto` livrés via leurs endpoints spécialisés ;
+- Quest interactions structurées, Autogear, Maintenance M1/M2, Hunter Pet H1/H2/H3 et Spellbook Cast / Ignore clôturés ;
+- Trainer T1/T2 clôturé : timeout 8 s, corrélation stricte des tokens, drainage `DISCONNECTED` et `Tout apprendre` transitif borné ;
+- Outfit L1/E1/E2 clôturé : lifecycle déterministe, résultat equip/replace, framing borné et libellé delete i18n validés ;
+- compatibilité Rogue Strategy Rename clôturée sans fusionner les contrôles Dps Assist / Aoe / Tank Assist ;
+- Formation F1–F6 clôturée via `FORMATION_V1`, y compris UI autoritaire, protections rate-limit/replay et exposition `far` ;
+- Craft normal C1 clôturé avec idempotence/anti-rejeu Bridge et tests normal/répété/target/rapid-click ;
+- Warlock Firestone/Spellstone clôturé via `WARLOCK_STONE_STATE_V1` : état physique autoritaire, icônes authentiques, OFF physique, application silencieuse et message système ;
+- `Core\MultiBotComm.lua` working tree final : `8fda18a57270188676993850d0052d565b211144754fe994caf0d6e304603252` ;
+- `Strategies\MultiBotWarlock.lua` working tree final : `e1cdf413e01ba49824bf277f76d4b254669f18b7a0cfcf072df4abdf7199cc1f` ;
+- ordre restant : reliquats techniques explicitement différés, puis audit global des chemins chat et cleanup legacy final.
 
 ### Bridge
 
 ```text
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge
 Branch: feature/group-orders-chatless
-HEAD pré-commit documentation:
-        ceb463d3ce86d065bdcd7b6c1b69c9aa756cbda0
+HEAD:   49f8d9f7af64f33af43f8d0cab73515515e0cca9
 ```
 
-État fonctionnel audité au 19/09/2026 :
+État fonctionnel audité au 23/09/2026 :
 
 - endpoints group/lifecycle et ordres collectifs précédemment validés conservés ;
-- `CREATOR_ADDCLASS_V1` et `CREATOR_INIT_AUTO_V1` présents comme adaptateurs spécialisés ;
-- les cinq capacités Quest structurées sont livrées côté Bridge ;
-- `AUTOGEAR_OPTIONS_V1` fournit limites serveur et workflow `INFO/PLAN/APPLY` avec revalidation serveur ;
-- Hunter Pet H1/H2/H3 livré côté Bridge via les trois capacités dédiées, avec `DISMISS` temporaire (`PET_SAVE_AS_CURRENT`), `CALL` via le sort 883 et `ABANDON` destructif séparé ;
-- `SPELLBOOK_CAST_V1` et `SPELLBOOK_IGNORE_V1` livrés via des endpoints spécialisés, sans exécuteur Playerbots générique ;
-- Cast utilise le `spellId` structuré et Ignore/Allow ne passe plus par le chemin chat `ss +/-` ;
+- `CREATOR_ADDCLASS_V1`, `CREATOR_INIT_AUTO_V1`, les cinq capacités Quest, `AUTOGEAR_OPTIONS_V1`, `BOT_MAINTENANCE_V1`, Hunter Pet H1/H2/H3 et Spellbook Cast / Ignore restent validés ;
+- Trainer T2 conserve son `Tout apprendre` transitif borné ; son hardening rate-limit/anti-rejeu spécifique reste différé ;
+- Outfit L1/E1/E2 est clôturé ; ses hardenings secondaires restent explicitement différés ;
+- `FORMATION_V1` couvre le lifecycle Formation F1–F6 validé ;
+- Craft normal C1 applique un rate-limit indépendant de 4 requêtes / 2 s et une protection replay TTL 10 s, 32 tokens, 512 requesters ;
+- `WARLOCK_STONE_STATE_V1` fournit l'état physique autoritaire Firestone/Spellstone et le chemin spécialisé d'application silencieuse, sans modifier Playerbots ;
 - aucun exécuteur Playerbots générique n'a été ajouté ;
-- `src\MultiBotBridge.cpp` working tree pré-commit : `64627A37BF000704078966728487A0C1BDBA69A1427231B9C99B34C079ED2F0D`.
+- `src\MultiBotBridge.cpp` working tree final : `930e3509cf4426e5113d45f6c5e40b1cc85fcd820ab0bd3b6fa6f8a8bf0cd670`.
 
 ### Playerbots
 
@@ -65,11 +60,11 @@ HEAD pré-commit documentation:
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-playerbots
 Remote: https://github.com/mod-playerbots/mod-playerbots
 Branch: master
-HEAD:   b6696bdbd3740e575598d167d69f39f68cc0b907
+HEAD:   7bae1b5c58c76a0aa20381155edc08096d1485b2
 Mode:   STRICT READ ONLY
 ```
 
-**Règle absolue :** aucune modification de `mod-playerbots` dans ce projet. Pour compiler le Bridge, utiliser la révision courante de `master` du dépôt officiel `mod-playerbots/mod-playerbots`; le SHA ci-dessus est la révision validée le 18/09/2026.
+**Règle absolue :** aucune modification de `mod-playerbots` dans ce projet. Pour compiler le Bridge, utiliser la révision courante de `master` du dépôt officiel `mod-playerbots/mod-playerbots`; le SHA ci-dessus est la révision validée le 23/09/2026.
 
 ### Architecture
 
@@ -1275,29 +1270,15 @@ dans les slots de sacs équipés
 
 Audit/implémentation bridge-first dédié à reprendre plus tard.
 
-### Firestone / Spellstone
-
-Faire la revalidation réelle finale du comportement :
-
-```text
-TEMP_ENCHANTMENT_SLOT
-```
-
-Le diagnostic et le code de support existants ne suffisent pas à déclarer ce point définitivement fermé.
-
-### LuaLint Warlock
-
-Quatre warnings historiques restent à nettoyer après les chantiers fonctionnels prioritaires.
-
 ---
 
-## 9. Reliquats techniques à auditer
+## 9. Clôtures techniques récentes et hardening différé
 
-Ces points sont enregistrés mais ne sont pas le prochain chantier fonctionnel.
+Les chantiers lifecycle/idempotence qui étaient encore ouverts au 19/09 sont désormais clôturés. Les éléments listés comme différés ci-dessous restent volontairement hors du prochain lot fonctionnel.
 
 ### Lifecycle Trainer — terminé (20/09/2026)
 
-Le lifecycle Trainer est désormais borné et déterministe :
+Le lifecycle Trainer est borné et déterministe :
 
 - timeout de 8 s pour la liste et l'apprentissage ;
 - résultat `DISCONNECTED` déterministe et drainage des transactions en cours ;
@@ -1312,23 +1293,54 @@ Hardening Trainer volontairement différé :
 - rate-limit / protection anti-rejeu spécifique aux endpoints Trainer ;
 - revue de parité avec `PlayerbotFactory::IsTrainerSpellAllowedForBot()`.
 
-### Lifecycle Outfit
+### Lifecycle Outfit — terminé et archivé (20/09/2026)
 
-Le verrou UI / pending doit être audité afin qu'une déconnexion ne laisse pas `commandBusy` bloqué.
+La clôture Outfit couvre :
 
-### Lifecycle Formation
+- L1 lifecycle déterministe avec tokens/timeouts, corrélation stricte et drainage sur disconnect ;
+- E1 traitement du résultat equip/replace ;
+- E2 transport framed borné à 255 octets ;
+- libellé delete i18n validé ;
+- tests runtime passés et checkpoint final archivé ;
+- Playerbots inchangé/read-only.
 
-Les callbacks/pending doivent être drainés de façon déterministe lors des transitions/disconnects.
+Hardening Outfit volontairement différé :
 
-### Craft normal — idempotence / anti-rejeu
+- gestion renforcée des doublons ring/trinket ;
+- rate-limit / anti-rejeu dédié ;
+- contrôle d'autorisation plus strict ;
+- noms contenant des séparateurs ;
+- cleanup global du fallback chat legacy ;
+- diagnostic du malformed packet WorldSocket hors de ce chantier.
 
-Le chemin `PROFESSION_RECIPE_CRAFT` doit être comparé aux protections de `CRAFT_RECIPE_TARGET_V1` :
+### Rogue Strategy Rename Compatibility — terminé (20/09/2026)
 
-- rate limit ;
-- replay token ;
-- retry ambigu ;
-- résultat perdu ;
-- risque de double craft.
+La divergence entre les noms de stratégie Rogue a été corrigée : l'Addon conserve son alias/UI sans confondre les contrôles Dps Assist / Aoe / Tank Assist, tandis que le Bridge adapte les spécialisations Rogue vers les stratégies Playerbots attendues (`combat` / `assassin`). Les commits Addon/Bridge ont été poussés et synchronisés.
+
+### Lifecycle Formation F1–F6 — terminé et archivé (21/09/2026)
+
+La clôture Formation comprend :
+
+- F1 idempotence ;
+- F2 capability `FORMATION_V1` ;
+- F3 UI autoritaire ;
+- F4 rate-limit / replay ;
+- F5 héritage de l'état désiré et stabilité de l'icône ;
+- F6 exposition de `far`, avec l'icône `Spell_Nature_FarSight` et `AiPlayerbot.FarDistance=20.0` ;
+- compilation/runtime validés ;
+- Playerbots inchangé/read-only.
+
+### Craft normal C1 — terminé et archivé (22/09/2026)
+
+Le chemin `PROFESSION_RECIPE_CRAFT` possède désormais son propre hardening Bridge :
+
+- rate-limit indépendant : 4 requêtes / 2 s ;
+- replay TTL : 10 s ;
+- 32 tokens conservés ;
+- 512 requesters maximum ;
+- état indépendant de `CRAFT_RECIPE_TARGET_V1` ;
+- tests runtime normal, répété, target et rapid-click validés ;
+- Playerbots inchangé/read-only.
 
 ---
 
@@ -1379,15 +1391,16 @@ Cette décision évite de casser prématurément les rosters, EveryBar, AutoInvi
 
 ### Familles actives à reprendre
 
-Ordre courant après clôture Maintenance + Hunter Pet H1/H2/H3 puis Spellbook Cast / Ignore du 19/09/2026 :
+Ordre courant après les clôtures Trainer, Outfit, Rogue compatibility, Formation F1–F6, Craft C1 et Warlock du 20–23/09/2026 :
 
 ```text
 1. reliquats techniques explicitement différés selon priorité
-2. final legacy parser/fallback cleanup
+2. audit global actualisé des chemins chat encore actifs
+3. final legacy parser/fallback cleanup
    including Units / lifecycle legacy cleanup
 ```
 
-Maintenance, interactions Quest, Autogear, Hunter Pet H1/H2/H3 et Spellbook Cast / Ignore sont clôturés dans la baseline courante ; ne pas les remettre dans la file active sans nouvel audit ciblé.
+Maintenance, interactions Quest, Autogear, Hunter Pet H1/H2/H3, Spellbook Cast / Ignore, Trainer, Outfit, Rogue compatibility, Formation F1–F6, Craft C1 et Warlock Firestone/Spellstone sont clôturés dans la baseline courante ; ne pas les remettre dans la file active sans nouvel audit ciblé.
 
 ### Classification finale attendue
 
@@ -1516,10 +1529,16 @@ Repères principaux conservés :
 - audit final Hunter Pet `E4CFFD...EE26` OK et checkpoint `1DFB0380...D4FD` vérifié 146/146 ;
 - Maintenance clôturée ; Hunter Pet H1/H2/H3 clôturé, compilé lorsque requis et runtime validé le 18/09/2026 ;
 - Spellbook Cast / Ignore clôturé et runtime validé le 19/09/2026 via `SPELLBOOK_CAST_V1` et `SPELLBOOK_IGNORE_V1`, avec feedback 8 locales, filtre ignorés et zéro fallback `ss +/-` ;
-- ordre restant : reliquats techniques différés, puis cleanup final global legacy ;
-- HEAD Addon pré-commit documentation du 19/09/2026 : `d593fdaf29b17f2fa6487cbc52e9993fd9e8451c` ;
-- HEAD Bridge pré-commit documentation du 19/09/2026 : `ceb463d3ce86d065bdcd7b6c1b69c9aa756cbda0` ;
-- Playerbots officiel `master` `b6696bdbd3740e575598d167d69f39f68cc0b907` resté strictement read-only.
+- Trainer T1/T2 clôturé le 20/09/2026 : lifecycle 8 s, drainage `DISCONNECTED`, corrélation stricte des tokens et `Tout apprendre` transitif borné ; hardening rate-limit/anti-rejeu et parité trainer-policy différés ;
+- Outfit L1/E1/E2 clôturé et archivé le 20/09/2026 ; lifecycle, equip/replace, framing <=255 octets et i18n delete validés ;
+- Rogue Strategy Rename Compatibility clôturée le 20/09/2026, avec adaptation `combat` / `assassin` et contrôles Dps Assist / Aoe / Tank Assist préservés ;
+- Formation F1–F6 clôturée et archivée le 21/09/2026 via `FORMATION_V1`, avec idempotence, UI autoritaire, rate-limit/replay, stabilité d'état/icône et `far` validés ;
+- Craft normal C1 clôturé et archivé le 22/09/2026 : 4 requêtes / 2 s, replay TTL 10 s, 32 tokens, 512 requesters ; tests normal/répété/target/rapid-click validés ;
+- Warlock Firestone/Spellstone clôturé et archivé le 23/09/2026 via `WARLOCK_STONE_STATE_V1` : H1/H1b/H1c/H2/W3 validés, icônes authentiques, OFF physique, application silencieuse et message système ; Playerbots inchangé ;
+- ordre restant : reliquats techniques différés, audit global actualisé des chemins chat, puis cleanup legacy final ;
+- HEAD Addon courant au 23/09/2026 : `36144e183686fa939f58f170a44bcfd21c198fac` ;
+- HEAD Bridge courant au 23/09/2026 : `49f8d9f7af64f33af43f8d0cab73515515e0cca9` ;
+- Playerbots officiel `master` `7bae1b5c58c76a0aa20381155edc08096d1485b2` resté strictement read-only.
 
 Les détails de branches anciennes ne doivent plus être présentés comme état courant dans les README.
 
@@ -1531,6 +1550,8 @@ Cette section conserve uniquement les preuves structurantes utiles à la reprise
 
 | Référence | SHA-256 | Portée |
 | --- | --- | --- |
+| `audit-multibot-warlock-final-global-v1-2026-09-23-191459.zip` | `4B1D1E59982469F3D444FC1D93F0018AC82B81AFBA07494E27BF57AC138427B1` | Audit global final Warlock : hashes finaux exacts, W3/silent-use/system-ACK/H2/H1-H1c conservés, build/runtime worldserver identiques, Playerbots clean/read-only, zéro warning. |
+| `checkpoint-multibot-warlock-final-v1-2026-09-23-191826.zip` | `78994886DBDB07A22E67AF3F8099B6A94FF034D9F20F4DA7D8226A5DAFF28CBD` | Checkpoint définitif Warlock : manifest 50 entrées vérifié, audits/packages/snapshots archivés, `WARLOCK_CHANTIER_STATUS=CLOSED`, aucun write Playerbots. |
 | `audit-multibot-hunter-pet-h1-h2-h3-final-v1-2026-09-18-192853.zip` | `E4CFFD5763DA3C821830F188C9154E92B952C1AA96FCFC9CD99769300426EE26` | Audit final Hunter Pet H1/H2/H3 : trois capabilities validées, 199 locals Comm, zéro `SendChatMessage` Hunter Quick, 8 locales, H3 compile/runtime validé, 57 hashes Playerbots clean/read-only. |
 | `checkpoint-multibot-hunter-pet-h1-h2-h3-v1-2026-09-18-193155.zip` | `1DFB038072ED1DC75C97334EF666162C14B526185DC52CADCFD49D7D1664D4FD` | Checkpoint final Hunter Pet : manifest 146/146 vérifié, 8 packages réussis, 6 rapports apply copiés ; `OK_WITH_WARNINGS` uniquement pour 2 rapports historiques absents. |
 | `audit-multibot-autogear-ui-deferred-open-final-v1-2026-09-17-190701.zip` | `EA5F49B9ABFE74501D825704B16510F9B24AB6D879F043A1F44D43D24C00D0B9` | Audit final UI Autogear + deferred-open : chaîne UI/hotfix cohérente, guards i18n/wire/PLAN-APPLY/AceGUI conservés, runtime `Viz`/`Heal` validé, 112 hashes protégés, Playerbots clean/read-only. |

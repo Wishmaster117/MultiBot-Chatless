@@ -67,6 +67,7 @@ The project is currently **bridge-first / mostly chatless** rather than fully ch
 | **Creator AddClass** | `CREATOR_ADDCLASS_V1` routes class/gender bot selection through the Bridge. Random, Male, Female and Death Knight paths are runtime validated; existing auto-group and roster refresh behavior is preserved. |
 | **Creator Auto Init** | `CREATOR_INIT_AUTO_V1` routes target and group `init=auto` through the Bridge, which reuses Playerbots authorization and initialization rules instead of accepting a raw command string. |
 | **Bot state & strategies** | Framed bot-state reads and structured strategy mutations for migrated controls, including Warlock selectors. |
+| **Warlock stones** | `WARLOCK_STONE_STATE_V1` keeps Firestone/Spellstone state authoritative, supports create/apply when needed, uses authentic item icons, physically clears known Warlock temporary enchants on OFF, preserves foreign temporary enchants and confirms successful actions through a system message. |
 | **Inventory** | Bag-aware exact inventory for Backpack, Bag 1..4 and Keyring, including empty slots and container filtering. |
 | **Item movement** | Whole-stack drag/drop between supported physical inventory slots through the Bridge. |
 | **Equipment** | Structured equip and unequip workflows with authoritative refresh. |
@@ -383,6 +384,32 @@ Runtime validation covered cast, ignore, allow, filtered removal, the empty filt
 
 ---
 
+# Recent Milestone — Warlock Firestone / Spellstone Finalization
+
+The Warlock stone lifecycle was completed and runtime validated on **23 September 2026** through the dedicated capability:
+
+```text
+WARLOCK_STONE_STATE_V1
+```
+
+The Addon keeps the desired strategy and the physical main-hand temporary enchant as separate authoritative states. The Bridge reports `NONE`, `FIRESTONE`, `SPELLSTONE` or `OTHER`, and the UI refreshes from that server state instead of assuming that a strategy mutation already means the enchant is present.
+
+Missing stones can be created and then applied through the existing bounded lifecycle. Apply and create phases keep their separate time budgets, and the final ACK is emitted only after the expected physical enchant is observed. Canonical Firestone/Spellstone enchant IDs are derived from the audited item templates rather than a hardcoded two-ID shortcut.
+
+The final UI uses the real item icons for Firestone and Spellstone, with the historical textures retained only as fallbacks. Toggling the active stone OFF physically removes only a recognized Warlock `TEMP_ENCHANTMENT_SLOT`; an unrelated temporary enchant is left untouched.
+
+Stone application no longer routes through Playerbots' generic `UseSpellItemAction` chat feedback path. The Bridge submits the validated item-use packet directly for this specialized case, while the Addon emits a concise system confirmation after success:
+
+```text
+[MultiBot] <bot>: Firestone OK
+[MultiBot] <bot>: Spellstone OK
+[MultiBot] <bot>: Stones OFF OK
+```
+
+Runtime validation covered both switch directions, physical OFF for both stones, missing-stone creation/application, authentic icons, authoritative ACK timing and absence of the previous `Using [Grand Firestone/Spellstone]` chat message. `mod-playerbots` remained strictly read-only.
+
+---
+
 # Bridge Capabilities
 
 The addon negotiates feature capabilities with the Bridge before using newer paths.
@@ -392,6 +419,7 @@ Important current capabilities include:
 ```text
 STATE_FRAMING_V1
 STRATEGY_MUTATION_V1
+WARLOCK_STONE_STATE_V1
 OUTFIT_V1
 INVENTORY_V1
 INVENTORY_EXACT_V1
@@ -408,6 +436,7 @@ ITEM_DEPOSIT_EXACT_V1
 GROUP_ROLL_V1
 ENCHANT_TRADE_V1
 CRAFT_RECIPE_TARGET_V1
+FORMATION_V1
 QUEST_ABANDON_V1
 LOOT_RULE_ITEM_V1
 TALENT_APPLY_V1
@@ -420,6 +449,7 @@ BOT_LIFECYCLE_V1
 BOT_TARGET_RESOLVE_V1
 BOT_GROUP_REMOVE_V1
 BOT_GROUP_LIFECYCLE_V1
+BOT_MAINTENANCE_V1
 CREATOR_ADDCLASS_V1
 CREATOR_INIT_AUTO_V1
 FOLLOW_ORDER_V1
@@ -504,7 +534,7 @@ Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or expli
 
 Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Creator `init=auto` is also structured through `CREATOR_INIT_AUTO_V1` for bounded target/group initialization. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
 
-The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is present through the five `QUEST_*` capabilities, **Autogear** is completed through `AUTOGEAR_OPTIONS_V1`, **Hunter Pet H1/H2/H3** is completed through `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` and `HUNTER_PET_LIFECYCLE_V1`, and **Spellbook Cast / Ignore** is completed through `SPELLBOOK_CAST_V1` and `SPELLBOOK_IGNORE_V1`. The next active work is the explicitly deferred technical residuals, followed by the final legacy parser/fallback cleanup.
+The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is present through the five `QUEST_*` capabilities, **Autogear** is completed through `AUTOGEAR_OPTIONS_V1`, **Maintenance M1/M2** is completed through `BOT_MAINTENANCE_V1`, **Hunter Pet H1/H2/H3** is completed through `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` and `HUNTER_PET_LIFECYCLE_V1`, and **Spellbook Cast / Ignore** is completed through `SPELLBOOK_CAST_V1` and `SPELLBOOK_IGNORE_V1`. Trainer lifecycle, Outfit lifecycle, Rogue strategy-name compatibility, Formation F1–F6 and normal Craft C1 hardening are also closed. Warlock Firestone/Spellstone is finalized through `WARLOCK_STONE_STATE_V1`, including authoritative physical enchant state, silent application and physical OFF. The remaining active work is the explicitly deferred technical residuals followed by the final global legacy parser/fallback and chat-path cleanup.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 
@@ -529,8 +559,6 @@ The active roadmap currently keeps these items outside the next normal feature b
 - dedicated localized `SOURCE_STALE` UI text;
 - moving/re-equipping the equipped bag objects themselves (`BAG_MOVE`);
 - `SELL_GREY` follow-up;
-- final real Firestone/Spellstone `TEMP_ENCHANTMENT_SLOT` revalidation;
-- remaining Warlock LuaLint warnings;
 - selected lifecycle/idempotence hardening for older pending-command flows.
 
 ---
