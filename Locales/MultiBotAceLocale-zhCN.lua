@@ -1440,6 +1440,61 @@ local zhCNValues = {
   ["autogear.reason.BAD_RESPONSE"] = "服务器响应无效。",
   ["autogear.reason.SEND_FAILED"] = "无法发送请求。",
   -- MB_AUTOGEAR_OPTIONS_I18N_V1_END
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_BEGIN
+  ["w3a.feedback.follow"] = "[MultiBot] 跟随：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.stay"] = "[MultiBot] 停留：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.release"] = "[MultiBot] 释放灵魂：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.revive"] = "[MultiBot] 复活：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.summon"] = "[MultiBot] 召唤：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.rtsc_enable"] = "[MultiBot] RTSC 已启用：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.rtsc_reset"] = "[MultiBot] RTSC 已重置：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.rti"] = "[MultiBot] RTI：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.combat"] = "[MultiBot] 战斗：%d/%d 个机器人已处理%s。",
+  ["w3a.feedback.reason.PARTIAL"] = "（部分成功）",
+  ["w3a.feedback.reason.FAILED"] = "（失败）",
+  ["w3a.feedback.reason.BOT_LIMIT"] = "（已达到机器人数量限制）",
+  ["w3a.flee.names"] = "[MultiBot] 撤退：%s",
+  ["w3a.flee.audience.names"] = "[MultiBot] 撤退 [%s]：%s",
+  ["w3a.flee.audience.count"] = "[MultiBot] 撤退 [%s]：%d/%d 个机器人",
+  ["w3a.flee.audience.all"] = "全部",
+  ["w3a.flee.audience.tank"] = "坦克",
+  ["w3a.flee.audience.healer"] = "治疗",
+  ["w3a.flee.audience.dps"] = "DPS",
+  ["w3a.flee.audience.melee"] = "近战",
+  ["w3a.flee.audience.ranged"] = "远程",
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_END
+
+  -- MB_SELL_ALL_BOTS_I18N_V1_BEGIN
+  ["sell.all.success"] = "[MultiBot] 出售：%d/%d 个机器人，共售出 %d 件灰色物品。",
+  ["sell.all.none"] = "[MultiBot] 出售：%d 个机器人都没有可出售的灰色物品。",
+  ["sell.all.partial"] = "[MultiBot] 出售：%d/%d 个机器人，共售出 %d 件物品；%d 个无可售物品；%d 个失败。",
+  ["sell.all.failed"] = "[MultiBot] 出售：%d/%d 个机器人失败。",
+  ["sell.all.busy"] = "[MultiBot] 出售：批量出售已在进行中。",
+  -- MB_SELL_ALL_BOTS_I18N_V1_END
+
+-- MB_GLYPH_EQUIP_V1_BEGIN
+  ["talent.glyphs.feedback.success"] = "[MultiBot] 已为 %s 应用雕文：%s",
+  ["talent.glyphs.feedback.error"] = "[MultiBot] %s 的雕文：%s",
+  ["talent.glyphs.feedback.item_fallback"] = "物品 #%d",
+  ["talent.glyphs.feedback.none"] = "无",
+  ["talent.glyphs.feedback.reason.BAD_REQUEST"] = "无效的雕文请求。",
+  ["talent.glyphs.feedback.reason.CAPABILITY_UNAVAILABLE"] = "Bridge 雕文装备功能不可用。",
+  ["talent.glyphs.feedback.reason.RATE_LIMIT"] = "雕文请求过多。",
+  ["talent.glyphs.feedback.reason.SEND_FAILED"] = "无法发送雕文请求。",
+  ["talent.glyphs.feedback.reason.TIMEOUT"] = "雕文请求超时。",
+  ["talent.glyphs.feedback.reason.DISCONNECTED"] = "雕文请求完成前 Bridge 已断开连接。",
+  ["talent.glyphs.feedback.reason.BAD_RESPONSE"] = "Bridge 返回了无效响应。",
+  ["talent.glyphs.feedback.reason.BAD_GLYPH"] = "一个或多个所选雕文无效，或存在空槽位。",
+  ["talent.glyphs.feedback.reason.WRONG_CLASS"] = "一个或多个所选雕文不适用于该机器人的职业。",
+  ["talent.glyphs.feedback.reason.SOCKET_MISMATCH"] = "所选大型/小型雕文与可用槽位不匹配。",
+  ["talent.glyphs.feedback.reason.NO_BOT"] = "未找到机器人。",
+  ["talent.glyphs.feedback.reason.BOT_UNAVAILABLE"] = "机器人不可用。",
+  ["talent.glyphs.feedback.reason.NO_AI"] = "机器人 AI 不可用。",
+  ["talent.glyphs.feedback.reason.FORBIDDEN"] = "你无权控制该机器人。",
+  ["talent.glyphs.feedback.reason.DUPLICATE"] = "重复的雕文请求。",
+  ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "机器人雕文状态不可用。",
+  ["talent.glyphs.feedback.reason.FAILED"] = "无法应用雕文。",
+-- MB_GLYPH_EQUIP_V1_END
 }
 
 register("zhCN", zhCNValues)

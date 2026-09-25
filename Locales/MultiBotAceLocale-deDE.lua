@@ -1442,6 +1442,61 @@ local deDEValues = {
   ["autogear.reason.BAD_RESPONSE"] = "Ungültige Serverantwort.",
   ["autogear.reason.SEND_FAILED"] = "Anfrage konnte nicht gesendet werden.",
   -- MB_AUTOGEAR_OPTIONS_I18N_V1_END
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_BEGIN
+  ["w3a.feedback.follow"] = "[MultiBot] Folgen: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.stay"] = "[MultiBot] Bleiben: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.release"] = "[MultiBot] Geist freigeben: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.revive"] = "[MultiBot] Wiederbeleben: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.summon"] = "[MultiBot] Beschwören: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.rtsc_enable"] = "[MultiBot] RTSC aktiviert: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.rtsc_reset"] = "[MultiBot] RTSC zurückgesetzt: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.rti"] = "[MultiBot] RTI: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.combat"] = "[MultiBot] Kampf: %d/%d Bot(s) berücksichtigt%s.",
+  ["w3a.feedback.reason.PARTIAL"] = " (teilweise)",
+  ["w3a.feedback.reason.FAILED"] = " (fehlgeschlagen)",
+  ["w3a.feedback.reason.BOT_LIMIT"] = " (Bot-Limit erreicht)",
+  ["w3a.flee.names"] = "[MultiBot] Flucht: %s",
+  ["w3a.flee.audience.names"] = "[MultiBot] Flucht [%s]: %s",
+  ["w3a.flee.audience.count"] = "[MultiBot] Flucht [%s]: %d/%d Bot(s)",
+  ["w3a.flee.audience.all"] = "ALLE",
+  ["w3a.flee.audience.tank"] = "TANK",
+  ["w3a.flee.audience.healer"] = "HEILER",
+  ["w3a.flee.audience.dps"] = "DPS",
+  ["w3a.flee.audience.melee"] = "NAHKAMPF",
+  ["w3a.flee.audience.ranged"] = "FERNKAMPF",
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_END
+
+  -- MB_SELL_ALL_BOTS_I18N_V1_BEGIN
+  ["sell.all.success"] = "[MultiBot] Verkauf: %d/%d Bot(s), %d graue Gegenstände verkauft.",
+  ["sell.all.none"] = "[MultiBot] Verkauf: keine grauen Gegenstände bei %d Bot(s) zu verkaufen.",
+  ["sell.all.partial"] = "[MultiBot] Verkauf: %d/%d Bot(s), %d Gegenstände verkauft; %d ohne verkaufbare Gegenstände; %d fehlgeschlagen.",
+  ["sell.all.failed"] = "[MultiBot] Verkauf: bei %d/%d Bot(s) fehlgeschlagen.",
+  ["sell.all.busy"] = "[MultiBot] Verkauf: ein Gruppenverkauf läuft bereits.",
+  -- MB_SELL_ALL_BOTS_I18N_V1_END
+
+-- MB_GLYPH_EQUIP_V1_BEGIN
+  ["talent.glyphs.feedback.success"] = "[MultiBot] Glyphen auf %s angewendet: %s",
+  ["talent.glyphs.feedback.error"] = "[MultiBot] Glyphen für %s: %s",
+  ["talent.glyphs.feedback.item_fallback"] = "Gegenstand #%d",
+  ["talent.glyphs.feedback.none"] = "keine",
+  ["talent.glyphs.feedback.reason.BAD_REQUEST"] = "Ungültige Glyphenanfrage.",
+  ["talent.glyphs.feedback.reason.CAPABILITY_UNAVAILABLE"] = "Die Glyphen-Ausrüstungsfunktion der Bridge ist nicht verfügbar.",
+  ["talent.glyphs.feedback.reason.RATE_LIMIT"] = "Zu viele Glyphenanfragen.",
+  ["talent.glyphs.feedback.reason.SEND_FAILED"] = "Die Glyphenanfrage konnte nicht gesendet werden.",
+  ["talent.glyphs.feedback.reason.TIMEOUT"] = "Zeitüberschreitung bei der Glyphenanfrage.",
+  ["talent.glyphs.feedback.reason.DISCONNECTED"] = "Die Bridge wurde getrennt, bevor die Glyphenanfrage abgeschlossen war.",
+  ["talent.glyphs.feedback.reason.BAD_RESPONSE"] = "Ungültige Antwort der Bridge.",
+  ["talent.glyphs.feedback.reason.BAD_GLYPH"] = "Eine oder mehrere ausgewählte Glyphen sind ungültig oder ein Platz ist leer.",
+  ["talent.glyphs.feedback.reason.WRONG_CLASS"] = "Eine oder mehrere Glyphen können von der Klasse dieses Bots nicht verwendet werden.",
+  ["talent.glyphs.feedback.reason.SOCKET_MISMATCH"] = "Die ausgewählten großen/kleinen Glyphen passen nicht in die verfügbaren Plätze.",
+  ["talent.glyphs.feedback.reason.NO_BOT"] = "Bot nicht gefunden.",
+  ["talent.glyphs.feedback.reason.BOT_UNAVAILABLE"] = "Der Bot ist nicht verfügbar.",
+  ["talent.glyphs.feedback.reason.NO_AI"] = "Die Bot-KI ist nicht verfügbar.",
+  ["talent.glyphs.feedback.reason.FORBIDDEN"] = "Du darfst diesen Bot nicht steuern.",
+  ["talent.glyphs.feedback.reason.DUPLICATE"] = "Doppelte Glyphenanfrage.",
+  ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "Der Glyphenstatus des Bots ist nicht verfügbar.",
+  ["talent.glyphs.feedback.reason.FAILED"] = "Die Glyphen konnten nicht angewendet werden.",
+-- MB_GLYPH_EQUIP_V1_END
 }
 
 register("deDE", deDEValues)

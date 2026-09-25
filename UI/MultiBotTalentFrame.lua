@@ -1377,11 +1377,9 @@ function MultiBot.InitializeTalentFrameModule()
             local socket = MultiBot.talent.getGlyphSocket(socketIndex)
             ids[wireSlot] = tonumber(socket and (socket.item or socket.itemID or socket.glyphID)) or 0
         end
-        local payload = "glyph equip " .. table.concat(ids, " ")
-        -- Debug manuel si besoin :
-        -- DEFAULT_CHAT_FRAME:AddMessage("|cff66ccff[DBG]|r " .. MultiBot.L("talent.glyphs.debug_prefix") ..
-        --     (MultiBot.talent.name or "?") .. " : " .. payload)
-        SendChatMessage(payload, "WHISPER", nil, MultiBot.talent.name)
+        if MultiBot.Comm and MultiBot.Comm.RunGlyphEquip then
+            MultiBot.Comm.RunGlyphEquip(MultiBot.talent.name, ids)
+        end
     end
 
 
@@ -1682,16 +1680,7 @@ function MultiBot.InitializeTalentFrameModule()
     -- TAB GLYPHS --
     function MultiBot.talent.requestGlyphsForTarget(targetName)
         if MultiBot.Comm and MultiBot.Comm.RequestGlyphs then
-            local token = MultiBot.Comm.RequestGlyphs(targetName)
-            if token then
-                MultiBot.awaitGlyphs = nil
-                return token
-            end
-        end
-
-        MultiBot.awaitGlyphs = targetName
-        if MultiBot.allowLegacyChatFallback == true then
-            SendChatMessage("glyphs", "WHISPER", nil, targetName)
+            return MultiBot.Comm.RequestGlyphs(targetName)
         end
         return nil
     end

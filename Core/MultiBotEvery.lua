@@ -308,7 +308,9 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
     -- Buttons inside the "Misc" sub-frame
 	for _, data in ipairs{
 		{ "Wipe", "Achievement_Halloween_Ghost_01", MultiBot.L("tips.every.wipe"), function(b)
-		    MultiBot.ActionToTarget("wipe", b.getName())
+		    if MultiBot.Comm and type(MultiBot.Comm.RunBotWipe) == "function" then
+		      MultiBot.Comm.RunBotWipe(b.getName())
+		    end
           end
 		},
 		{ "Autogear", "inv_misc_enggizmos_30", isSelfBot and MultiBot.L("tips.every.autogear") or (MultiBot.Autogear and MultiBot.Autogear.Text("button_tip") or "Autogear"), function(b)
@@ -408,7 +410,7 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 	if not isSelfBot then
 		pFrame.addButton("Summon", 94, 0, "ability_hunter_beastcall", MultiBot.L("tips.every.summon"))
 		.doLeft = function(pButton)
-			MultiBot.ActionToTarget("summon", pButton.getName())
+			MultiBot.Comm.RunBotSummon(pButton.getName())
 		end
 
 		pFrame.addButton("Uninvite", 124, 0, "inv_misc_grouplooking", MultiBot.L("tips.every.uninvite")).doShow()

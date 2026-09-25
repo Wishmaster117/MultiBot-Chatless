@@ -2764,13 +2764,30 @@ MultiBot.addFrame = function(pName, pX, pY, pSize)
 end
 
 -- MULTIBOT: SELL ALL BOTS --
--- Envoie une commande de vente à tous les bots listés dans l’onglet "Units".
--- pCommand : "s *" (tout le gris) ou "s vendor" (tout ce qui est vendable).
+-- MB_SELL_ALL_BOTS_CHATLESS_V1_BEGIN
+-- Vend les objets gris de tous les bots actuellement listés dans l'onglet Units.
+-- Le transport est exclusivement structuré via INVENTORY_ITEM_ACTION/SELL_GREY.
 MultiBot.SellAllBots = function(pCommand)
-	-- Par défaut : vendre tous les objets gris (safe)
+	-- Le bouton historique passe encore "s *". Toute autre variante reste refusée
+	-- ici afin de ne pas transformer silencieusement une ancienne commande chat.
 	pCommand = pCommand or "s *"
+	if pCommand ~= "s *" then
+		return 0
+	end
 
-	if not MultiBot.isTarget or not MultiBot.isTarget() then
+	local comm = MultiBot and MultiBot.Comm or nil
+	local function showFeedback(key, color, ...)
+		local message = string.format(MultiBot.L(key), ...)
+		if comm and type(comm.ShowSystemMessage) == "function" then
+			comm.ShowSystemMessage(message, color)
+		elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+			DEFAULT_CHAT_FRAME:AddMessage(message)
+		end
+	end
+
+	if not comm or type(comm.RunInventoryItemAction) ~= "function"
+		or type(MultiBot.TimerAfter) ~= "function" then
+		showFeedback("sell.all.failed", "red", 0, 0)
 		return 0
 	end
 
@@ -2787,27 +2804,141 @@ MultiBot.SellAllBots = function(pCommand)
 		return 0
 	end
 
+	if type(MultiBot._sellAllBotsQueue) == "table" and MultiBot._sellAllBotsQueue.active then
+		showFeedback("sell.all.busy", "yellow")
+		return 0
+	end
+
 	CancelTrade()
 
-	local count = 0
-
+	local targets = {}
+	local unitsButton = multiBar.buttons and multiBar.buttons["Units"] or nil
+	local currentRoster = unitsButton and unitsButton.roster or nil
 	for key, btn in pairs(units.buttons) do
 		if type(btn) == "table" then
 			local botName = btn.name or (btn.getName and btn.getName()) or key
+			local isOnline = false
 			if botName and botName ~= "" then
-				SendChatMessage(pCommand, "WHISPER", nil, botName)
-				count = count + 1
+				if currentRoster == "players" and MultiBot.IsBridgePlayerRosterBotOnline then
+					isOnline = MultiBot.IsBridgePlayerRosterBotOnline(btn, botName)
+				elseif currentRoster == "members" and MultiBot.IsGuildRosterBotOnline then
+					isOnline = MultiBot.IsGuildRosterBotOnline(btn, botName)
+				elseif currentRoster == "friends" and MultiBot.IsFriendRosterBotOnline then
+					isOnline = MultiBot.IsFriendRosterBotOnline(btn, botName)
+				elseif currentRoster == "favorites" and MultiBot.IsFavoriteRosterBotOnline then
+					isOnline = MultiBot.IsFavoriteRosterBotOnline(btn, botName)
+				else
+					isOnline = ((MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(btn, botName)) or (not MultiBot.IsUnitBotOnline and btn.state == true))
+				end
 			end
+			if isOnline then targets[#targets + 1] = botName end
+		end
+	end
+	table.sort(targets)
+
+	local total = #targets
+	if total == 0 then
+		return 0
+	end
+
+	local queue = {
+		active = true,
+		targets = targets,
+		index = 1,
+		total = total,
+		sent = 0,
+		completed = 0,
+		succeeded = 0,
+		empty = 0,
+		failed = 0,
+		sold = 0,
+	}
+	MultiBot._sellAllBotsQueue = queue
+
+	local function finishQueue()
+		if MultiBot._sellAllBotsQueue ~= queue or not queue.active then
+			return
+		end
+		queue.active = false
+
+		if queue.completed < queue.total then
+			queue.failed = queue.failed + (queue.total - queue.completed)
+			queue.completed = queue.total
+		end
+
+		if queue.failed == 0 and queue.empty == 0 then
+			showFeedback("sell.all.success", "green", queue.succeeded, queue.total, queue.sold)
+		elseif queue.failed == 0 and queue.empty == queue.total then
+			showFeedback("sell.all.none", "yellow", queue.total)
+		elseif queue.succeeded > 0 or queue.empty > 0 then
+			showFeedback("sell.all.partial", "yellow", queue.succeeded, queue.total, queue.sold, queue.empty, queue.failed)
+		else
+			showFeedback("sell.all.failed", "red", queue.failed, queue.total)
+		end
+
+		if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
+			MultiBot.RefreshInventory(0.5)
 		end
 	end
 
-	-- Si une fenêtre d’inventaire est ouverte, on la rafraîchit pour le bot affiché
-	if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
-		MultiBot.RefreshInventory(0.5)
+	local function completeOne(botName, action, itemId, result, reason, moved)
+		if MultiBot._sellAllBotsQueue ~= queue or not queue.active then
+			return
+		end
+
+		queue.completed = queue.completed + 1
+		moved = tonumber(moved or 0) or 0
+		if result == "OK" then
+			queue.succeeded = queue.succeeded + 1
+			queue.sold = queue.sold + moved
+		elseif reason == "ITEM_NOT_FOUND" then
+			queue.empty = queue.empty + 1
+		else
+			queue.failed = queue.failed + 1
+		end
+
+		if queue.sent >= queue.total and queue.completed >= queue.total then
+			finishQueue()
+		end
 	end
 
-	return count
+	local runNext
+	runNext = function()
+		if MultiBot._sellAllBotsQueue ~= queue or not queue.active then
+			return
+		end
+
+		local botName = queue.targets[queue.index]
+		if not botName then
+			if queue.completed >= queue.total then
+				finishQueue()
+			else
+				MultiBot.TimerAfter(5.0, finishQueue)
+			end
+			return
+		end
+
+		queue.index = queue.index + 1
+		queue.sent = queue.sent + 1
+		local token = comm.RunInventoryItemAction(botName, "SELL_GREY", 0, 0, completeOne, { silentFeedback = true })
+		if token == false then
+			queue.completed = queue.completed + 1
+			queue.failed = queue.failed + 1
+		end
+
+		if queue.index <= queue.total then
+			MultiBot.TimerAfter(0.10, runNext)
+		elseif queue.completed >= queue.total then
+			finishQueue()
+		else
+			MultiBot.TimerAfter(5.0, finishQueue)
+		end
+	end
+
+	runNext()
+	return total
 end
+-- MB_SELL_ALL_BOTS_CHATLESS_V1_END
 
 -- MULTIBOT: MAINTENANCE ALL BOTS --
 -- MB_MAINTENANCE_ALL_CHATLESS_V1_BEGIN

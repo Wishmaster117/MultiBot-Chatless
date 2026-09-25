@@ -1721,17 +1721,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			return
 		end
 
-		if(MultiBot.auto.release == true) then
-			if(MultiBot.isInside(arg1, "已经死亡")) then
-				SendChatMessage("release", "WHISPER", nil, MultiBot.doReplace(arg1, "已经死亡。", ""))
-				return
-			end
-
-			if(MultiBot.isInside(arg1, "ist tot", "has dies", "has died")) then
-				SendChatMessage("release", "WHISPER", nil, MultiBot.doSplit(arg1, " ")[1])
-				return
-			end
-		end
 
         -- Anti-dup: ignore the same "Bot roster:" line repeated in a short window
         do
@@ -2056,81 +2045,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			return
 		end
 
-		if MultiBot.awaitGlyphs and author == MultiBot.awaitGlyphs then
-
-			-- On ne traite que les réponses commençant par "Glyphs:" ou "No glyphs"
-			if not rawMsg:match("^[Gg]lyphs:") and not rawMsg:match("^[Nn]o glyphs") then
-				DEFAULT_CHAT_FRAME:AddMessage("|cff66ccff[ERROR]|r " .. MultiBot.L("talent.glyphs.error_ignored_non_glyph"))
-				return
-			end
-
-			-- On extrait tout ce qui suit "Glyphs:"
-			local rest = rawMsg:match("^[Gg]lyphs:%s*(.*)") or ""
-			local ids = {}
-
-			if rest:lower():match("^no glyphs") then
-				-- pas de glyphe → on met 6 zéros
-				for i = 1, 6 do ids[i] = 0 end
-			else
-				-- on récupère directement chaque ID depuis les liens cliquables
-				for id in rest:gmatch("|Hitem:(%d+):") do
-					table.insert(ids, tonumber(id))
-				end
-				-- on complète si moins de 6
-				for i = #ids + 1, 6 do
-					ids[i] = 0
-				end
-			end
-
-			-- On stocke cette liste pour le rafraîchissement
-			local receivedGlyphs = (MultiBot.Store and MultiBot.Store.EnsureRuntimeTable and MultiBot.Store.EnsureRuntimeTable("receivedGlyphs")) or MultiBot.receivedGlyphs
-			if type(receivedGlyphs) ~= "table" then
-				receivedGlyphs = {}
-				MultiBot.receivedGlyphs = receivedGlyphs
-			end
-			receivedGlyphs[author] = {}
-
-			-- Détermination du type Major/Minor et remplissage
-			local unit = MultiBot.toUnit(author)
-			local _, cf = UnitClass(unit or "player")
-			local classKey = (cf == "DEATHKNIGHT")
-							and "DeathKnight"
-							or cf:sub(1,1)..cf:sub(2):lower()
-			local glyphDB = MultiBot.data.talent.glyphs[classKey] or {}
-
-			-- Mappage des sockets
-			local map = { 1, 2, 5, 6, 4, 3 }
-			for idx, id in ipairs(ids) do
-				local sock = map[idx]                    -- n° de socket cible
-				local typ  = (glyphDB.Major and glyphDB.Major[id]) and "Major" or "Minor"
-				receivedGlyphs[author][sock] = { id = id, type = typ }
-			end
-
-			-- Si l'onglet Glyphes est ouvert, on force son rafraîchissement.
-			local glyphFrameKey = MultiBot.TalentTabGroups and MultiBot.TalentTabGroups.GLYPH
-			local glyphFrame = glyphFrameKey and MultiBot.talent.frames[glyphFrameKey]
-			if glyphFrame and glyphFrame:IsShown() then
-
-				MultiBot.FillDefaultGlyphs()
-			end
-
-			MultiBot.awaitGlyphs = nil
-			return
-		end
-		-- END GLYPHES --
-
-		if(MultiBot.auto.release == true) then
-			-- Graveyard not ready to talk Bot in the chinese Version --
-			if(arg1 == "在墓地见我") then
-				MultiBot.frames["MultiBar"].frames["Units"].buttons[arg2].waitFor = "你好"
-				return
-			end
-
-			if(arg1 == "Meet me at the graveyard") then
-				SendChatMessage("summon", "WHISPER", nil, arg2)
-				return
-			end
-		end
 
 		if(MultiBot.isInside(arg1, "StatsOfPlayer")) then
 			local statsFrame = MultiBot.EnsureStatsUI and MultiBot.EnsureStatsUI() or MultiBot.stats
@@ -2155,14 +2069,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 
 		local tButton = MultiBot.frames["MultiBar"].frames["Units"].buttons[arg2]
 
-		if(MultiBot.auto.release == true) then
-			-- Graveyard ready to talk Bot in the chinese Version --
-			if(tButton ~= nil and tButton.waitFor == "你好" and arg1 == "你好") then
-				SendChatMessage("summon", "WHISPER", nil, arg2)
-				tButton.waitFor = ""
-				return
-			end
-		end
 
 		if(MultiBot.isInside(arg1, "Hello", "你好") and tButton == nil) then
             local tUnit = MultiBot.toUnit(arg2)

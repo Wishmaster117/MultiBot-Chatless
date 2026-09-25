@@ -1440,6 +1440,61 @@ local ruRUValues = {
   ["autogear.reason.BAD_RESPONSE"] = "Недопустимый ответ сервера.",
   ["autogear.reason.SEND_FAILED"] = "Не удалось отправить запрос.",
   -- MB_AUTOGEAR_OPTIONS_I18N_V1_END
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_BEGIN
+  ["w3a.feedback.follow"] = "[MultiBot] Следовать: обработано %d/%d ботов%s.",
+  ["w3a.feedback.stay"] = "[MultiBot] Стоять: обработано %d/%d ботов%s.",
+  ["w3a.feedback.release"] = "[MultiBot] Освобождение духа: обработано %d/%d ботов%s.",
+  ["w3a.feedback.revive"] = "[MultiBot] Воскрешение: обработано %d/%d ботов%s.",
+  ["w3a.feedback.summon"] = "[MultiBot] Призыв: обработано %d/%d ботов%s.",
+  ["w3a.feedback.rtsc_enable"] = "[MultiBot] RTSC включён: обработано %d/%d ботов%s.",
+  ["w3a.feedback.rtsc_reset"] = "[MultiBot] RTSC сброшен: обработано %d/%d ботов%s.",
+  ["w3a.feedback.rti"] = "[MultiBot] RTI: обработано %d/%d ботов%s.",
+  ["w3a.feedback.combat"] = "[MultiBot] Бой: обработано %d/%d ботов%s.",
+  ["w3a.feedback.reason.PARTIAL"] = " (частично)",
+  ["w3a.feedback.reason.FAILED"] = " (ошибка)",
+  ["w3a.feedback.reason.BOT_LIMIT"] = " (достигнут лимит ботов)",
+  ["w3a.flee.names"] = "[MultiBot] Отступление: %s",
+  ["w3a.flee.audience.names"] = "[MultiBot] Отступление [%s]: %s",
+  ["w3a.flee.audience.count"] = "[MultiBot] Отступление [%s]: %d/%d ботов",
+  ["w3a.flee.audience.all"] = "ВСЕ",
+  ["w3a.flee.audience.tank"] = "ТАНК",
+  ["w3a.flee.audience.healer"] = "ЛЕКАРЬ",
+  ["w3a.flee.audience.dps"] = "DPS",
+  ["w3a.flee.audience.melee"] = "БЛИЖНИЙ БОЙ",
+  ["w3a.flee.audience.ranged"] = "ДАЛЬНИЙ БОЙ",
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_END
+
+  -- MB_SELL_ALL_BOTS_I18N_V1_BEGIN
+  ["sell.all.success"] = "[MultiBot] Продажа: %d/%d бот(ов), продано серых предметов: %d.",
+  ["sell.all.none"] = "[MultiBot] Продажа: у %d бот(ов) нет серых предметов для продажи.",
+  ["sell.all.partial"] = "[MultiBot] Продажа: %d/%d бот(ов), продано предметов: %d; без предметов: %d; ошибок: %d.",
+  ["sell.all.failed"] = "[MultiBot] Продажа: ошибка у %d/%d бот(ов).",
+  ["sell.all.busy"] = "[MultiBot] Продажа: групповая продажа уже выполняется.",
+  -- MB_SELL_ALL_BOTS_I18N_V1_END
+
+-- MB_GLYPH_EQUIP_V1_BEGIN
+  ["talent.glyphs.feedback.success"] = "[MultiBot] Символы применены к %s: %s",
+  ["talent.glyphs.feedback.error"] = "[MultiBot] Символы для %s: %s",
+  ["talent.glyphs.feedback.item_fallback"] = "предмет #%d",
+  ["talent.glyphs.feedback.none"] = "нет",
+  ["talent.glyphs.feedback.reason.BAD_REQUEST"] = "Недопустимый запрос символов.",
+  ["talent.glyphs.feedback.reason.CAPABILITY_UNAVAILABLE"] = "Функция экипировки символов Bridge недоступна.",
+  ["talent.glyphs.feedback.reason.RATE_LIMIT"] = "Слишком много запросов символов.",
+  ["talent.glyphs.feedback.reason.SEND_FAILED"] = "Не удалось отправить запрос символов.",
+  ["talent.glyphs.feedback.reason.TIMEOUT"] = "Время ожидания запроса символов истекло.",
+  ["talent.glyphs.feedback.reason.DISCONNECTED"] = "Bridge отключился до завершения запроса символов.",
+  ["talent.glyphs.feedback.reason.BAD_RESPONSE"] = "Недопустимый ответ Bridge.",
+  ["talent.glyphs.feedback.reason.BAD_GLYPH"] = "Один или несколько выбранных символов недопустимы или ячейка пуста.",
+  ["talent.glyphs.feedback.reason.WRONG_CLASS"] = "Один или несколько символов недоступны классу этого бота.",
+  ["talent.glyphs.feedback.reason.SOCKET_MISMATCH"] = "Выбранные большие/малые символы не подходят к доступным ячейкам.",
+  ["talent.glyphs.feedback.reason.NO_BOT"] = "Бот не найден.",
+  ["talent.glyphs.feedback.reason.BOT_UNAVAILABLE"] = "Бот недоступен.",
+  ["talent.glyphs.feedback.reason.NO_AI"] = "ИИ бота недоступен.",
+  ["talent.glyphs.feedback.reason.FORBIDDEN"] = "У вас нет права управлять этим ботом.",
+  ["talent.glyphs.feedback.reason.DUPLICATE"] = "Повторный запрос символов.",
+  ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "Состояние символов бота недоступно.",
+  ["talent.glyphs.feedback.reason.FAILED"] = "Не удалось применить символы.",
+-- MB_GLYPH_EQUIP_V1_END
 }
 
 register("ruRU", ruRUValues)

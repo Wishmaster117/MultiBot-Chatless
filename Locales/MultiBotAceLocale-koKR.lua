@@ -1431,6 +1431,61 @@ local koKRValues = {
   ["autogear.reason.BAD_RESPONSE"] = "서버 응답이 올바르지 않습니다.",
   ["autogear.reason.SEND_FAILED"] = "요청을 보낼 수 없습니다.",
   -- MB_AUTOGEAR_OPTIONS_I18N_V1_END
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_BEGIN
+  ["w3a.feedback.follow"] = "[MultiBot] 따라가기: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.stay"] = "[MultiBot] 대기: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.release"] = "[MultiBot] 영혼 해제: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.revive"] = "[MultiBot] 부활: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.summon"] = "[MultiBot] 소환: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.rtsc_enable"] = "[MultiBot] RTSC 활성화: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.rtsc_reset"] = "[MultiBot] RTSC 초기화: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.rti"] = "[MultiBot] RTI: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.combat"] = "[MultiBot] 전투: %d/%d 봇 적용됨%s.",
+  ["w3a.feedback.reason.PARTIAL"] = " (일부 적용)",
+  ["w3a.feedback.reason.FAILED"] = " (실패)",
+  ["w3a.feedback.reason.BOT_LIMIT"] = " (봇 제한 도달)",
+  ["w3a.flee.names"] = "[MultiBot] 도주: %s",
+  ["w3a.flee.audience.names"] = "[MultiBot] 도주 [%s]: %s",
+  ["w3a.flee.audience.count"] = "[MultiBot] 도주 [%s]: %d/%d 봇",
+  ["w3a.flee.audience.all"] = "전체",
+  ["w3a.flee.audience.tank"] = "탱커",
+  ["w3a.flee.audience.healer"] = "힐러",
+  ["w3a.flee.audience.dps"] = "DPS",
+  ["w3a.flee.audience.melee"] = "근접",
+  ["w3a.flee.audience.ranged"] = "원거리",
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_END
+
+  -- MB_SELL_ALL_BOTS_I18N_V1_BEGIN
+  ["sell.all.success"] = "[MultiBot] 판매: %d/%d 봇, 회색 아이템 %d개 판매 완료.",
+  ["sell.all.none"] = "[MultiBot] 판매: %d개 봇에 판매할 회색 아이템이 없습니다.",
+  ["sell.all.partial"] = "[MultiBot] 판매: %d/%d 봇, 아이템 %d개 판매; 판매할 아이템 없음 %d; 실패 %d.",
+  ["sell.all.failed"] = "[MultiBot] 판매: %d/%d 봇에서 실패했습니다.",
+  ["sell.all.busy"] = "[MultiBot] 판매: 일괄 판매가 이미 진행 중입니다.",
+  -- MB_SELL_ALL_BOTS_I18N_V1_END
+
+-- MB_GLYPH_EQUIP_V1_BEGIN
+  ["talent.glyphs.feedback.success"] = "[MultiBot] %s에게 문양 적용: %s",
+  ["talent.glyphs.feedback.error"] = "[MultiBot] %s의 문양: %s",
+  ["talent.glyphs.feedback.item_fallback"] = "아이템 #%d",
+  ["talent.glyphs.feedback.none"] = "없음",
+  ["talent.glyphs.feedback.reason.BAD_REQUEST"] = "잘못된 문양 요청입니다.",
+  ["talent.glyphs.feedback.reason.CAPABILITY_UNAVAILABLE"] = "Bridge 문양 장착 기능을 사용할 수 없습니다.",
+  ["talent.glyphs.feedback.reason.RATE_LIMIT"] = "문양 요청이 너무 많습니다.",
+  ["talent.glyphs.feedback.reason.SEND_FAILED"] = "문양 요청을 보낼 수 없습니다.",
+  ["talent.glyphs.feedback.reason.TIMEOUT"] = "문양 요청 시간이 초과되었습니다.",
+  ["talent.glyphs.feedback.reason.DISCONNECTED"] = "문양 요청이 완료되기 전에 Bridge 연결이 끊어졌습니다.",
+  ["talent.glyphs.feedback.reason.BAD_RESPONSE"] = "Bridge의 응답이 잘못되었습니다.",
+  ["talent.glyphs.feedback.reason.BAD_GLYPH"] = "선택한 문양 중 하나 이상이 잘못되었거나 슬롯이 비어 있습니다.",
+  ["talent.glyphs.feedback.reason.WRONG_CLASS"] = "선택한 문양 중 하나 이상을 이 봇의 직업이 사용할 수 없습니다.",
+  ["talent.glyphs.feedback.reason.SOCKET_MISMATCH"] = "선택한 주/보조 문양이 사용 가능한 슬롯과 맞지 않습니다.",
+  ["talent.glyphs.feedback.reason.NO_BOT"] = "봇을 찾을 수 없습니다.",
+  ["talent.glyphs.feedback.reason.BOT_UNAVAILABLE"] = "봇을 사용할 수 없습니다.",
+  ["talent.glyphs.feedback.reason.NO_AI"] = "봇 AI를 사용할 수 없습니다.",
+  ["talent.glyphs.feedback.reason.FORBIDDEN"] = "이 봇을 제어할 권한이 없습니다.",
+  ["talent.glyphs.feedback.reason.DUPLICATE"] = "중복 문양 요청입니다.",
+  ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "봇의 문양 상태를 사용할 수 없습니다.",
+  ["talent.glyphs.feedback.reason.FAILED"] = "문양을 적용할 수 없습니다.",
+-- MB_GLYPH_EQUIP_V1_END
 }
 
 register("koKR", koKRValues)

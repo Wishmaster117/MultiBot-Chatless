@@ -983,7 +983,11 @@ function MultiBot.OnBridgeInventoryItemUseResult(botName, result, reason)
     end
 end
 
-function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, result, reason, moved)
+function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, result, reason, moved, command)
+    if type(command) == "table" and command.silentFeedback == true then
+        return
+    end
+
     local actionLabel = getInventoryItemActionLabel(action)
     local itemName = tostring(itemId or "")
     if GetItemInfo then

@@ -1443,6 +1443,61 @@ local esESValues = {
   ["autogear.reason.BAD_RESPONSE"] = "Respuesta del servidor no válida.",
   ["autogear.reason.SEND_FAILED"] = "No se pudo enviar la solicitud.",
   -- MB_AUTOGEAR_OPTIONS_I18N_V1_END
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_BEGIN
+  ["w3a.feedback.follow"] = "[MultiBot] Seguir: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.stay"] = "[MultiBot] Quedarse: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.release"] = "[MultiBot] Liberar espíritu: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.revive"] = "[MultiBot] Revivir: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.summon"] = "[MultiBot] Invocar: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.rtsc_enable"] = "[MultiBot] RTSC activado: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.rtsc_reset"] = "[MultiBot] RTSC restablecido: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.rti"] = "[MultiBot] RTI: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.combat"] = "[MultiBot] Combate: %d/%d bot(s) aceptado(s)%s.",
+  ["w3a.feedback.reason.PARTIAL"] = " (parcial)",
+  ["w3a.feedback.reason.FAILED"] = " (fallido)",
+  ["w3a.feedback.reason.BOT_LIMIT"] = " (límite de bots alcanzado)",
+  ["w3a.flee.names"] = "[MultiBot] Huida: %s",
+  ["w3a.flee.audience.names"] = "[MultiBot] Huida [%s]: %s",
+  ["w3a.flee.audience.count"] = "[MultiBot] Huida [%s]: %d/%d bot(s)",
+  ["w3a.flee.audience.all"] = "TODOS",
+  ["w3a.flee.audience.tank"] = "TANQUE",
+  ["w3a.flee.audience.healer"] = "SANADOR",
+  ["w3a.flee.audience.dps"] = "DPS",
+  ["w3a.flee.audience.melee"] = "CUERPO A CUERPO",
+  ["w3a.flee.audience.ranged"] = "A DISTANCIA",
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_END
+
+  -- MB_SELL_ALL_BOTS_I18N_V1_BEGIN
+  ["sell.all.success"] = "[MultiBot] Venta: %d/%d bot(s), %d objeto(s) gris(es) vendido(s).",
+  ["sell.all.none"] = "[MultiBot] Venta: no hay objetos grises que vender en %d bot(s).",
+  ["sell.all.partial"] = "[MultiBot] Venta: %d/%d bot(s), %d objeto(s) vendido(s); %d sin objetos que vender; %d fallo(s).",
+  ["sell.all.failed"] = "[MultiBot] Venta: fallo en %d/%d bot(s).",
+  ["sell.all.busy"] = "[MultiBot] Venta: ya hay una venta grupal en curso.",
+  -- MB_SELL_ALL_BOTS_I18N_V1_END
+
+-- MB_GLYPH_EQUIP_V1_BEGIN
+  ["talent.glyphs.feedback.success"] = "[MultiBot] Glifos aplicados a %s: %s",
+  ["talent.glyphs.feedback.error"] = "[MultiBot] Glifos de %s: %s",
+  ["talent.glyphs.feedback.item_fallback"] = "objeto n.º %d",
+  ["talent.glyphs.feedback.none"] = "ninguno",
+  ["talent.glyphs.feedback.reason.BAD_REQUEST"] = "Solicitud de glifos no válida.",
+  ["talent.glyphs.feedback.reason.CAPABILITY_UNAVAILABLE"] = "La función del Bridge para equipar glifos no está disponible.",
+  ["talent.glyphs.feedback.reason.RATE_LIMIT"] = "Demasiadas solicitudes de glifos.",
+  ["talent.glyphs.feedback.reason.SEND_FAILED"] = "No se pudo enviar la solicitud de glifos.",
+  ["talent.glyphs.feedback.reason.TIMEOUT"] = "La solicitud de glifos agotó el tiempo de espera.",
+  ["talent.glyphs.feedback.reason.DISCONNECTED"] = "El Bridge se desconectó antes de completar la solicitud de glifos.",
+  ["talent.glyphs.feedback.reason.BAD_RESPONSE"] = "Respuesta no válida del Bridge.",
+  ["talent.glyphs.feedback.reason.BAD_GLYPH"] = "Uno o más glifos seleccionados no son válidos o hay un hueco vacío.",
+  ["talent.glyphs.feedback.reason.WRONG_CLASS"] = "Uno o más glifos seleccionados no pueden ser usados por la clase de este bot.",
+  ["talent.glyphs.feedback.reason.SOCKET_MISMATCH"] = "Los glifos mayores/menores seleccionados no encajan en los huecos disponibles.",
+  ["talent.glyphs.feedback.reason.NO_BOT"] = "Bot no encontrado.",
+  ["talent.glyphs.feedback.reason.BOT_UNAVAILABLE"] = "El bot no está disponible.",
+  ["talent.glyphs.feedback.reason.NO_AI"] = "La IA del bot no está disponible.",
+  ["talent.glyphs.feedback.reason.FORBIDDEN"] = "No tienes permiso para controlar este bot.",
+  ["talent.glyphs.feedback.reason.DUPLICATE"] = "Solicitud de glifos duplicada.",
+  ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "El estado de glifos del bot no está disponible.",
+  ["talent.glyphs.feedback.reason.FAILED"] = "No se pudieron aplicar los glifos.",
+-- MB_GLYPH_EQUIP_V1_END
 }
 
 register("esES", esESValues)

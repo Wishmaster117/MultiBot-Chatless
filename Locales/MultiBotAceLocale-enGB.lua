@@ -1445,6 +1445,61 @@ local enGBValues = {
   ["autogear.reason.BAD_RESPONSE"] = "Invalid server response.",
   ["autogear.reason.SEND_FAILED"] = "Request could not be sent.",
   -- MB_AUTOGEAR_OPTIONS_I18N_V1_END
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_BEGIN
+  ["w3a.feedback.follow"] = "[MultiBot] Follow: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.stay"] = "[MultiBot] Stay: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.release"] = "[MultiBot] Release: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.revive"] = "[MultiBot] Revive: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.summon"] = "[MultiBot] Summon: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.rtsc_enable"] = "[MultiBot] RTSC enabled: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.rtsc_reset"] = "[MultiBot] RTSC reset: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.rti"] = "[MultiBot] RTI: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.combat"] = "[MultiBot] Combat: %d/%d bot(s) accepted%s.",
+  ["w3a.feedback.reason.PARTIAL"] = " (partial)",
+  ["w3a.feedback.reason.FAILED"] = " (failed)",
+  ["w3a.feedback.reason.BOT_LIMIT"] = " (bot limit reached)",
+  ["w3a.flee.names"] = "[MultiBot] Flee: %s",
+  ["w3a.flee.audience.names"] = "[MultiBot] Flee [%s]: %s",
+  ["w3a.flee.audience.count"] = "[MultiBot] Flee [%s]: %d/%d bot(s)",
+  ["w3a.flee.audience.all"] = "ALL",
+  ["w3a.flee.audience.tank"] = "TANK",
+  ["w3a.flee.audience.healer"] = "HEALER",
+  ["w3a.flee.audience.dps"] = "DPS",
+  ["w3a.flee.audience.melee"] = "MELEE",
+  ["w3a.flee.audience.ranged"] = "RANGED",
+  -- MB_W3A_ADDON_FEEDBACK_I18N_V1_END
+
+  -- MB_SELL_ALL_BOTS_I18N_V1_BEGIN
+  ["sell.all.success"] = "[MultiBot] Sell: %d/%d bot(s), %d grey item(s) sold.",
+  ["sell.all.none"] = "[MultiBot] Sell: no grey items to sell on %d bot(s).",
+  ["sell.all.partial"] = "[MultiBot] Sell: %d/%d bot(s), %d item(s) sold; %d with nothing to sell; %d failed.",
+  ["sell.all.failed"] = "[MultiBot] Sell: failed for %d/%d bot(s).",
+  ["sell.all.busy"] = "[MultiBot] Sell: a bulk sale is already running.",
+  -- MB_SELL_ALL_BOTS_I18N_V1_END
+
+-- MB_GLYPH_EQUIP_V1_BEGIN
+  ["talent.glyphs.feedback.success"] = "[MultiBot] Glyphs applied to %s: %s",
+  ["talent.glyphs.feedback.error"] = "[MultiBot] Glyphs for %s: %s",
+  ["talent.glyphs.feedback.item_fallback"] = "item #%d",
+  ["talent.glyphs.feedback.none"] = "none",
+  ["talent.glyphs.feedback.reason.BAD_REQUEST"] = "Invalid glyph request.",
+  ["talent.glyphs.feedback.reason.CAPABILITY_UNAVAILABLE"] = "The Bridge glyph equipment capability is unavailable.",
+  ["talent.glyphs.feedback.reason.RATE_LIMIT"] = "Too many glyph requests.",
+  ["talent.glyphs.feedback.reason.SEND_FAILED"] = "Unable to send the glyph request.",
+  ["talent.glyphs.feedback.reason.TIMEOUT"] = "The glyph request timed out.",
+  ["talent.glyphs.feedback.reason.DISCONNECTED"] = "The Bridge disconnected before the glyph request completed.",
+  ["talent.glyphs.feedback.reason.BAD_RESPONSE"] = "Invalid response from the Bridge.",
+  ["talent.glyphs.feedback.reason.BAD_GLYPH"] = "One or more selected glyphs are invalid or a socket is empty.",
+  ["talent.glyphs.feedback.reason.WRONG_CLASS"] = "One or more selected glyphs cannot be used by this bot's class.",
+  ["talent.glyphs.feedback.reason.SOCKET_MISMATCH"] = "The selected major/minor glyphs do not fit the available sockets.",
+  ["talent.glyphs.feedback.reason.NO_BOT"] = "Bot not found.",
+  ["talent.glyphs.feedback.reason.BOT_UNAVAILABLE"] = "The bot is unavailable.",
+  ["talent.glyphs.feedback.reason.NO_AI"] = "The bot AI is unavailable.",
+  ["talent.glyphs.feedback.reason.FORBIDDEN"] = "You are not allowed to control this bot.",
+  ["talent.glyphs.feedback.reason.DUPLICATE"] = "Duplicate glyph request.",
+  ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "The bot glyph state is unavailable.",
+  ["talent.glyphs.feedback.reason.FAILED"] = "The glyphs could not be applied.",
+-- MB_GLYPH_EQUIP_V1_END
 }
 
 register("enGB", enGBValues)
