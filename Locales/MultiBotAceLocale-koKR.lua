@@ -54,6 +54,17 @@ local koKRValues = {
   ["selfaction.send_failed"] = "SelfBot 동작을 보내지 못했습니다: %s",
   ["selfaction.reason.RATE_LIMIT"] = "SelfBot 요청이 너무 많습니다. 몇 초 후 다시 시도하세요.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
+  ["quest.feedback.available"] = "수행 가능한 퀘스트: ",
+  ["quest.feedback.incomplete"] = "미완료 퀘스트: ",
+  ["quest.feedback.accepted"] = "퀘스트 수락: ",
+  ["quest.feedback.already_completed"] = "이미 완료한 퀘스트: ",
+  ["quest.feedback.already_on"] = "이미 진행 중인 퀘스트: ",
+  ["quest.feedback.cant_take"] = "퀘스트를 받을 수 없음: ",
+  ["quest.feedback.quest_log_full"] = "퀘스트 목록이 가득 참: ",
+  ["quest.feedback.bags_full"] = "가방이 가득 참: ",
+  ["quest.feedback.cannot_accept"] = "퀘스트를 수락할 수 없음: ",
+  -- MB_QUEST_FEEDBACK_I18N_V1_END
   ["lootmaster.title"] = "MultiBot 전리품 담당자",
   ["lootmaster.refresh"] = "새로 고침",
   ["lootmaster.assign_to"] = "할당 대상:",

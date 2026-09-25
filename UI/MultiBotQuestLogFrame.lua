@@ -112,13 +112,6 @@ local function handleQuestClick(questID, button)
                     showQuestAbandonFailure({ status = "error", reason = failureReason })
                 end
 
-                if not bridgeHandled and MultiBot.allowLegacyChatFallback == true then
-                    if GetNumRaidMembers() > 0 then
-                        SendChatMessage("drop " .. questLink, "RAID")
-                    elseif GetNumPartyMembers() > 0 then
-                        SendChatMessage("drop " .. questLink, "PARTY")
-                    end
-                end
 
                 SetAbandonQuest()
                 AbandonQuest()

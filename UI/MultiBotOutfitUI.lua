@@ -1296,47 +1296,11 @@ function OutfitUI:RunCommand(commandSuffix, statusText, refreshDelay, persistDel
         return false
     end
 
-    if MultiBot.allowLegacyChatFallback ~= true then
-        if bridgeState then
-            bridgeState.lastError = "OUTFIT_CAPABILITY_UNAVAILABLE"
-        end
-        self:SetStatus(outfitL("bridge_unavailable"))
-        return false
+    if bridgeState then
+        bridgeState.lastError = "OUTFIT_CAPABILITY_UNAVAILABLE"
     end
-
-    -- print("OutfitUI DEBUG: sending -> 'outfit " .. tostring(commandSuffix) .. "' to " .. tostring(botName))
-    SendChatMessage("outfit " .. commandSuffix, "WHISPER", nil, botName)
-    self:SetStatus(statusText)
-
-    local commandToken = nil
-    if type(refreshDelay) == "number" and refreshDelay > 0 then
-        commandToken = self:BeginCommandLock(botName)
-    end
-
-    if type(persistDelay) == "number" and persistDelay >= 0 then
-        local flushBotName = botName
-        if MultiBot.TimerAfter then
-            MultiBot.TimerAfter(persistDelay, function()
-                SendChatMessage("nc +chat", "WHISPER", nil, flushBotName)
-            end)
-        else
-            SendChatMessage("nc +chat", "WHISPER", nil, flushBotName)
-        end
-    end
-
-    if type(refreshDelay) == "number" and refreshDelay > 0 and MultiBot.TimerAfter then
-        MultiBot.TimerAfter(refreshDelay, function()
-            if commandToken then
-                self:EndCommandLock(botName, commandToken, true)
-            elseif self.botName == botName and self:IsVisible() then
-                self:RequestList(botName)
-            end
-        end)
-    elseif commandToken then
-        self:EndCommandLock(botName, commandToken, true)
-    end
-
-    return true
+    self:SetStatus(outfitL("bridge_unavailable"))
+    return false
 end
 
 function OutfitUI:CreateFromCurrent()

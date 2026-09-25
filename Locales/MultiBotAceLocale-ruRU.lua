@@ -54,6 +54,17 @@ local ruRUValues = {
   ["selfaction.send_failed"] = "Не удалось отправить действие SelfBot: %s",
   ["selfaction.reason.RATE_LIMIT"] = "Слишком много запросов SelfBot. Повторите попытку через несколько секунд.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
+  ["quest.feedback.available"] = "Доступное задание: ",
+  ["quest.feedback.incomplete"] = "Задание не завершено: ",
+  ["quest.feedback.accepted"] = "Задание принято: ",
+  ["quest.feedback.already_completed"] = "Задание уже выполнено: ",
+  ["quest.feedback.already_on"] = "Задание уже выполняется: ",
+  ["quest.feedback.cant_take"] = "Невозможно взять задание: ",
+  ["quest.feedback.quest_log_full"] = "Журнал заданий заполнен: ",
+  ["quest.feedback.bags_full"] = "Сумки заполнены: ",
+  ["quest.feedback.cannot_accept"] = "Невозможно принять задание: ",
+  -- MB_QUEST_FEEDBACK_I18N_V1_END
   ["lootmaster.title"] = "MultiBot ответственный за добычу",
   ["lootmaster.refresh"] = "Обновить",
   ["lootmaster.assign_to"] = "Назначить:",

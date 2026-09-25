@@ -3663,23 +3663,24 @@ end
 function Comm._QuestAcceptAllFeedbackPrefix(message)
   message = tostring(message or "")
   local prefixes = {
-    { "Accepted ", "accepted " },
-    { "Already completed ", "Already completed " },
-    { "Already on ", "Already on " },
-    { "Can't take ", "Can't take " },
-    { "Quest log is full ", "Quest log is full " },
-    { "Bags are full ", "Bags are full " },
-    { "Cannot accept ", "Cannot accept " },
+    { "Quest Available: ", "quest.feedback.available", "green" },
+    { "Accepted ", "quest.feedback.accepted", "green" },
+    { "Already completed ", "quest.feedback.already_completed", "yellow" },
+    { "Already on ", "quest.feedback.already_on", "yellow" },
+    { "Can't take ", "quest.feedback.cant_take", "red" },
+    { "Quest log is full ", "quest.feedback.quest_log_full", "red" },
+    { "Bags are full ", "quest.feedback.bags_full", "red" },
+    { "Cannot accept ", "quest.feedback.cannot_accept", "red" },
   }
 
   for _, pair in ipairs(prefixes) do
     local sourcePrefix = pair[1]
     if string.sub(message, 1, string.len(sourcePrefix)) == sourcePrefix then
-      return sourcePrefix, pair[2]
+      return sourcePrefix, pair[2], pair[3]
     end
   end
 
-  return nil, nil
+  return nil, nil, nil
 end
 
 function Comm.HandleQuestAcceptAllFeedbackAddonMessage(prefix, message, distribution, sender)
@@ -3705,10 +3706,10 @@ function Comm.HandleQuestAcceptAllFeedbackAddonMessage(prefix, message, distribu
 
   for _, pending in pairs(state.groupOrderCommands) do
     if type(pending) == "table"
-        and pending.order == "QUEST_ACCEPT_ALL"
+        and (pending.order == "QUEST_ACCEPT_ALL" or pending.order == "QUEST_TALK")
         and type(pending.feedbackNames) == "table"
         and pending.feedbackNames[senderKey] then
-      local sourcePrefix, displayPrefix = Comm._QuestAcceptAllFeedbackPrefix(prefix)
+      local sourcePrefix, localeKey, feedbackColor = Comm._QuestAcceptAllFeedbackPrefix(prefix)
       if sourcePrefix == nil then
         return false
       end
@@ -3719,7 +3720,7 @@ function Comm.HandleQuestAcceptAllFeedbackAddonMessage(prefix, message, distribu
       end
 
       local suffix = string.sub(prefix, string.len(sourcePrefix) + 1)
-      systemMessage("[" .. displayName .. "] " .. displayPrefix .. suffix)
+      systemMessage("[" .. displayName .. "] " .. L(localeKey) .. suffix, feedbackColor)
       return true
     end
   end
@@ -3807,6 +3808,25 @@ function Comm._AutonomousUseItemWhisperDisplayName(message, sender, state)
   return nil
 end
 
+function Comm._BridgeRosterBotDisplayName(sender, state)
+  if type(state) ~= "table" or type(state.roster) ~= "table" then
+    return nil
+  end
+  local senderKey = Comm._NormalizeFleeWhisperName(sender)
+  if senderKey == "" then
+    return nil
+  end
+  for _, entry in ipairs(state.roster) do
+    if type(entry) == "table" then
+      local displayName = trim(entry.name or "")
+      if displayName ~= "" and Comm._NormalizeFleeWhisperName(displayName) == senderKey then
+        return displayName
+      end
+    end
+  end
+  return nil
+end
+
 function Comm._FleeWhisperFilter(_, event, message, sender)
   if event ~= "CHAT_MSG_WHISPER" then
     return false
@@ -3827,6 +3847,11 @@ function Comm._FleeWhisperFilter(_, event, message, sender)
       state.autonomousUseItemWhisperLastAt = now
       systemMessage("[" .. displayName .. "] " .. tostring(message or ""), true)
     end
+    return true
+  end
+
+  local questBotDisplayName = Comm._BridgeRosterBotDisplayName(sender, state)
+  if questBotDisplayName and Comm._ShowQuestFeedbackMessage(message, questBotDisplayName) then
     return true
   end
 
@@ -11683,82 +11708,103 @@ end
 
 
 
-function Comm.HandleQuestTalkFeedbackAddonMessage(prefix, message, distribution, sender)
+function Comm._QuestFeedbackParts(rawMessage)
+  rawMessage = tostring(rawMessage or "")
+  local plain = string.gsub(rawMessage, "|c%x%x%x%x%x%x%x%x", "")
+  plain = string.gsub(plain, "|r", "")
 
-  if type(prefix) ~= "string" or prefix == "" or tostring(message or "") ~= "" then
-
-    return false
-
+  local sourcePrefix, localeKey, feedbackColor = Comm._QuestAcceptAllFeedbackPrefix(plain)
+  if sourcePrefix == nil and string.sub(plain, 1, string.len("Quest Incomplete: ")) == "Quest Incomplete: " then
+    sourcePrefix = "Quest Incomplete: "
+    localeKey = "quest.feedback.incomplete"
+    feedbackColor = "yellow"
+  end
+  if sourcePrefix == nil and string.sub(plain, 1, string.len("Quest Incompleted: ")) == "Quest Incompleted: " then
+    sourcePrefix = "Quest Incompleted: "
+    localeKey = "quest.feedback.incomplete"
+    feedbackColor = "yellow"
+  end
+  if sourcePrefix == nil then
+    return nil, nil, nil
   end
 
-
-
-  if distribution ~= "PARTY" then
-
+  local suffix = string.sub(plain, string.len(sourcePrefix) + 1)
+  local questLink = string.find(rawMessage, "|Hquest:", 1, true)
+  if questLink then
+    local searchAt = 1
+    local lastColorStart = nil
+    while true do
+      local colorStart = string.find(rawMessage, "|c", searchAt, true)
+      if not colorStart or colorStart >= questLink then
+        break
+      end
+      lastColorStart = colorStart
+      searchAt = colorStart + 2
+    end
+    suffix = string.sub(rawMessage, lastColorStart or questLink)
+  end
+  return localeKey, feedbackColor, suffix
+end
+function Comm._ShowQuestFeedbackMessage(rawMessage, sender)
+  local localeKey, feedbackColor, suffix = Comm._QuestFeedbackParts(rawMessage)
+  if localeKey == nil then
     return false
-
   end
 
-
+  local displayName = Comm._QuestTalkFeedbackDisplayName(sender)
+  if displayName == "" then
+    return false
+  end
 
   local state = MultiBot and MultiBot.bridge or nil
-
-  if type(state) ~= "table"
-
-      or state.connected ~= true
-
-      or type(state.groupOrderCommands) ~= "table" then
-
-    return false
-
+  local dedupeKey = displayName .. "\031" .. localeKey .. "\031" .. tostring(suffix or "")
+  local now = safeNow()
+  if type(state) == "table"
+      and state.questFeedbackLastKey == dedupeKey
+      and now - (tonumber(state.questFeedbackLastAt) or 0) <= 0.25 then
+    return true
+  end
+  if type(state) == "table" then
+    state.questFeedbackLastKey = dedupeKey
+    state.questFeedbackLastAt = now
   end
 
-
-
-  local senderKey = Comm._NormalizeFleeWhisperName(sender)
-
-  if senderKey == "" then
-
-    return false
-
-  end
-
-
-
-  for _, pending in pairs(state.groupOrderCommands) do
-
-    if type(pending) == "table"
-
-        and pending.order == "QUEST_TALK"
-
-        and type(pending.feedbackNames) == "table"
-
-        and pending.feedbackNames[senderKey] then
-
-      local displayName = Comm._QuestTalkFeedbackDisplayName(sender)
-
-      if displayName == "" then
-
-        return false
-
-      end
-
-
-
-      systemMessage("[" .. displayName .. "] " .. prefix)
-
-      return true
-
-    end
-
-  end
-
-
-
-  return false
-
+  systemMessage("[" .. displayName .. "] " .. L(localeKey) .. tostring(suffix or ""), feedbackColor)
+  return true
 end
 
+function Comm.HandleQuestTalkFeedbackAddonMessage(prefix, message, distribution, sender)
+  if type(prefix) ~= "string" or prefix == "" or tostring(message or "") ~= "" then
+    return false
+  end
+
+  if distribution ~= "PARTY" then
+    return false
+  end
+
+  local state = MultiBot and MultiBot.bridge or nil
+  if type(state) ~= "table"
+      or state.connected ~= true
+      or type(state.groupOrderCommands) ~= "table" then
+    return false
+  end
+
+  local senderKey = Comm._NormalizeFleeWhisperName(sender)
+  if senderKey == "" then
+    return false
+  end
+
+  for _, pending in pairs(state.groupOrderCommands) do
+    if type(pending) == "table"
+        and pending.order == "QUEST_TALK"
+        and type(pending.feedbackNames) == "table"
+        and pending.feedbackNames[senderKey] then
+      return Comm._ShowQuestFeedbackMessage(prefix, sender)
+    end
+  end
+
+  return false
+end
 -- MB_QUEST_TALK_V1_FEEDBACK_END
 
 -- MB_QUEST_GAMEOBJECT_USE_V1_FEEDBACK_BEGIN

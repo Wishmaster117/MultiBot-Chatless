@@ -54,6 +54,17 @@ local enUSValues = {
   ["selfaction.send_failed"] = "The SelfBot action could not be sent: %s",
   ["selfaction.reason.RATE_LIMIT"] = "Too many SelfBot requests. Try again in a few seconds.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
+  ["quest.feedback.available"] = "Quest available: ",
+  ["quest.feedback.incomplete"] = "Quest incomplete: ",
+  ["quest.feedback.accepted"] = "Quest accepted: ",
+  ["quest.feedback.already_completed"] = "Quest already completed: ",
+  ["quest.feedback.already_on"] = "Already on: ",
+  ["quest.feedback.cant_take"] = "Cannot take quest: ",
+  ["quest.feedback.quest_log_full"] = "Quest log is full: ",
+  ["quest.feedback.bags_full"] = "Bags are full: ",
+  ["quest.feedback.cannot_accept"] = "Cannot accept quest: ",
+  -- MB_QUEST_FEEDBACK_I18N_V1_END
   ["lootmaster.title"] = "MultiBot Loot Master",
   ["lootmaster.refresh"] = "Refresh",
   ["lootmaster.assign_to"] = "Assign to:",

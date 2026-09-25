@@ -54,6 +54,17 @@ local frFRValues = {
   ["selfaction.send_failed"] = "L'action SelfBot n'a pas pu être envoyée : %s",
   ["selfaction.reason.RATE_LIMIT"] = "Trop de demandes SelfBot. Réessayez dans quelques secondes.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
+  ["quest.feedback.available"] = "Quête disponible : ",
+  ["quest.feedback.incomplete"] = "Quête incomplète : ",
+  ["quest.feedback.accepted"] = "Quête acceptée : ",
+  ["quest.feedback.already_completed"] = "Quête déjà terminée : ",
+  ["quest.feedback.already_on"] = "Déjà sur la quête : ",
+  ["quest.feedback.cant_take"] = "Impossible de prendre la quête : ",
+  ["quest.feedback.quest_log_full"] = "Journal de quêtes plein : ",
+  ["quest.feedback.bags_full"] = "Sacs pleins : ",
+  ["quest.feedback.cannot_accept"] = "Impossible d'accepter la quête : ",
+  -- MB_QUEST_FEEDBACK_I18N_V1_END
   ["lootmaster.title"] = "MultiBot Responsable du butin",
   ["lootmaster.refresh"] = "Rafraîchir",
   ["lootmaster.assign_to"] = "Attribuer à :",

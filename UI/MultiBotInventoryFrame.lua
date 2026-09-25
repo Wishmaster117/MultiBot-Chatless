@@ -1615,48 +1615,7 @@ local function runInventoryInstantAction(botName, command, options)
             return false
         end
 
-        if MultiBot.allowLegacyChatFallback ~= true then
-            return false
-        end
-
-        local inventory = MultiBot.inventory
-        local itemsFrame = inventory and inventory.frames and inventory.frames.Items
-        local itemButtons = itemsFrame and itemsFrame.buttons
-        if type(itemButtons) ~= "table" then
-            return false
-        end
-
-        local sellCount = 0
-        local protectedFound = false
-        for _, itemButton in pairs(itemButtons) do
-            if itemButton and itemButton.item then
-                if MultiBot.InventoryIsProtectedSellItem and MultiBot.InventoryIsProtectedSellItem(itemButton.item) then
-                    protectedFound = true
-                elseif shouldSellButtonForBulk(itemButton, cmd) then
-                    SendChatMessage("s " .. itemButton.tip, "WHISPER", nil, botName)
-                    if itemButton.Hide then
-                        itemButton:Hide()
-                    end
-                    sellCount = sellCount + 1
-                end
-            end
-        end
-
-        if protectedFound then
-            SendChatMessage(MultiBot.L("info.questitemsellalert", "I cannot sell quest items."), "SAY")
-        end
-
-        if sellCount < 1 and not protectedFound then
-            return false
-        end
-
-        if options.refreshDelay ~= nil and MultiBot.RefreshInventory then
-            MultiBot.RefreshInventory(options.refreshDelay)
-        elseif options.refresh and MultiBot.RefreshInventory then
-            MultiBot.RefreshInventory()
-        end
-
-        return true
+        return false
     end
 
     if isBulkSellCommand(command) then

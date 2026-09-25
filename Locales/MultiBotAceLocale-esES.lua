@@ -54,6 +54,17 @@ local esESValues = {
   ["selfaction.send_failed"] = "No se ha podido enviar la acción de SelfBot: %s",
   ["selfaction.reason.RATE_LIMIT"] = "Demasiadas solicitudes de SelfBot. Vuelve a intentarlo en unos segundos.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
+  ["quest.feedback.available"] = "Misión disponible: ",
+  ["quest.feedback.incomplete"] = "Misión incompleta: ",
+  ["quest.feedback.accepted"] = "Misión aceptada: ",
+  ["quest.feedback.already_completed"] = "Misión ya completada: ",
+  ["quest.feedback.already_on"] = "Ya está en la misión: ",
+  ["quest.feedback.cant_take"] = "No se puede aceptar la misión: ",
+  ["quest.feedback.quest_log_full"] = "El registro de misiones está lleno: ",
+  ["quest.feedback.bags_full"] = "Las bolsas están llenas: ",
+  ["quest.feedback.cannot_accept"] = "No se puede aceptar la misión: ",
+  -- MB_QUEST_FEEDBACK_I18N_V1_END
   ["lootmaster.title"] = "MultiBot Maestro despojador",
   ["lootmaster.refresh"] = "Actualizar",
   ["lootmaster.assign_to"] = "Asignar a:",

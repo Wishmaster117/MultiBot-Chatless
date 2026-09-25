@@ -54,6 +54,17 @@ local zhCNValues = {
   ["selfaction.send_failed"] = "无法发送 SelfBot 操作：%s",
   ["selfaction.reason.RATE_LIMIT"] = "SelfBot 请求过于频繁。请几秒后重试。",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
+  ["quest.feedback.available"] = "可接任务：",
+  ["quest.feedback.incomplete"] = "任务未完成：",
+  ["quest.feedback.accepted"] = "已接受任务：",
+  ["quest.feedback.already_completed"] = "任务已完成：",
+  ["quest.feedback.already_on"] = "已在进行任务：",
+  ["quest.feedback.cant_take"] = "无法接取任务：",
+  ["quest.feedback.quest_log_full"] = "任务日志已满：",
+  ["quest.feedback.bags_full"] = "背包已满：",
+  ["quest.feedback.cannot_accept"] = "无法接受任务：",
+  -- MB_QUEST_FEEDBACK_I18N_V1_END
   ["lootmaster.title"] = "MultiBot 战利品分配者",
   ["lootmaster.refresh"] = "刷新",
   ["lootmaster.assign_to"] = "分配给：",

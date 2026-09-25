@@ -1068,10 +1068,6 @@ function MultiBot.InitializeTalentFrameModule()
             end
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            SendChatMessage("talents apply " .. build, "WHISPER", nil, botName)
-            return true
-        end
 
         showTalentApplyResult({
             status = "error",

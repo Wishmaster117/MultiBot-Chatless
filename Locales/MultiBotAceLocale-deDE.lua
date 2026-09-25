@@ -54,6 +54,17 @@ local deDEValues = {
   ["selfaction.send_failed"] = "Die SelfBot-Aktion konnte nicht gesendet werden: %s",
   ["selfaction.reason.RATE_LIMIT"] = "Zu viele SelfBot-Anfragen. Bitte in einigen Sekunden erneut versuchen.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
+  ["quest.feedback.available"] = "Quest verfügbar: ",
+  ["quest.feedback.incomplete"] = "Quest unvollständig: ",
+  ["quest.feedback.accepted"] = "Quest angenommen: ",
+  ["quest.feedback.already_completed"] = "Quest bereits abgeschlossen: ",
+  ["quest.feedback.already_on"] = "Quest bereits angenommen: ",
+  ["quest.feedback.cant_take"] = "Quest kann nicht angenommen werden: ",
+  ["quest.feedback.quest_log_full"] = "Questlog ist voll: ",
+  ["quest.feedback.bags_full"] = "Taschen sind voll: ",
+  ["quest.feedback.cannot_accept"] = "Quest kann nicht angenommen werden: ",
+  -- MB_QUEST_FEEDBACK_I18N_V1_END
   ["lootmaster.title"] = "MultiBot Plündermeister",
   ["lootmaster.refresh"] = "Aktualisieren",
   ["lootmaster.assign_to"] = "Zuweisen an:",
