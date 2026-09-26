@@ -1,7 +1,7 @@
-﻿# Multibot Chatless + Bridge — Roadmap
+# Multibot Chatless + Bridge — Roadmap
 
 **Statut : active**
-**Dernière synchronisation : 23/09/2026**
+**Dernière synchronisation : 26/09/2026**
 
 Cette roadmap est la **source de vérité technique** du projet.
 Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontairement plus courts.
@@ -15,7 +15,7 @@ Les README Addon/Bridge servent de vitrine fonctionnelle et restent volontaireme
 ```text
 Repo:   L:\ChromieCraft_3.3.5a\Interface\AddOns\MultiBot
 Branch: feature/group-orders-chatless
-HEAD:   36144e183686fa939f58f170a44bcfd21c198fac
+HEAD:   becea1a82c15c34ae325a4e8c41650f082c37f5c
 ```
 
 État fonctionnel audité au 23/09/2026 :
@@ -39,7 +39,7 @@ HEAD:   36144e183686fa939f58f170a44bcfd21c198fac
 ```text
 Repo:   L:\AC_PB\azerothcore-wotlk\modules\mod-multibot-bridge
 Branch: feature/group-orders-chatless
-HEAD:   49f8d9f7af64f33af43f8d0cab73515515e0cca9
+HEAD:   3b00e4369fa5307ede69967b00234cc4e3124bd3
 ```
 
 État fonctionnel audité au 23/09/2026 :
@@ -1595,3 +1595,56 @@ Après chaque gros merge :
 5. garder les README centrés sur les fonctionnalités et nouveautés visibles ;
 6. synchroniser `docs/RAIDUS_GUIDE.md` lorsqu'un comportement utilisateur Raidus change ;
 7. vérifier à nouveau l'intégrité Playerbots read-only.
+
+<!-- DOC_SYNC_2026_09_26_GLOBAL_CHAT_AUDIT_V2 -->
+## 15. Synchronisation 26/09/2026 — baseline pré-audit global v2
+
+### Clôtures post-Warlock
+
+Les éléments suivants sont clôturés et ne doivent plus être présentés comme backlog actif :
+
+- `GLYPH_EQUIP_V1` : application de glyphes structurée avec résultat/feedback localisé ;
+- `BOT_WIPE_V1` : wipe ciblé via endpoint Bridge borné ;
+- `BOT_SUMMON_V1` : summon ciblé structuré ;
+- `BOT_RELEASE_V1` et Auto Release : lifecycle de mort/release structuré ;
+- P1-C1 : suppression des fallbacks chat prouvés obsolètes pour Quest Abandon, Talent Apply, Outfit execution et Inventory bulk sell ;
+- Quest Feedback Chatless : feedback Playerbots localisé ; suppression du whisper uniquement après confirmation de l'expéditeur dans le roster Bridge ; un whisper humain identique reste visible ;
+- Warlock Firestone/Spellstone/TEMP_ENCHANT : déjà clôturé via `WARLOCK_STONE_STATE_V1`.
+
+### Baseline de reprise
+
+```text
+Addon
+Branch: feature/group-orders-chatless
+HEAD:   becea1a82c15c34ae325a4e8c41650f082c37f5c
+
+Bridge
+Branch: feature/group-orders-chatless
+HEAD:   3b00e4369fa5307ede69967b00234cc4e3124bd3
+
+Playerbots
+Mode: STRICT READ ONLY
+```
+
+### Ordre de reprise autorisé
+
+```text
+1. audit-multibot-global-remaining-chat-paths-v2 (READ ONLY)
+2. analyse et classification de chaque occurrence restante
+3. patches minimaux uniquement sur les chemins prouvés actifs/obsolètes
+4. cleanup final des parsers/fallbacks legacy, y compris Units/lifecycle
+5. audit final global et archivage
+```
+
+Classification attendue :
+
+```text
+manual command volontaire
+diagnostic
+compatibility fallback
+information message
+UI mechanism à migrer
+dead code
+```
+
+Aucun nouveau cleanup ne doit précéder l'audit global v2.

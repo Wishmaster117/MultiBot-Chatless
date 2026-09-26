@@ -596,3 +596,14 @@ Confirm `mod-multibot-bridge` is installed, configured, compiled and loaded by t
 ### I still see some Playerbots chat
 
 That does not automatically mean the Bridge is broken. Manual commands and a small number of intentionally retained or not-yet-migrated paths still exist while the project remains **mostly chatless**.
+
+<!-- DOC_SYNC_2026_09_26_GLOBAL_CHAT_AUDIT_V2 -->
+# Recent Milestone — Glyphs, Bot Lifecycle and Quest Feedback Chatless
+
+The post-Warlock closeout completed the structured `GLYPH_EQUIP_V1`, `BOT_WIPE_V1`, `BOT_SUMMON_V1` and `BOT_RELEASE_V1` paths. The corresponding migrated automatic chat dependencies were removed where their obsolescence was proven.
+
+Quest feedback produced by controlled Playerbots is now converted to localized local system feedback. Whisper suppression is performed only when the sender is positively identified in the current authoritative Bridge roster. An identical whisper from a real human player is therefore not filtered by text alone, and native quest hyperlinks/colors are preserved.
+
+P1-C1 also removed proven obsolete chat fallbacks from Quest Abandon, Talent Apply, Outfit execution and Inventory bulk sell.
+
+Warlock Firestone/Spellstone is already closed through `WARLOCK_STONE_STATE_V1` and is not active backlog. The next project milestone is the read-only `audit-multibot-global-remaining-chat-paths-v2`, followed by evidence-based legacy parser/fallback cleanup.
