@@ -54,6 +54,15 @@ local ruRUValues = {
   ["selfaction.send_failed"] = "Не удалось отправить действие SelfBot: %s",
   ["selfaction.reason.RATE_LIMIT"] = "Слишком много запросов SelfBot. Повторите попытку через несколько секунд.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_BEGIN
+  ["info.lifecycle.already_logged_in.strategy_refresh_skipped"] = "[MultiBot] %s уже подключён. Обновление стратегий через шёпот пропущено.",
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_END
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_BEGIN
+  ["info.selfbot.enable.strategy_refresh_whisper_skipped"] = "[MultiBot] SelfBot включён. Автоматическое обновление стратегий через шёпот пропущено.",
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_END
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_BEGIN
+  ["info.lifecycle.hello.strategy_refresh_whisper_skipped"] = "[MultiBot] %s подключён. Автоматическое обновление стратегий через шёпот пропущено.",
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_END
   -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
   ["quest.feedback.available"] = "Доступное задание: ",
   ["quest.feedback.incomplete"] = "Задание не завершено: ",
@@ -1355,6 +1364,9 @@ local ruRUValues = {
   ["strategy.reason.SELF_STRATEGY_INVALID_CHANGES"] = "Недопустимые изменения стратегии SelfBot.",
   ["strategy.reason.SELF_STRATEGY_TOO_MANY_REQUESTS"] = "Слишком много запросов стратегии SelfBot. Повторите попытку чуть позже.",
   ["strategy.reason.UNKNOWN"] = "Команда стратегии завершилась ошибкой по неизвестной причине.",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_BEGIN
+  ["creator.init_auto.feedback.equipped"] = "[MultiBot] %s экипирует: %s",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_END
   ["info.outfits.feedback_equip"] = "Комплект «%s» экипирован.",
   ["info.outfits.feedback_replace"] = "Комплект «%s» заменён.",
   ["info.outfits.feedback_update"] = "Комплект «%s» обновлён.",

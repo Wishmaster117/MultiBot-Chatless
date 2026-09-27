@@ -54,6 +54,15 @@ local deDEValues = {
   ["selfaction.send_failed"] = "Die SelfBot-Aktion konnte nicht gesendet werden: %s",
   ["selfaction.reason.RATE_LIMIT"] = "Zu viele SelfBot-Anfragen. Bitte in einigen Sekunden erneut versuchen.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_BEGIN
+  ["info.lifecycle.already_logged_in.strategy_refresh_skipped"] = "[MultiBot] %s ist bereits eingeloggt. Die Strategieaktualisierung per Flüstern wurde übersprungen.",
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_END
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_BEGIN
+  ["info.selfbot.enable.strategy_refresh_whisper_skipped"] = "[MultiBot] SelfBot aktiviert. Die automatische Strategieaktualisierung per Flüstern wurde übersprungen.",
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_END
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_BEGIN
+  ["info.lifecycle.hello.strategy_refresh_whisper_skipped"] = "[MultiBot] %s ist verbunden. Die automatische Strategieaktualisierung per Flüstern wurde übersprungen.",
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_END
   -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
   ["quest.feedback.available"] = "Quest verfügbar: ",
   ["quest.feedback.incomplete"] = "Quest unvollständig: ",
@@ -1357,6 +1366,9 @@ local deDEValues = {
   ["strategy.reason.SELF_STRATEGY_INVALID_CHANGES"] = "Ungültige SelfBot-Strategieänderungen.",
   ["strategy.reason.SELF_STRATEGY_TOO_MANY_REQUESTS"] = "Zu viele SelfBot-Strategieanfragen. Versuche es gleich erneut.",
   ["strategy.reason.UNKNOWN"] = "Der Strategiebefehl ist aus unbekanntem Grund fehlgeschlagen.",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_BEGIN
+  ["creator.init_auto.feedback.equipped"] = "[MultiBot] %s rüstet aus: %s",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_END
   ["info.outfits.feedback_equip"] = "Outfit „%s“ ausgerüstet.",
   ["info.outfits.feedback_replace"] = "Outfit „%s“ ersetzt.",
   ["info.outfits.feedback_update"] = "Outfit „%s“ aktualisiert.",

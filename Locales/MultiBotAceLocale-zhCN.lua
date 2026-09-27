@@ -54,6 +54,15 @@ local zhCNValues = {
   ["selfaction.send_failed"] = "无法发送 SelfBot 操作：%s",
   ["selfaction.reason.RATE_LIMIT"] = "SelfBot 请求过于频繁。请几秒后重试。",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_BEGIN
+  ["info.lifecycle.already_logged_in.strategy_refresh_skipped"] = "[MultiBot] %s 已登录。已跳过通过密语进行的策略刷新。",
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_END
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_BEGIN
+  ["info.selfbot.enable.strategy_refresh_whisper_skipped"] = "[MultiBot] SelfBot 已启用。已跳过通过密语自动刷新策略。",
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_END
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_BEGIN
+  ["info.lifecycle.hello.strategy_refresh_whisper_skipped"] = "[MultiBot] %s 已连接。已跳过通过密语自动刷新策略。",
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_END
   -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
   ["quest.feedback.available"] = "可接任务：",
   ["quest.feedback.incomplete"] = "任务未完成：",
@@ -1355,6 +1364,9 @@ local zhCNValues = {
   ["strategy.reason.SELF_STRATEGY_INVALID_CHANGES"] = "SelfBot 策略更改无效。",
   ["strategy.reason.SELF_STRATEGY_TOO_MANY_REQUESTS"] = "SelfBot 策略请求过多，请稍后重试。",
   ["strategy.reason.UNKNOWN"] = "策略命令因未知原因失败。",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_BEGIN
+  ["creator.init_auto.feedback.equipped"] = "[MultiBot] %s 装备：%s",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_END
   ["info.outfits.feedback_equip"] = "配装“%s”已装备。",
   ["info.outfits.feedback_replace"] = "配装“%s”已替换。",
   ["info.outfits.feedback_update"] = "配装“%s”已更新。",

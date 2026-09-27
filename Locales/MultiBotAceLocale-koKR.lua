@@ -54,6 +54,15 @@ local koKRValues = {
   ["selfaction.send_failed"] = "SelfBot 동작을 보내지 못했습니다: %s",
   ["selfaction.reason.RATE_LIMIT"] = "SelfBot 요청이 너무 많습니다. 몇 초 후 다시 시도하세요.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_BEGIN
+  ["info.lifecycle.already_logged_in.strategy_refresh_skipped"] = "[MultiBot] %s 님은 이미 로그인되어 있습니다. 귓속말을 통한 전략 갱신은 건너뛰었습니다.",
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_END
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_BEGIN
+  ["info.selfbot.enable.strategy_refresh_whisper_skipped"] = "[MultiBot] SelfBot이 활성화되었습니다. 귓속말을 통한 자동 전략 새로고침을 건너뛰었습니다.",
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_END
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_BEGIN
+  ["info.lifecycle.hello.strategy_refresh_whisper_skipped"] = "[MultiBot] %s 님이 접속했습니다. 귓속말을 통한 자동 전략 새로고침을 건너뛰었습니다.",
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_END
   -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
   ["quest.feedback.available"] = "수행 가능한 퀘스트: ",
   ["quest.feedback.incomplete"] = "미완료 퀘스트: ",
@@ -1346,6 +1355,9 @@ local koKRValues = {
   ["strategy.reason.SELF_STRATEGY_INVALID_CHANGES"] = "SelfBot 전략 변경 내용이 올바르지 않습니다.",
   ["strategy.reason.SELF_STRATEGY_TOO_MANY_REQUESTS"] = "SelfBot 전략 요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
   ["strategy.reason.UNKNOWN"] = "알 수 없는 이유로 전략 명령이 실패했습니다.",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_BEGIN
+  ["creator.init_auto.feedback.equipped"] = "[MultiBot] %s 장착: %s",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_END
   ["info.outfits.feedback_equip"] = "장비 세트 \"%s\": 장착 완료.",
   ["info.outfits.feedback_replace"] = "장비 세트 \"%s\": 교체 완료.",
   ["info.outfits.feedback_update"] = "장비 세트 \"%s\": 업데이트 완료.",

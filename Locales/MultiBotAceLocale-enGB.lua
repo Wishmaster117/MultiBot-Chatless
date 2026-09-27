@@ -54,6 +54,15 @@ local enGBValues = {
   ["selfaction.send_failed"] = "The SelfBot action could not be sent: %s",
   ["selfaction.reason.RATE_LIMIT"] = "Too many SelfBot requests. Try again in a few seconds.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_BEGIN
+  ["info.lifecycle.already_logged_in.strategy_refresh_skipped"] = "[MultiBot] %s is already logged in. Strategy refresh via whisper was skipped.",
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_END
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_BEGIN
+  ["info.selfbot.enable.strategy_refresh_whisper_skipped"] = "[MultiBot] SelfBot enabled. Automatic strategy refresh via whisper was skipped.",
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_END
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_BEGIN
+  ["info.lifecycle.hello.strategy_refresh_whisper_skipped"] = "[MultiBot] %s is connected. Automatic strategy refresh via whisper was skipped.",
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_END
   -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
   ["quest.feedback.available"] = "Quest available: ",
   ["quest.feedback.incomplete"] = "Quest incomplete: ",
@@ -1360,6 +1369,9 @@ local enGBValues = {
   ["strategy.reason.SELF_STRATEGY_INVALID_CHANGES"] = "Invalid SelfBot strategy changes.",
   ["strategy.reason.SELF_STRATEGY_TOO_MANY_REQUESTS"] = "Too many SelfBot strategy requests. Try again in a moment.",
   ["strategy.reason.UNKNOWN"] = "The strategy command failed for an unknown reason.",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_BEGIN
+  ["creator.init_auto.feedback.equipped"] = "[MultiBot] %s equips: %s",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_END
   ["info.outfits.feedback_equip"] = "Outfit \"%s\" equipped.",
   ["info.outfits.feedback_replace"] = "Outfit \"%s\" replaced.",
   ["info.outfits.feedback_update"] = "Outfit \"%s\" updated.",

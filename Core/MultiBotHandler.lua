@@ -37,87 +37,8 @@ local function BridgeBootOwnsState()
 	return false
 end
 
-local function RequestBridgeSnapshotAfterGroupReconnect()
-	if not (MultiBot and MultiBot.Comm and MultiBot.bridge and MultiBot.bridge.connected) then
-		return
-	end
-
-	local function refresh()
-		if not (MultiBot and MultiBot.Comm and MultiBot.bridge and MultiBot.bridge.connected) then
-			return
-		end
-
-		if MultiBot.Comm.RequestRoster then
-			MultiBot.Comm.RequestRoster()
-		end
-		if MultiBot.Comm.RequestStates then
-			MultiBot.Comm.RequestStates()
-		end
-		if MultiBot.Comm.RequestBotDetails then
-			MultiBot.Comm.RequestBotDetails()
-		end
-	end
-
-	if MultiBot.TimerAfter then
-		MultiBot.TimerAfter(2.0, refresh)
-	else
-		refresh()
-	end
-end
-
-local function ReconnectExistingGroupBots(reason)
-	local bridge = MultiBot and MultiBot.bridge
-	if bridge and bridge.connected == true
-		and bridge.botLifecycleCapable == true
-		and bridge.botTargetResolveCapable == true then
-		-- Structured lifecycle mode: group reconnect is explicit from the
-		-- roster row and must never auto-send ".playerbot bot add".
-		return false
-	end
-
-	if not (MultiBot and MultiBot.allowLegacyChatFallback == true) then
-		return false
-	end
-
-	if MultiBot._groupReconnectDone then
-		return false
-	end
-
-	local now = (type(GetTime) == "function") and GetTime() or 0
-	if MultiBot._lastGroupReconnectAt and (now - MultiBot._lastGroupReconnectAt) < 3.0 then
-		return false
-	end
-
-	local playerName = UnitName("player")
-	local sent = 0
-
-	if GetNumRaidMembers() > 0 then
-		for i = 1, GetNumRaidMembers() do
-			local raidName = UnitName("raid" .. i)
-			if raidName and raidName ~= "" and raidName ~= playerName then
-				SendChatMessage(".playerbot bot add " .. raidName, "SAY")
-				sent = sent + 1
-			end
-		end
-	elseif GetNumPartyMembers() > 0 then
-		for i = 1, GetNumPartyMembers() do
-			local partyName = UnitName("party" .. i)
-			if partyName and partyName ~= "" and partyName ~= playerName then
-				SendChatMessage(".playerbot bot add " .. partyName, "SAY")
-				sent = sent + 1
-			end
-		end
-	end
-
-	if sent <= 0 then
-		return false
-	end
-
-	MultiBot._groupReconnectDone = true
-	MultiBot._lastGroupReconnectAt = now
-	MultiBot.dprint("GROUP_RECONNECT", reason or "?", sent)
-	RequestBridgeSnapshotAfterGroupReconnect()
-	return true
+local function ReconnectExistingGroupBots(_)
+	return false
 end
 
 local function LegacyChatFallbackEnabled()
@@ -280,12 +201,6 @@ function MultiBot.HandleOnUpdate(pElapsed)
 							invite.pendingName = nil
 							MultiBot.auto.invite = false
 						end
-					elseif inviteSource == "BAR" and LegacyChatFallbackEnabled() then
-						SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", inviteName), "SAY")
-						SendChatMessage(".playerbot bot add " .. inviteName, "SAY")
-						invite.needs = invite.needs - 1
-						invite.index = invite.index + 1
-						invite.elapsed = 0
 					else
 						invite.elapsed = 0
 						invite.roster = ""
@@ -1084,51 +999,12 @@ local function restoreMainBarSavedStates()
 	end
 end
 
-local function hideButtonUnitFrame(button)
-	if not button or not button.parent or not button.parent.frames then return end
-	local unitFrame = button.parent.frames[button.name]
-	if unitFrame ~= nil then
-		unitFrame:Hide()
-	end
-end
-
 local function bindUnitToggleHandlers(button, options)
 	if MultiBot.BindUnitToggleHandlers then
 		return MultiBot.BindUnitToggleHandlers(button, options)
 	end
 
-	if not button then return end
-
-	local requireEnabledStateOnRight = options and options.requireEnabledStateOnRight
-
-	button.doRight = function(pButton)
-		if requireEnabledStateOnRight and pButton.state == false then
-			return
-		end
-
-		if not LegacyChatFallbackEnabled() then
-			return
-		end
-
-		SendChatMessage(".playerbot bot remove " .. pButton.name, "SAY")
-		hideButtonUnitFrame(pButton)
-		pButton.setDisable()
-	end
-
-	button.doLeft = function(pButton)
-		if pButton.state then
-			if pButton.parent and pButton.parent.frames and pButton.parent.frames[pButton.name] ~= nil then
-				MultiBot.ShowHideSwitch(pButton.parent.frames[pButton.name])
-			end
-		else
-			if not LegacyChatFallbackEnabled() then
-				return
-			end
-
-			SendChatMessage(".playerbot bot add " .. pButton.name, "SAY")
-			pButton.setEnable()
-		end
-	end
+	return nil
 end
 
 local function ensureQuestStateTables()
@@ -1677,11 +1553,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                     return
                 end
 
-                if not LegacyChatFallbackEnabled() then
-                    return
-                end
-
-                SendChatMessage(".playerbot bot list", "SAY")
+                return
             end)
         end
 
@@ -1881,32 +1753,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				end
 			end
 
-			if not LegacyChatFallbackEnabled() then
-				return
-			end
-
-			-- REFRESH:RAID --
-
-			if(GetNumRaidMembers() > 4) then
-				for i = 1, GetNumRaidMembers() do
-					local raidName = UnitName("raid" .. i)
-					SendChatMessage(".playerbot bot add " .. raidName, "SAY")
-				end
-
-				return
-			end
-
-			-- REFRESH:GROUP --
-
-			if(GetNumPartyMembers() > 0) then
-				for i = 1, GetNumPartyMembers() do
-					local partyName = UnitName("party" .. i)
-					SendChatMessage(".playerbot bot add " .. partyName, "SAY")
-				end
-
-				return
-			end
-
 			return
 		end
 
@@ -1928,12 +1774,12 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                   return
                end
 
-               if LegacyChatFallbackEnabled() then
-                  tButton.waitFor = "CO"
-                  SendChatMessage("co ?", "WHISPER", nil, tName)
-               else
-                  tButton.waitFor = ""
+               if LegacyChatFallbackEnabled() and MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
+                  MultiBot.Comm.ShowSystemMessage(
+                     string.format(MultiBot.L("info.lifecycle.already_logged_in.strategy_refresh_skipped"), tName)
+                  )
                end
+               tButton.waitFor = ""
                tButton.setEnable()
                return
             end
@@ -1943,34 +1789,21 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			return
 		end
 
-		if(MultiBot.isInside(arg1, "remove: ")) then
-			local tName = string.sub(arg1, 9, string.find(arg1, " ", 9) - 1)
-			local tFrame = MultiBot.frames["MultiBar"].frames["Units"].frames[tName]
-			local tButton = MultiBot.frames["MultiBar"].frames["Units"].buttons[tName]
-			if(tButton == nil) then return end
-
-			if(MultiBot.isInside(arg1, "not your bot")) then
-				SendChatMessage("leave", "WHISPER", nil, tName)
-			end
-
-			MultiBot.doRemove(MultiBot.index.classes.actives[tButton.class], tButton.name)
-			MultiBot.doRemove(MultiBot.index.actives, tButton.name)
-
-			if(tFrame ~= nil) then tFrame:Hide() end
-			tButton.setDisable()
-			return
-		end
-
 		if(arg1 == "Enable player botAI") then
 			local tName = UnitName("player")
 			local tButton = MultiBot.frames["MultiBar"].frames["Units"].buttons[tName]
 			if(tButton == nil) then return end
-			if LegacyChatFallbackEnabled() then
-				tButton.waitFor = "CO"
-				SendChatMessage("co ?", "WHISPER", nil, tName)
-			else
-				tButton.waitFor = ""
+			if MultiBot.Comm and type(MultiBot.Comm.IsSelfBotCapable) == "function"
+					and MultiBot.Comm.IsSelfBotCapable()
+					and type(MultiBot.Comm.RequestSelfBotState) == "function" then
+				MultiBot.Comm.RequestSelfBotState()
 			end
+			if LegacyChatFallbackEnabled() and MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
+				MultiBot.Comm.ShowSystemMessage(
+					MultiBot.L("info.selfbot.enable.strategy_refresh_whisper_skipped")
+				)
+			end
+			tButton.waitFor = ""
 			tButton.setEnable()
 			return
 		end
@@ -2132,12 +1965,12 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				return
 			end
 
-			if LegacyChatFallbackEnabled() then
-				tButton.waitFor = "CO"
-				SendChatMessage("co ?", "WHISPER", nil, arg2)
-			else
-				tButton.waitFor = ""
+			if LegacyChatFallbackEnabled() and MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
+				MultiBot.Comm.ShowSystemMessage(
+					string.format(MultiBot.L("info.lifecycle.hello.strategy_refresh_whisper_skipped"), arg2)
+				)
 			end
+			tButton.waitFor = ""
 			return
 		end
 
@@ -2177,56 +2010,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			end
 
 			SendChatMessage("who", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor == "NC" and MultiBot.isInside(arg1, "Strategies: ")) then
-			tButton.waitFor = "IGNORE"
-			tButton.normal = string.sub(arg1, 13)
-
-			local tUnitsFrame = MultiBot.frames["MultiBar"].frames["Units"]
-			local tExistingFrame = tUnitsFrame.frames and tUnitsFrame.frames[arg2] or nil
-			local tCombat = tButton.combat or ""
-			local tNormal = tButton.normal or ""
-
-			if tExistingFrame
-					and tExistingFrame._mbLegacyBuilt == true
-					and tExistingFrame._mbLegacyClass == tButton.class
-					and tExistingFrame._mbLegacyCombat == tCombat
-					and tExistingFrame._mbLegacyNormal == tNormal then
-				tButton.setEnable()
-				SendChatMessage("ss ?", "WHISPER", nil, arg2)
-				return
-			end
-
-			local tWasShown = tExistingFrame and tExistingFrame.IsShown and tExistingFrame:IsShown()
-			local tFrame = tUnitsFrame.addFrame(arg2, tButton.x - tButton.size - 2, tButton.y + 2)
-			tFrame.class = tButton.class
-			tFrame.name = tButton.name
-
-			MultiBot["add" .. tButton.class](tFrame, tButton.combat, tButton.normal)
-			MultiBot.addEvery(tFrame, tButton.combat, tButton.normal)
-			tFrame._mbLegacyBuilt = true
-			tFrame._mbLegacyClass = tButton.class
-			tFrame._mbLegacyCombat = tCombat
-			tFrame._mbLegacyNormal = tNormal
-
-			if(MultiBot.index.classes.actives[tButton.class] == nil) then MultiBot.index.classes.actives[tButton.class] = {} end
-			if(MultiBot.isActive(tButton.name) == false) then
-				table.insert(MultiBot.index.classes.actives[tButton.class], tButton.name)
-				table.insert(MultiBot.index.actives, tButton.name)
-			end
-
-			tButton.setEnable()
-			if tWasShown and tFrame.Show then tFrame:Show() end
-			SendChatMessage("ss ?", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor == "CO" and MultiBot.isInside(arg1, "Strategies: ")) then
-			tButton.waitFor = "NC"
-			tButton.combat = string.sub(arg1, 13)
-			SendChatMessage("nc ?", "WHISPER", nil, arg2)
 			return
 		end
 

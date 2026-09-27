@@ -1892,21 +1892,6 @@ local function addRosterMemberButton(member, socialRoster)
                 return
             end
 
-            -- Preserve the pre-existing fallback only when structured
-            -- lifecycle capabilities are unavailable.
-            if MultiBot.allowLegacyChatFallback ~= true then
-                return
-            end
-
-            SendChatMessage(".playerbot bot remove " .. button.name, "SAY")
-            if MultiBot.SetBridgeBotOnlineState and button.bridge ~= nil then
-                MultiBot.SetBridgeBotOnlineState(button, false)
-            else
-                hideSharedRosterUnitFrame(button)
-                if button.setDisable then
-                    button.setDisable()
-                end
-            end
             return
         end
 
@@ -1931,15 +1916,7 @@ local function addRosterMemberButton(member, socialRoster)
         if button.state == false then
             return
         end
-        if MultiBot.allowLegacyChatFallback ~= true then
-            return
-        end
-        button._mbSocialForceCollapsed = true
-        SendChatMessage(".playerbot bot remove " .. button.name, "SAY")
-        if button.parent.frames[button.name] ~= nil then
-            button.parent.frames[button.name]:Hide()
-        end
-        button.setDisable()
+        return
     end
 
     member.doLeft = function(button)
@@ -1969,14 +1946,6 @@ local function addRosterMemberButton(member, socialRoster)
                 return
             end
 
-            if MultiBot.allowLegacyChatFallback ~= true then
-                return
-            end
-
-            SendChatMessage(".playerbot bot add " .. button.name, "SAY")
-            if button.setEnable then
-                button.setEnable()
-            end
             return
         end
 
@@ -2015,13 +1984,7 @@ local function addRosterMemberButton(member, socialRoster)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback ~= true then
-            return
-        end
-
-        button._mbSocialForceCollapsed = false
-        SendChatMessage(".playerbot bot add " .. button.name, "SAY")
-        button.setEnable()
+        return
     end
 end
 
@@ -2231,68 +2194,6 @@ refreshStrategiesForActiveBots = function(unitsButton)
         return
     end
 
-    if MultiBot.allowLegacyChatFallback ~= true then
-        return
-    end
-
-    local function refreshStrategiesFor(name)
-        if not name or name == UnitName("player") then
-            return
-        end
-
-        local rosters = { "actives", "players", "members", "friends", "favorites" }
-        local isBot = false
-        local hasAnyRoster = false
-
-        if MultiBot.isRoster and MultiBot.index then
-            for index = 1, #rosters do
-                local rosterName = rosters[index]
-                local list = MultiBot.index[rosterName]
-                if list and next(list) ~= nil then
-                    hasAnyRoster = true
-                end
-                if list and MultiBot.isRoster(rosterName, name) then
-                    isBot = true
-                    break
-                end
-            end
-        end
-
-        if not isBot and hasAnyRoster then
-            return
-        end
-
-        local button = unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]
-
-        if button then
-            button.waitFor = "CO"
-        end
-
-        SendChatMessage("co ?", "WHISPER", nil, name)
-    end
-
-    if scopedToDisplayedUnits then
-        if targetNames and #targetNames > 0 then
-            for index = 1, #targetNames do
-                refreshStrategiesFor(targetNames[index])
-            end
-        end
-
-        return
-    end
-
-    if IsInRaid() then
-        for index = 1, GetNumGroupMembers() do
-            refreshStrategiesFor(UnitName("raid" .. index))
-        end
-        return
-    end
-
-    if IsInGroup() then
-        for index = 1, GetNumSubgroupMembers() do
-            refreshStrategiesFor(UnitName("party" .. index))
-        end
-    end
 end
 
 local function requestRosterBootstrap(button)
@@ -2395,9 +2296,6 @@ local function createFactionBanner(unitsFrame)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            SendChatMessage(".playerbot bot remove *", "SAY")
-        end
     end
     button.doLeft = function()
         local bridge = MultiBot.bridge
@@ -2409,9 +2307,6 @@ local function createFactionBanner(unitsFrame)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            SendChatMessage(".playerbot bot add *", "SAY")
-        end
     end
     -- MB_BOT_GROUP_LIFECYCLE_V1_END
 

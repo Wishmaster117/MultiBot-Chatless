@@ -412,6 +412,7 @@ local function ensureBridgeState()
   state.botLifecycleCommands = type(state.botLifecycleCommands) == "table" and state.botLifecycleCommands or {}
   state.creatorAddClassCommands = type(state.creatorAddClassCommands) == "table" and state.creatorAddClassCommands or {}
   state.creatorInitAutoCommands = type(state.creatorInitAutoCommands) == "table" and state.creatorInitAutoCommands or {}
+  state.creatorInitAutoFeedbackSessions = type(state.creatorInitAutoFeedbackSessions) == "table" and state.creatorInitAutoFeedbackSessions or {}
   state.botMaintenanceSeq = tonumber(state.botMaintenanceSeq) or 0
   state.botMaintenanceCommands = type(state.botMaintenanceCommands) == "table" and state.botMaintenanceCommands or {}
   state.botWipeCapable = state.botWipeCapable or false
@@ -1429,6 +1430,360 @@ function Comm.ApplyCreatorAddClassResultPayload(payload, state)
 end
 -- MB_CREATOR_ADDCLASS_V1_END
 -- MB_CREATOR_INIT_AUTO_V1_BEGIN
+-- MB_CREATOR_INIT_AUTO_CHATLESS_FEEDBACK_V2_BEGIN
+function Comm._CreatorInitAutoFeedbackBuildAllowedNames(mode, botName, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+  local rosterNames = {}
+  local allowedNames = {}
+
+  for _, entry in ipairs(state.roster or {}) do
+    if type(entry) == "table" then
+      local displayName = trim(entry.name or "")
+      local key = Comm._NormalizeFleeWhisperName(displayName)
+      if key ~= "" and displayName ~= "" then
+        rosterNames[key] = displayName
+      end
+    end
+  end
+
+  mode = string.upper(trim(tostring(mode or "")))
+  if mode == "TARGET" then
+    local targetKey = Comm._NormalizeFleeWhisperName(botName)
+    if targetKey ~= "" and rosterNames[targetKey] then
+      allowedNames[targetKey] = rosterNames[targetKey]
+    end
+    return allowedNames
+  end
+
+  if mode ~= "GROUP" then
+    return allowedNames
+  end
+
+  local raidCount = type(GetNumRaidMembers) == "function"
+      and (tonumber(GetNumRaidMembers()) or 0)
+      or 0
+  if raidCount > 0 and type(GetRaidRosterInfo) == "function" then
+    for index = 1, raidCount do
+      local raidName = GetRaidRosterInfo(index)
+      local key = Comm._NormalizeFleeWhisperName(raidName)
+      if key ~= "" and rosterNames[key] then
+        allowedNames[key] = rosterNames[key]
+      end
+    end
+    return allowedNames
+  end
+
+  local partyCount = type(GetNumPartyMembers) == "function"
+      and (tonumber(GetNumPartyMembers()) or 0)
+      or 0
+  if type(UnitName) == "function" then
+    for index = 1, partyCount do
+      local partyName = UnitName("party" .. tostring(index))
+      local key = Comm._NormalizeFleeWhisperName(partyName)
+      if key ~= "" and rosterNames[key] then
+        allowedNames[key] = rosterNames[key]
+      end
+    end
+  end
+
+  return allowedNames
+end
+
+function Comm._CreatorInitAutoFeedbackParts(message)
+  message = tostring(message or "")
+  if message == "" then
+    return nil, nil
+  end
+
+  local equipPrefix = "equipping "
+  local movePrefix = "Main hand upgrade found. Moving "
+  local lowered = string.lower(message)
+  local isEquip = string.sub(lowered, 1, string.len(equipPrefix)) == equipPrefix
+  local isMove = string.sub(message, 1, string.len(movePrefix)) == movePrefix
+  if not isEquip and not isMove then
+    return nil, nil
+  end
+
+  local itemMarker = string.find(message, "|Hitem:", 1, true)
+  if not itemMarker then
+    return nil, nil
+  end
+
+  local linkStart = itemMarker
+  local colorStart = nil
+  local searchAt = 1
+  while true do
+    local candidate = string.find(message, "|c", searchAt, true)
+    if not candidate or candidate > itemMarker then
+      break
+    end
+    colorStart = candidate
+    searchAt = candidate + 2
+  end
+  if colorStart then
+    linkStart = colorStart
+  end
+
+  local resetStart = string.find(message, "|r", itemMarker, true)
+  if not resetStart then
+    return nil, nil
+  end
+  local linkEnd = resetStart + 1
+
+  local before = string.sub(message, 1, linkStart - 1)
+  local after = string.sub(message, linkEnd + 1)
+  local itemLink = string.sub(message, linkStart, linkEnd)
+  if string.find(itemLink, "|Hitem:", 1, true) == nil then
+    return nil, nil
+  end
+
+  if isEquip then
+    if string.lower(before) ~= equipPrefix then
+      return nil, nil
+    end
+    if after ~= ""
+        and after ~= " in ranged slot"
+        and after ~= " in main hand"
+        and after ~= " in offhand" then
+      return nil, nil
+    end
+    return "EQUIP", itemLink
+  end
+
+  if before ~= movePrefix or after ~= " to offhand" then
+    return nil, nil
+  end
+  return "MOVE", itemLink
+end
+
+function Comm._FlushCreatorInitAutoFeedbackSession(token, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+  local sessions = state.creatorInitAutoFeedbackSessions
+  if type(sessions) ~= "table" then
+    return
+  end
+
+  local session = sessions[token]
+  if type(session) ~= "table" then
+    return
+  end
+
+  sessions[token] = nil
+  local rows = {}
+  for _, entry in pairs(session.itemsByBot or {}) do
+    if type(entry) == "table"
+        and trim(tostring(entry.name or "")) ~= ""
+        and type(entry.items) == "table"
+        and #entry.items > 0 then
+      rows[#rows + 1] = entry
+    end
+  end
+
+  table.sort(rows, function(left, right)
+    return string.lower(tostring(left.name or "")) < string.lower(tostring(right.name or ""))
+  end)
+
+  for _, entry in ipairs(rows) do
+    local itemList = table.concat(entry.items, " ")
+    if itemList ~= "" then
+      Comm.ShowSystemMessage(string.format(
+        L("creator.init_auto.feedback.equipped", "[MultiBot] %s equips: %s"),
+        entry.name,
+        itemList
+      ))
+    end
+  end
+end
+
+function Comm._ScheduleCreatorInitAutoFeedbackFlush(token, state, delaySeconds)
+  state = type(state) == "table" and state or ensureBridgeState()
+  local sessions = state.creatorInitAutoFeedbackSessions
+  if type(sessions) ~= "table" then
+    return
+  end
+
+  local session = sessions[token]
+  if type(session) ~= "table" then
+    return
+  end
+
+  session.flushEpoch = (tonumber(session.flushEpoch) or 0) + 1
+  local epoch = session.flushEpoch
+  safeDelay(delaySeconds or 1.5, function()
+    local live = ensureBridgeState()
+    local liveSessions = live.creatorInitAutoFeedbackSessions
+    local current = type(liveSessions) == "table" and liveSessions[token] or nil
+    if current ~= session or tonumber(current.flushEpoch) ~= epoch then
+      return
+    end
+    Comm._FlushCreatorInitAutoFeedbackSession(token, live)
+  end)
+end
+
+function Comm._CompleteCreatorInitAutoFeedbackSession(token, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+  local sessions = state.creatorInitAutoFeedbackSessions
+  if type(sessions) ~= "table" then
+    return
+  end
+
+  local session = sessions[token]
+  if type(session) ~= "table" then
+    return
+  end
+
+  if session.completed ~= true then
+    session.completed = true
+    session.completedAt = safeNow()
+  end
+  Comm._ScheduleCreatorInitAutoFeedbackFlush(token, state, 1.5)
+end
+
+function Comm._ClearCreatorInitAutoFeedbackSession(token, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+  if type(state.creatorInitAutoFeedbackSessions) == "table" then
+    state.creatorInitAutoFeedbackSessions[token] = nil
+  end
+end
+
+function Comm._StartCreatorInitAutoFeedbackSession(token, mode, botName, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(tostring(token or ""))
+  mode = string.upper(trim(tostring(mode or "")))
+  botName = trim(tostring(botName or ""))
+  if token == "" or (mode ~= "TARGET" and mode ~= "GROUP") then
+    return false
+  end
+
+  state.creatorInitAutoFeedbackSessions =
+      type(state.creatorInitAutoFeedbackSessions) == "table"
+      and state.creatorInitAutoFeedbackSessions
+      or {}
+
+  local allowedNames = Comm._CreatorInitAutoFeedbackBuildAllowedNames(mode, botName, state)
+  local allowedCount = 0
+  for _ in pairs(allowedNames) do
+    allowedCount = allowedCount + 1
+  end
+  if allowedCount == 0 then
+    return false
+  end
+
+  local session = {
+    token = token,
+    mode = mode,
+    botName = botName,
+    startedAt = safeNow(),
+    completed = false,
+    completedAt = 0,
+    flushEpoch = 0,
+    allowedNames = allowedNames,
+    itemsByBot = {},
+  }
+  state.creatorInitAutoFeedbackSessions[token] = session
+
+  if type(Comm._ArmFleeWhisperFilter) == "function" then
+    Comm._ArmFleeWhisperFilter()
+  end
+
+  local safetyDelay = mode == "GROUP" and 64.0 or 24.0
+  safeDelay(safetyDelay, function()
+    local live = ensureBridgeState()
+    local liveSessions = live.creatorInitAutoFeedbackSessions
+    local current = type(liveSessions) == "table" and liveSessions[token] or nil
+    if current ~= session then
+      return
+    end
+    Comm._FlushCreatorInitAutoFeedbackSession(token, live)
+  end)
+
+  return true
+end
+
+function Comm._CreatorInitAutoFeedbackSessionForBot(displayName, state)
+  state = type(state) == "table" and state or ensureBridgeState()
+  local sessions = state.creatorInitAutoFeedbackSessions
+  if type(sessions) ~= "table" then
+    return nil
+  end
+
+  local botKey = Comm._NormalizeFleeWhisperName(displayName)
+  if botKey == "" then
+    return nil
+  end
+
+  local matched = nil
+  for _, session in pairs(sessions) do
+    if type(session) == "table"
+        and type(session.allowedNames) == "table"
+        and session.allowedNames[botKey] then
+      if matched ~= nil then
+        return nil
+      end
+      matched = session
+    end
+  end
+  return matched
+end
+
+function Comm._CaptureCreatorInitAutoWhisper(message, sender, state)
+  local action, itemLink = Comm._CreatorInitAutoFeedbackParts(message)
+  if action == nil then
+    return false
+  end
+
+  local displayName = Comm._BridgeRosterBotDisplayName(sender, state)
+  if not displayName then
+    return false
+  end
+
+  local session = Comm._CreatorInitAutoFeedbackSessionForBot(displayName, state)
+  if type(session) ~= "table" then
+    return false
+  end
+
+  local dedupeKey = displayName .. "\031" .. tostring(message or "")
+  local now = safeNow()
+  if session.feedbackLastKey == dedupeKey
+      and now - (tonumber(session.feedbackLastAt) or 0) <= 0.25 then
+    return true
+  end
+  session.feedbackLastKey = dedupeKey
+  session.feedbackLastAt = now
+
+  if action == "MOVE" then
+    return true
+  end
+
+  local botKey = Comm._NormalizeFleeWhisperName(displayName)
+  if botKey == "" then
+    return false
+  end
+
+  session.itemsByBot = type(session.itemsByBot) == "table" and session.itemsByBot or {}
+  local entry = session.itemsByBot[botKey]
+  if type(entry) ~= "table" then
+    entry = {
+      name = displayName,
+      items = {},
+    }
+    session.itemsByBot[botKey] = entry
+  end
+
+  if type(entry.items) ~= "table" then
+    entry.items = {}
+  end
+  if #entry.items < 40 then
+    entry.items[#entry.items + 1] = itemLink
+  end
+
+  if session.completed == true then
+    Comm._ScheduleCreatorInitAutoFeedbackFlush(session.token, state, 1.5)
+  end
+  return true
+end
+-- MB_CREATOR_INIT_AUTO_CHATLESS_FEEDBACK_V2_END
+
 function Comm.RunCreatorInitAuto(mode, botName)
   local state = ensureBridgeState()
   if state.connected ~= true
@@ -1476,11 +1831,14 @@ function Comm.RunCreatorInitAuto(mode, botName)
     startedAt = safeNow(),
   }
 
+  Comm._StartCreatorInitAutoFeedbackSession(token, mode, botName, state)
+
   local encodedTarget = urlEncodeField(botName)
   if not Comm.Send(
       "RUN",
       "CREATOR_INIT_AUTO~" .. token .. "~" .. mode .. "~" .. encodedTarget) then
     state.creatorInitAutoCommands[token] = nil
+    Comm._ClearCreatorInitAutoFeedbackSession(token, state)
     return nil
   end
 
@@ -1493,6 +1851,7 @@ function Comm.RunCreatorInitAuto(mode, botName)
     end
 
     live.creatorInitAutoCommands[token] = nil
+    Comm._CompleteCreatorInitAutoFeedbackSession(token, live)
     local reason = live.connected == true and "CLIENT_TIMEOUT" or "BRIDGE_DISCONNECTED"
     live.lastError = "CREATOR_INIT_AUTO_" .. reason
     live.lastCreatorInitAutoResult = {
@@ -1546,11 +1905,13 @@ function Comm.ApplyCreatorInitAutoResultPayload(payload, state)
       or total ~= initialized + skipped + failed
       or (mode == "TARGET" and total > 1) then
     state.creatorInitAutoCommands[token] = nil
+    Comm._CompleteCreatorInitAutoFeedbackSession(token, state)
     state.lastError = "CREATOR_INIT_AUTO_BAD_RESPONSE"
     return true
   end
 
   state.creatorInitAutoCommands[token] = nil
+  Comm._CompleteCreatorInitAutoFeedbackSession(token, state)
   state.connected = true
   state.lastError = status == "ERR"
       and ("CREATOR_INIT_AUTO_" .. reason)
@@ -1898,6 +2259,7 @@ function Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, sta
     local command = state.creatorInitAutoCommands[token]
     if type(command) == "table" then
       state.creatorInitAutoCommands[token] = nil
+      Comm._CompleteCreatorInitAutoFeedbackSession(token, state)
       state.lastCreatorInitAutoResult = {
         token = token,
         mode = command.mode,
@@ -3851,6 +4213,10 @@ function Comm._FleeWhisperFilter(_, event, message, sender)
   end
 
   local questBotDisplayName = Comm._BridgeRosterBotDisplayName(sender, state)
+  if Comm._CaptureCreatorInitAutoWhisper(message, sender, state) then
+    return true
+  end
+
   if questBotDisplayName and Comm._ShowQuestFeedbackMessage(message, questBotDisplayName) then
     return true
   end

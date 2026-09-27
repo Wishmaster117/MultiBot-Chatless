@@ -54,6 +54,15 @@ local frFRValues = {
   ["selfaction.send_failed"] = "L'action SelfBot n'a pas pu être envoyée : %s",
   ["selfaction.reason.RATE_LIMIT"] = "Trop de demandes SelfBot. Réessayez dans quelques secondes.",
   -- MB_SELFACTION_I18N_V1_END
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_BEGIN
+  ["info.lifecycle.already_logged_in.strategy_refresh_skipped"] = "[MultiBot] %s est déjà connecté. L’actualisation des stratégies par whisper a été ignorée.",
+  -- MB_C1B3_ALREADY_LOGGED_IN_I18N_V1_END
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_BEGIN
+  ["info.selfbot.enable.strategy_refresh_whisper_skipped"] = "[MultiBot] SelfBot activé. L’actualisation automatique des stratégies par whisper a été ignorée.",
+  -- MB_C1B4_SELFBOT_ENABLE_WHISPER_I18N_V1_END
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_BEGIN
+  ["info.lifecycle.hello.strategy_refresh_whisper_skipped"] = "[MultiBot] %s est connecté. L’actualisation automatique des stratégies par whisper a été ignorée.",
+  -- MB_C1B5_HELLO_WHISPER_I18N_V1_END
   -- MB_QUEST_FEEDBACK_I18N_V1_BEGIN
   ["quest.feedback.available"] = "Quête disponible : ",
   ["quest.feedback.incomplete"] = "Quête incomplète : ",
@@ -1357,6 +1366,9 @@ local frFRValues = {
   ["strategy.reason.SELF_STRATEGY_INVALID_CHANGES"] = "Modifications de stratégie SelfBot non valides.",
   ["strategy.reason.SELF_STRATEGY_TOO_MANY_REQUESTS"] = "Trop de requêtes de stratégie SelfBot. Réessayez dans un instant.",
   ["strategy.reason.UNKNOWN"] = "La commande de stratégie a échoué pour une raison inconnue.",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_BEGIN
+  ["creator.init_auto.feedback.equipped"] = "[MultiBot] %s équipe : %s",
+  -- MB_CREATOR_INIT_AUTO_FEEDBACK_I18N_V1_END
   ["info.outfits.feedback_equip"] = "Tenue « %s » équipée.",
   ["info.outfits.feedback_replace"] = "Tenue « %s » remplacée.",
   ["info.outfits.feedback_update"] = "Tenue « %s » mise à jour.",

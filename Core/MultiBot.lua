@@ -2530,17 +2530,6 @@ function MultiBot.BindUnitToggleHandlers(button, options)
       return
     end
 
-    if MultiBot.allowLegacyChatFallback ~= true then
-      return
-    end
-
-    SendChatMessage(".playerbot bot remove " .. unitButton.name, "SAY")
-    if MultiBot.SetBridgeBotOnlineState and unitButton.bridge ~= nil then
-      MultiBot.SetBridgeBotOnlineState(unitButton, false)
-    else
-      HideButtonUnitFrame(unitButton)
-      unitButton.setDisable()
-    end
   end
 
   button.doLeft = function(unitButton)
@@ -2590,18 +2579,7 @@ function MultiBot.BindUnitToggleHandlers(button, options)
       return
     end
 
-    if MultiBot.allowLegacyChatFallback ~= true then
-      return
-    end
-
-    SendChatMessage(".playerbot bot add " .. unitButton.name, "SAY")
-    unitButton.setEnable()
-
-    if (unitButton._mbFavoritePlaceholder
-        or (MultiBot.IsFavorite and MultiBot.IsFavorite(unitButton.name)))
-        and MultiBot.BeginFavoriteRosterRefresh then
-      MultiBot.BeginFavoriteRosterRefresh(unitButton.name)
-    end
+    return
   end
 
   button._mbUnitToggleBound = true
@@ -2669,10 +2647,6 @@ local function BindBridgeSelfBotHandler(button)
       return
     end
 
-    if MultiBot.allowLegacyChatFallback == true then
-      SendChatMessage(".playerbot bot self", "SAY")
-      MultiBot.OnOffSwitch(pButton)
-    end
   end
 
   button._mbSelfBotHandlerBound = true
@@ -4394,28 +4368,10 @@ MultiBot.AddClassToTarget = function(classCmd, gender)
     end
   end
 
-  if MultiBot.allowLegacyChatFallback ~= true then
-    if bridge then
-      bridge.lastError = "CREATOR_ADDCLASS_CAPABILITY_UNAVAILABLE"
-    end
-    return nil
+  if bridge then
+    bridge.lastError = "CREATOR_ADDCLASS_CAPABILITY_UNAVAILABLE"
   end
-
-  local msg = ".playerbot bot addclass " .. classCmd
-  if gender then
-    msg = msg .. " " .. gender
-  end
-
-  if MultiBot.BeginAddClassAutoGroup then
-    MultiBot.BeginAddClassAutoGroup(classCmd)
-  end
-
-  SendChatMessage(msg, "SAY")
-
-  if MultiBot.RequestBridgeRosterRefresh then
-    MultiBot.RequestBridgeRosterRefresh()
-  end
-  return true
+  return nil
 end
 -- MB_CREATOR_ADDCLASS_V1_END
 -- Init Wrapper
@@ -4431,15 +4387,10 @@ function MultiBot.InitAuto(name)
     return comm.RunCreatorInitAuto("TARGET", name)
   end
 
-  if MultiBot.allowLegacyChatFallback ~= true then
-    if bridge then
-      bridge.lastError = "CREATOR_INIT_AUTO_CAPABILITY_UNAVAILABLE"
-    end
-    return nil
+  if bridge then
+    bridge.lastError = "CREATOR_INIT_AUTO_CAPABILITY_UNAVAILABLE"
   end
-
-  SendChatMessage(".playerbot bot init=auto " .. name, "SAY")
-  return true
+  return nil
 end
 
 function MultiBot.InitAutoGroup()
@@ -4451,19 +4402,10 @@ function MultiBot.InitAutoGroup()
     return comm.RunCreatorInitAuto("GROUP")
   end
 
-  if MultiBot.allowLegacyChatFallback ~= true then
-    if bridge then
-      bridge.lastError = "CREATOR_INIT_AUTO_CAPABILITY_UNAVAILABLE"
-    end
-    return nil
+  if bridge then
+    bridge.lastError = "CREATOR_INIT_AUTO_CAPABILITY_UNAVAILABLE"
   end
-
-  if not IsInRaid() and not IsInGroup() then
-    return nil
-  end
-
-  SendChatMessage(".playerbot bot init=auto *", "SAY")
-  return true
+  return nil
 end
 -- MB_CREATOR_INIT_AUTO_V1_END
 
