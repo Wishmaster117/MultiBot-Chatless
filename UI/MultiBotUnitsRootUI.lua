@@ -1852,13 +1852,6 @@ local function isSharedRosterButtonOnline(button)
     return button.state == true
 end
 
-local function hideSharedRosterUnitFrame(button)
-    local frames = button and button.parent and button.parent.frames
-    local unitFrame = frames and frames[button.name]
-    if unitFrame and unitFrame.Hide then
-        unitFrame:Hide()
-    end
-end
 
 local function addRosterMemberButton(member, socialRoster)
     -- Guild/Friends rebuilds run in the background and reuse the same button

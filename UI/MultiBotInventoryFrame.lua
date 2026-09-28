@@ -1574,22 +1574,6 @@ local function runInventoryInstantAction(botName, command, options)
         return cmd == "s *" or cmd == "s vendor"
     end
 
-    local function shouldSellButtonForBulk(button, cmd)
-        local item = button and button.item
-        if not item then
-            return false
-        end
-
-        if MultiBot.InventoryIsProtectedSellItem and MultiBot.InventoryIsProtectedSellItem(item) then
-            return false
-        end
-
-        if cmd == "s *" then
-            return tonumber(item.rare or -1) == 0
-        end
-
-        return true
-    end
 
     local function runFilteredBulkSell(cmd)
         local bridgeAction = nil

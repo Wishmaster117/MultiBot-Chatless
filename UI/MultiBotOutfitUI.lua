@@ -19,11 +19,7 @@ local OUTFIT_ITEM_SPACING_X = 38
 local OUTFIT_ITEM_SPACING_Y = 38
 local OUTFIT_ITEMS_PER_ROW = 6
 local OUTFIT_UPDATE_REFRESH_DELAY  = 0.60
-local OUTFIT_RESET_REFRESH_DELAY   = 0.60
-local OUTFIT_EQUIP_REFRESH_DELAY   = 1.10
-local OUTFIT_REPLACE_REFRESH_DELAY = 1.75
 local OUTFIT_INSPECT_GAP = 12
-local OUTFIT_PERSIST_FLUSH_DELAY = 0.25
 local INV_SLOT_MAINHAND = INV_SLOT_MAINHAND or 16
 
 local OUTFIT_LIST_SCROLL_NAME = "MultiBotOutfitListScrollFrame"
@@ -1244,7 +1240,7 @@ function MultiBot.HandleOutfitChatLine(tButton, line, botName)
     return false
 end
 
-function OutfitUI:RunCommand(commandSuffix, statusText, refreshDelay, persistDelay, persist, wasCreate)
+function OutfitUI:RunCommand(commandSuffix, statusText, persist, wasCreate)
     local botName = self.botName or (self.frame and self.frame.name) or nil
     if not botName or botName == "" then
         return false
@@ -1260,9 +1256,7 @@ function OutfitUI:RunCommand(commandSuffix, statusText, refreshDelay, persistDel
         if twoHand == true or twoHand == nil then
             commandSuffix = string.gsub(commandSuffix, "%s*equip%s*$", " replace")
             statusText = outfitL("equip_auto_replace")
-            if not refreshDelay or refreshDelay <= 0 then
-                refreshDelay = OUTFIT_REPLACE_REFRESH_DELAY
-            end
+
             -- print("OutfitUI DEBUG: forced replace, commandSuffix='" .. tostring(commandSuffix) .. "'")
         end
     end
@@ -1324,7 +1318,7 @@ function OutfitUI:CreateFromCurrent()
         self.selectedName = outfitName
         setLastSelected(self.botName or "", outfitName)
         local statusText = wasCreate and outfitL("created") or outfitL("updated")
-        self:RunCommand(outfitName .. " update", statusText, 0.35, OUTFIT_PERSIST_FLUSH_DELAY, true, wasCreate)
+        self:RunCommand(outfitName .. " update", statusText, true, wasCreate)
     end, "", anchorFrame)
 end
 
@@ -1364,9 +1358,9 @@ function OutfitUI:EquipSelected(replaceCurrent)
             self:SetStatus(outfitL("equip_auto_replace"))
         end
 
-        self:RunCommand(selected.name .. " replace", outfitL("replace_sent"), OUTFIT_REPLACE_REFRESH_DELAY)
+        self:RunCommand(selected.name .. " replace", outfitL("replace_sent"))
     else
-        self:RunCommand(selected.name .. " equip", outfitL("equip_sent"), OUTFIT_EQUIP_REFRESH_DELAY)
+        self:RunCommand(selected.name .. " equip", outfitL("equip_sent"))
     end
 end
 
@@ -1377,7 +1371,7 @@ function OutfitUI:UpdateSelected()
     end
 
     setLastSelected(self.botName or "", selected.name)
-    self:RunCommand(selected.name .. " update", outfitL("updated"), OUTFIT_UPDATE_REFRESH_DELAY, nil, true, false)
+    self:RunCommand(selected.name .. " update", outfitL("updated"), true, false)
 end
 
 function OutfitUI:ResetSelected()
@@ -1386,7 +1380,7 @@ function OutfitUI:ResetSelected()
         return
     end
 
-    self:RunCommand(selected.name .. " reset", outfitL("reset_sent"), OUTFIT_RESET_REFRESH_DELAY, nil, true, false)
+    self:RunCommand(selected.name .. " reset", outfitL("reset_sent"), true, false)
 end
 
 function MultiBot.InitializeOutfitFrame()
