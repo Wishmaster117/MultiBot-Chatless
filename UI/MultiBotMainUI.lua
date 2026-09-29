@@ -801,13 +801,7 @@ local function sendMainCombatStrategy(scope, strategyName, enabled)
 		return MultiBot.Comm.RunCombatCommand(scope, "", command)
 	end
 
-	if scope == "ALL" then
-		SendChatMessage(command, GetNumRaidMembers() > 0 and "RAID" or "PARTY")
-	else
-		SendChatMessage(command, "PARTY")
-	end
-
-	return true
+	return false
 end
 
 local function showMainCombatStrategyTooltip(owner)

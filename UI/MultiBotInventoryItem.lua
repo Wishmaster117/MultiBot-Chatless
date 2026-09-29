@@ -304,29 +304,7 @@ local function buildInventoryDestroyRequest(button, botName)
     return request
 end
 
-local function isInventoryItemHyperlink(value)
-    return type(value) == "string"
-        and string.sub(value, 1, 1) == "|"
-        and string.find(value, "|Hitem:", 1, true) ~= nil
-end
 
-local function runLegacyInventoryItemDestroy(request)
-    if MultiBot.allowLegacyChatFallback ~= true or type(request) ~= "table" then
-        return false
-    end
-
-    if not request.botName or request.botName == "" or not request.tip or request.tip == "" then
-        return false
-    end
-
-    if request.exactLocation == true and not isInventoryItemHyperlink(request.tip) then
-        return false
-    end
-
-    SendChatMessage("destroy " .. request.tip, "WHISPER", nil, request.botName)
-    requestInventoryPostActionRefresh(request.botName, 0.45, 1.20)
-    return true
-end
 
 local function bindInventoryDestroyConfirm(button, botName)
     local request = buildInventoryDestroyRequest(button, botName)
@@ -346,11 +324,9 @@ local function bindInventoryDestroyConfirm(button, botName)
                 local acceptedRequest = data and data.request or nil
                 if not acceptedRequest then return end
 
-                if runBridgeInventoryItemDestroy and runBridgeInventoryItemDestroy(acceptedRequest) then
-                    return
+                if runBridgeInventoryItemDestroy then
+                    runBridgeInventoryItemDestroy(acceptedRequest)
                 end
-
-                runLegacyInventoryItemDestroy(acceptedRequest)
             end,
         }
     end
@@ -414,41 +390,6 @@ local function needsInventoryDestroyConfirmation(item)
         or ((item and item.rare or 0) > 3)
 end
 
-local function sendInventoryItemCommand(command, button, botName, options)
-    options = options or {}
-
-    if not command or command == "" or not button or not botName or botName == "" then
-        return false
-    end
-
-    if button.item and button.item.exactLocation == true and not isInventoryItemHyperlink(button.tip) then
-        return false
-    end
-
-    SendChatMessage(command .. " " .. button.tip, "WHISPER", nil, botName)
-
-    if options.hideButton and button.Hide then
-        button:Hide()
-    end
-
-    if options.optimisticConsume then
-        optimisticallyConsumeInventoryButton(button)
-    end
-
-    if options.postActionRefresh then
-        requestInventoryPostActionRefresh(botName, options.refreshDelay, options.followupRefreshDelay)
-    elseif options.refreshDelay ~= nil then
-        requestInventoryRefresh(options.refreshDelay, botName)
-    elseif options.refresh then
-        requestInventoryRefresh(nil, botName)
-    end
-
-    if options.followupRefreshDelay ~= nil and not options.postActionRefresh then
-        requestInventoryRefresh(options.followupRefreshDelay, botName)
-    end
-
-    return true
-end
 
 local function runBridgeInventoryItemAction(action, button, botName, options)
     options = options or {}
@@ -711,22 +652,10 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            if not MultiBot.isTarget() then
-                sendInventoryFeedback("inventoryvendortarget", "Target a vendor first")
-                return
-            end
-
-            sendInventoryItemCommand(action, button, botName, {
-                hideButton = true,
-                refreshDelay = 0.3,
-            })
-        else
-            addInventorySystemMessage(inventoryItemL(
-                "inventory.item_sell.unavailable",
-                "Item selling via the bridge is unavailable."
-            ))
-        end
+        addInventorySystemMessage(inventoryItemL(
+            "inventory.item_sell.unavailable",
+            "Item selling via the bridge is unavailable."
+        ))
         return
     end
     -- MB_ITEM_SELL_SINGLE_V1_ACTION_END
@@ -736,9 +665,6 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand(action, button, botName)
-        end
         return
     end
 
@@ -759,14 +685,10 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand(action, button, botName)
-        else
-            addInventorySystemMessage(inventoryItemL(
-                "inventory.item_trade.unavailable",
-                "Item trading via the bridge is unavailable."
-            ))
-        end
+        addInventorySystemMessage(inventoryItemL(
+            "inventory.item_trade.unavailable",
+            "Item trading via the bridge is unavailable."
+        ))
         return
     end
 
@@ -792,13 +714,6 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand("bank", button, botName, {
-                postActionRefresh = true,
-                refreshDelay = 0.45,
-                followupRefreshDelay = 1.20,
-            })
-        end
         return
     end
 
@@ -824,13 +739,6 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand("gb", button, botName, {
-                postActionRefresh = true,
-                refreshDelay = 0.45,
-                followupRefreshDelay = 1.20,
-            })
-        end
         return
     end
 
@@ -839,13 +747,6 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand("b", button, botName, {
-                postActionRefresh = true,
-                refreshDelay = 0.45,
-                followupRefreshDelay = 1.20,
-            })
-        end
         return
     end
 
@@ -866,20 +767,10 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            registerInventoryPendingConsume(botName, item, 1)
-            sendInventoryItemCommand(action, button, botName, {
-                optimisticConsume = true,
-                postActionRefresh = true,
-                refreshDelay = 0.45,
-                followupRefreshDelay = 1.20,
-            })
-        else
-            addInventorySystemMessage(MultiBot.L(
-                "inventory.item_use.unavailable",
-                "Item use via the bridge is unavailable."
-            ))
-        end
+        addInventorySystemMessage(MultiBot.L(
+            "inventory.item_use.unavailable",
+            "Item use via the bridge is unavailable."
+        ))
         return
     end
 
@@ -897,11 +788,7 @@ local function handleInventoryItemClick(button)
         return
     end
 
-    if runBridgeInventoryItemDestroy(destroyRequest) then
-        return
-    end
-
-    runLegacyInventoryItemDestroy(destroyRequest)
+    runBridgeInventoryItemDestroy(destroyRequest)
 end
 
 local function getInventoryItemActionLabel(action)

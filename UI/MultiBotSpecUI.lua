@@ -260,167 +260,6 @@ Spec.initialised = true
 
 Spec.pending, Spec.buttons = nil, {}
 
-local SPEC_LEGACY_USAGE_FILTER_TTL = 5
-
-local function specNow()
-    if GetTime then
-        return GetTime()
-    end
-
-    return time and time() or 0
-end
-
-local function normalizeSpecAuthorName(author)
-    if type(author) ~= "string" then
-        return ""
-    end
-
-    local name = author
-    if Ambiguate then
-        name = Ambiguate(author, "none") or author
-    end
-
-    name = string.match(name, "^[^-]+") or name
-    return string.lower(name or "")
-end
-
-local function cleanSpecChatLine(message)
-    if type(message) ~= "string" then
-        return ""
-    end
-
-    return message
-        :gsub("|c%x%x%x%x%x%x%x%x", "")
-        :gsub("|r", "")
-        :gsub("^%s+", "")
-        :gsub("%s+$", "")
-end
-
-local function extractCurrentTalentSpecLine(message)
-    local clean = cleanSpecChatLine(message)
-    if clean == "" then
-        return ""
-    end
-
-    for line in string.gmatch(clean .. "\n", "([^\r\n]+)") do
-        line = line:gsub("^%s+", ""):gsub("%s+$", "")
-        local lower = string.lower(line)
-
-        if string.find(lower, "current talent spec", 1, true)
-            or string.find(lower, "current spec", 1, true) then
-            return line
-        end
-    end
-
-    return ""
-end
-
-local function emitPreservedTalentWhisper(author, line)
-    if type(line) ~= "string" or line == "" then
-        return
-    end
-
-    if not DEFAULT_CHAT_FRAME or not DEFAULT_CHAT_FRAME.AddMessage then
-        return
-    end
-
-    local authorName = author or ""
-    if Ambiguate then
-        authorName = Ambiguate(authorName, "none") or authorName
-    end
-
-    local template = _G.CHAT_WHISPER_GET or "%s whispers: "
-    local prefix = string.format(template, "[" .. tostring(authorName) .. "]")
-    local color = ChatTypeInfo and ChatTypeInfo["WHISPER"] or nil
-
-    if color then
-        DEFAULT_CHAT_FRAME:AddMessage(prefix .. line, color.r, color.g, color.b)
-    else
-        DEFAULT_CHAT_FRAME:AddMessage(prefix .. line)
-    end
-end
-
-local function isLegacyTalentUsageLine(message)
-    local clean = cleanSpecChatLine(message)
-    local lower = string.lower(clean)
-
-    if lower == "warrior" or lower == "paladin" or lower == "hunter" or lower == "rogue"
-        or lower == "priest" or lower == "death knight" or lower == "shaman" or lower == "mage"
-        or lower == "warlock" or lower == "druid" then
-        return true
-    end
-
-    if string.find(lower, "talents usage", 1, true) then
-        return true
-    end
-
-    if string.find(lower, "talents switch", 1, true) and string.find(lower, "talents spec", 1, true) then
-        return true
-    end
-
-    return false
-end
-
-local function ensureSpecLegacyUsageFilter()
-    if MultiBot._specLegacyUsageFilterInstalled then
-        return true
-    end
-
-    if type(ChatFrame_AddMessageEventFilter) ~= "function" then
-        return false
-    end
-
-    MultiBot._specLegacyUsageFilterInstalled = true
-    ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", function(_, _, message, author, ...)
-        local state = MultiBot and MultiBot._specLegacyUsageFilter or nil
-        if type(state) ~= "table" then
-            return false
-        end
-
-        if state.expiresAt and specNow() > state.expiresAt then
-            MultiBot._specLegacyUsageFilter = nil
-            return false
-        end
-
-        if state.botKey and normalizeSpecAuthorName(author) ~= state.botKey then
-            return false
-        end
-
-        local currentSpecLine = extractCurrentTalentSpecLine(message)
-        if currentSpecLine ~= "" then
-            if isLegacyTalentUsageLine(message) then
-                emitPreservedTalentWhisper(author, currentSpecLine)
-                return true
-            end
-
-            return false
-        end
-
-        if isLegacyTalentUsageLine(message) then
-            return true
-        end
-
-        return false
-    end)
-
-    return true
-end
-
-local function suppressNextTalentUsageLines(botName)
-    if not botName or botName == "" then
-        return
-    end
-
-    if not ensureSpecLegacyUsageFilter() then
-        return
-    end
-
-    MultiBot._specLegacyUsageFilter = {
-        botKey = normalizeSpecAuthorName(botName),
-        expiresAt = specNow() + SPEC_LEGACY_USAGE_FILTER_TTL,
-    }
-end
-
 function Spec:RequestList(bot, wrapper)
     if self.busy then
         return                  --    on ignore le clic
@@ -443,25 +282,12 @@ function Spec:RequestList(bot, wrapper)
     self.activeWrapper = wrapper
 
     local comm = MultiBot.Comm or nil
-    local bridgeApplyCapable = comm
-        and comm.IsTalentSpecApplyCapable
-        and comm.IsTalentSpecApplyCapable()
 
-    -- The current active slot/build is returned by TALENT_SPEC_CURRENT on a
-    -- TALENT_SPEC_APPLY_V1 bridge. Keep the old "talents" whisper only as an
-    -- explicitly enabled legacy fallback.
-    if not bridgeApplyCapable and MultiBot.allowLegacyChatFallback == true then
-        suppressNextTalentUsageLines(bot)
-        SendChatMessage("talents", "WHISPER", nil, bot)
-    end
 
     if comm and comm.RequestTalentSpecList and comm.RequestTalentSpecList(bot) then
         return
     end
 
-    if MultiBot.allowLegacyChatFallback == true then
-        SendChatMessage("talents spec list", "WHISPER", nil, bot)
-    end
 end
 
 
@@ -904,23 +730,6 @@ local function refreshSpecTalentInspection(bot, className)
     end)
 end
 
-local function runLegacySpecSelection(bot, slot, spec, className)
-    SendChatMessage("stopcasting", "WHISPER", nil, bot)
-    SendChatMessage("talents switch " .. slot, "WHISPER", nil, bot)
-
-    MultiBot.TimerAfter(0.4, function()
-        SendChatMessage("talents spec " .. spec, "WHISPER", nil, bot)
-    end)
-
-    Spec.pendingRefresh = bot
-    MultiBot.TimerAfter(1.3, function()
-        if Spec.pendingRefresh and Spec.pendingRefresh == bot then
-            refreshSpecTalentInspection(bot, className)
-            Spec.pendingRefresh = nil
-            Spec.busy = false
-        end
-    end)
-end
 
 local function bindSpecSelection(button, spec, specIndex, build, tip, bot, className, currentBuild)
     if build == currentBuild then
@@ -985,10 +794,6 @@ local function bindSpecSelection(button, spec, specIndex, build, tip, bot, class
                 return
             end
 
-            if MultiBot.allowLegacyChatFallback == true then
-                runLegacySpecSelection(bot, slot, spec, className)
-                return
-            end
 
             Spec.busy = false
             if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then

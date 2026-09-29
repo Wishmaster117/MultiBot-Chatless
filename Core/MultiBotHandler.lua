@@ -41,9 +41,6 @@ local function ReconnectExistingGroupBots(_)
 	return false
 end
 
-local function LegacyChatFallbackEnabled()
-	return MultiBot and MultiBot.allowLegacyChatFallback == true
-end
 
 function MultiBot.HandleOnUpdate(pElapsed)
 	perfCount("handler.onupdate.calls")
@@ -1644,10 +1641,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			tPlayer.class = tClass
 			tPlayer.name = tName
 
-			tPlayer.doLeft = function(pButton)
-				SendChatMessage(".playerbot bot self", "SAY")
-				MultiBot.OnOffSwitch(pButton)
-			end
 
 			-- PLAYERBOTS --
 
@@ -1774,11 +1767,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                   return
                end
 
-               if LegacyChatFallbackEnabled() and MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
-                  MultiBot.Comm.ShowSystemMessage(
-                     string.format(MultiBot.L("info.lifecycle.already_logged_in.strategy_refresh_skipped"), tName)
-                  )
-               end
+
                tButton.waitFor = ""
                tButton.setEnable()
                return
@@ -1798,11 +1787,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 					and type(MultiBot.Comm.RequestSelfBotState) == "function" then
 				MultiBot.Comm.RequestSelfBotState()
 			end
-			if LegacyChatFallbackEnabled() and MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
-				MultiBot.Comm.ShowSystemMessage(
-					MultiBot.L("info.selfbot.enable.strategy_refresh_whisper_skipped")
-				)
-			end
+
 			tButton.waitFor = ""
 			tButton.setEnable()
 			return
@@ -1965,11 +1950,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				return
 			end
 
-			if LegacyChatFallbackEnabled() and MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
-				MultiBot.Comm.ShowSystemMessage(
-					string.format(MultiBot.L("info.lifecycle.hello.strategy_refresh_whisper_skipped"), arg2)
-				)
-			end
+
 			tButton.waitFor = ""
 			return
 		end
@@ -1978,42 +1959,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			return
 		end
 
-		if(MultiBot.isInside(arg1, "reset to default") and tButton.waitFor == "CO") then
-			SendChatMessage("co ,?", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(MultiBot.isInside(arg1, "reset to default") and tButton.waitFor == "NC") then
-			SendChatMessage("nc ,?", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor == "DETAIL" and MultiBot.isInside(arg1, "playing with")) then
-			tButton.waitFor = ""
-			MultiBot.RaidPool(arg2, arg1)
-			return
-		end
-
-		if(tButton.waitFor == "IGNORE" and MultiBot.isInside(arg1, "Ignored ")) then
-			if(MultiBot.spells[arg2] == nil) then MultiBot.spells[arg2] = {} end
-			tButton.waitFor = "DETAIL"
-
-			local tIgnores = MultiBot.doSplit(arg1, ": ")[2]
-
-			if(tIgnores ~= nil) then
-				local tSpells = MultiBot.doSplit(tIgnores, ", ")
-
-				for k,v in pairs(tSpells) do
-					local tSpell = MultiBot.doSplit(v, "|")[3]
-					if(tSpell ~= nil) then MultiBot.spells[arg2][MultiBot.doSplit(tSpell, ":")[2]] = false end
-				end
-			end
-
-			SendChatMessage("who", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor ~= "ITEM" and tButton.waitFor ~= "SPELL" and MultiBot.auto.stats and MultiBot.isInside(arg1, "Bag")) then
+		if(MultiBot.auto.stats and MultiBot.isInside(arg1, "Bag")) then
 			local statsFrame = MultiBot.EnsureStatsUI and MultiBot.EnsureStatsUI() or MultiBot.stats
 			if not statsFrame then
 				return
@@ -2027,58 +1973,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			if statsFrame.frames[tUnit] and statsFrame.frames[tUnit].setStats then
 				statsFrame.frames[tUnit].setStats(arg2, UnitLevel(tUnit), arg1)
 			end
-			return
-		end
-
-		if(tButton.waitFor == "OUTFITS" and MultiBot.HandleOutfitChatLine and MultiBot.HandleOutfitChatLine(tButton, arg1, arg2)) then
-			return
-		end
-
-		-- Inventory --
-
-		if(tButton.waitFor == "INVENTORY" and MultiBot.isInside(arg1, "Inventory", "背包")) then
-			if(MultiBot.inventory and MultiBot.inventory.beginPayload) then
-				MultiBot.inventory:beginPayload(arg2)
-			else
-				local tItems = MultiBot.inventory.frames["Items"]
-				if(tItems.clear) then
-					tItems:clear()
-				else
-					for key, value in pairs(tItems.buttons) do value:Hide() end
-					for key in pairs(tItems.buttons) do tItems.buttons[key] = nil end
-				end
-				MultiBot.inventory.setText("Title", MultiBot.doReplace(MultiBot.L("info.inventory"), "NAME", arg2))
-				MultiBot.inventory.name = arg2
-				tItems.index = 0
-			end
-			tButton.waitFor = "ITEM"
-			SendChatMessage("stats", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor == "ITEM" and (MultiBot.beInside(arg1, "Bag,", "Dur") or MultiBot.beInside(arg1, "背包", "耐久度"))) then
-			if MultiBot.inventory and MultiBot.inventory.applySummaryLine then
-				MultiBot.inventory:applySummaryLine(arg1)
-			end
-			MultiBot.inventory:Show()
-			tButton.waitFor = ""
-			InspectUnit(arg2)
-			return
-		end
-
-		if(tButton.waitFor == "ITEM") then
-			if(string.sub(arg1, 1, 3) == "---") then return end
-			if(MultiBot.inventory and MultiBot.inventory.appendItem) then
-				MultiBot.inventory:appendItem(arg1)
-			else
-				MultiBot.addItem(MultiBot.inventory.frames["Items"], arg1)
-			end
-			return
-		end
-
-		-- Spellbook --
-
-		if(MultiBot.handleSpellbookChatLine and MultiBot.handleSpellbookChatLine(tButton, arg1, arg2)) then
 			return
 		end
 
@@ -2114,8 +2008,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			if(MultiBot.inventory:IsVisible() and MultiBot.isInside(string.lower(arg1), "opened")) then
 				if(MultiBot.inventory and MultiBot.inventory.markLootPending) then
 					MultiBot.inventory:markLootPending(tButton.name)
-				else
-					tButton.waitFor = "LOOT"
 				end
 				return
 			end
@@ -2144,15 +2036,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				return
 			end
 
-			if(tButton ~= nil and tButton.waitFor == "LOOT" and tButton ~= nil) then
-				if(MultiBot.RequestInventoryPostActionRefresh and MultiBot.RequestInventoryPostActionRefresh(tButton.name, 0.25, 0.85)) then
-					tButton.waitFor = ""
-					return
-				end
-
-				tButton.waitFor = ""
-				return
-			end
 		end
 
 		return

@@ -514,7 +514,7 @@ end
 -- MB_P1_STRATEGY_NO_SILENT_CHAT_FALLBACK_V1_START
 local MB_STRATEGY_ROUTE_NOT_STRATEGY = "NOT_STRATEGY"
 local MB_STRATEGY_ROUTE_BRIDGE = "BRIDGE"
-local MB_STRATEGY_ROUTE_LEGACY = "LEGACY"
+
 local MB_STRATEGY_ROUTE_BLOCKED = "BLOCKED"
 
 local function _mbCanUseBridgeStrategyMutation()
@@ -601,10 +601,6 @@ local function _mbRouteStrategyMutation(action, commandScope, target)
 	target = target or ""
 
 	if(not _mbCanUseBridgeStrategyMutation()) then
-		if(MultiBot.allowLegacyChatFallback == true) then
-			return MB_STRATEGY_ROUTE_LEGACY
-		end
-
 		_mbWarnStrategyMutationBlocked(commandScope, target, _mbStrategyBridgeUnavailableReason())
 		_mbRefreshStrategyState(commandScope, target)
 		return MB_STRATEGY_ROUTE_BLOCKED
@@ -810,10 +806,8 @@ MultiBot.ActionToTarget = function(pAction, oTarget)
 				return false, "blocked"
 			end
 
-			if(MultiBot.allowLegacyChatFallback ~= true) then
-				if(MultiBot.bridge) then MultiBot.bridge.lastError = "FLEE_ORDER_UNAVAILABLE" end
-				return false, "blocked"
-			end
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "FLEE_ORDER_UNAVAILABLE" end
+			return false, "blocked"
 		end
 		-- MB_FLEE_ORDER_V1_TARGET_ROUTE_END
 
@@ -952,10 +946,8 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 			return false, "blocked"
 		end
 
-		if(MultiBot.allowLegacyChatFallback ~= true) then
-			if(MultiBot.bridge) then MultiBot.bridge.lastError = "FLEE_ORDER_UNAVAILABLE" end
-			return false, "blocked"
-		end
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "FLEE_ORDER_UNAVAILABLE" end
+		return false, "blocked"
 	end
 	-- MB_FLEE_ORDER_V1_GROUP_ROUTE_END
 
@@ -984,10 +976,8 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 			return false, "blocked"
 		end
 
-		if(MultiBot.allowLegacyChatFallback ~= true) then
-			if(MultiBot.bridge) then MultiBot.bridge.lastError = "GROUP_ACTION_UNAVAILABLE" end
-			return false, "blocked"
-		end
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "GROUP_ACTION_UNAVAILABLE" end
+		return false, "blocked"
 	end
 	-- MB_GROUP_ACTION_V1_ROUTE_END
 	-- MB_QUEST_ACCEPT_ALL_V1_ROUTE_BEGIN
@@ -1004,12 +994,10 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 			return false, "blocked"
 		end
 
-		if(MultiBot.allowLegacyChatFallback ~= true) then
-			if(MultiBot.bridge) then
-				MultiBot.bridge.lastError = "QUEST_ACCEPT_ALL_UNAVAILABLE"
-			end
-			return false, "blocked"
+		if(MultiBot.bridge) then
+			MultiBot.bridge.lastError = "QUEST_ACCEPT_ALL_UNAVAILABLE"
 		end
+		return false, "blocked"
 	end
 	-- MB_QUEST_ACCEPT_ALL_V1_ROUTE_END
 	-- MB_QUEST_TALK_V1_ROUTE_BEGIN
@@ -1171,11 +1159,9 @@ MultiBot.ActionToGroup = function(pAction, onComplete)
 			return false, "blocked"
 		end
 
-		if(MultiBot.allowLegacyChatFallback ~= true) then
-			if(MultiBot.bridge) then MultiBot.bridge.lastError = "RTSC_ORDER_UNAVAILABLE" end
-			return false, "blocked"
-		end
-	elseif(rtscLike and MultiBot.allowLegacyChatFallback ~= true) then
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "RTSC_ORDER_UNAVAILABLE" end
+		return false, "blocked"
+	elseif(rtscLike) then
 		if(MultiBot.bridge) then MultiBot.bridge.lastError = "RTSC_ORDER_INVALID" end
 		return false, "blocked"
 	end
@@ -1583,15 +1569,6 @@ MultiBot.CollapseOtherUnitBarsForDropdown = function(targetFrame)
 	targetFrame._mbCollapsedBars = collapsedBars
 end
 
-local function _mbGetStrategyUnitButton(target)
-	if(type(target) ~= "string" or target == "") then return nil end
-	local units = MultiBot.frames
-		and MultiBot.frames["MultiBar"]
-		and MultiBot.frames["MultiBar"].frames
-		and MultiBot.frames["MultiBar"].frames["Units"]
-	if(not units or not units.buttons) then return nil end
-	return units.buttons[target]
-end
 
 MultiBot.OnOffActionToTarget = function(pButton, pOn, pOff, pTarget)
 	local wasEnabled = pButton.state == true
@@ -1604,23 +1581,9 @@ MultiBot.OnOffActionToTarget = function(pButton, pOn, pOff, pTarget)
 			-- L'etat visuel definitif reste reconstruit depuis l'ACK puis STATE.
 			return not wasEnabled
 		end
-		if(route == MB_STRATEGY_ROUTE_BLOCKED) then
-			-- Aucun changement optimiste si le bridge refuse ou ne peut pas envoyer.
-			return wasEnabled
-		end
 
-		local unitButton = _mbGetStrategyUnitButton(pTarget)
-		if(unitButton) then unitButton.waitFor = string.upper(mutationScope) end
-
-		-- Seul le mode legacy explicitement autorise atteint ce transport chat.
-		SendChatMessage(action, "WHISPER", nil, pTarget)
-		if(wasEnabled) then
-			pButton.setDisable()
-			return false
-		else
-			pButton.setEnable()
-			return true
-		end
+		-- Aucun changement optimiste si le bridge refuse ou ne peut pas envoyer.
+		return wasEnabled
 	end
 
 	if(wasEnabled) then
@@ -3254,18 +3217,6 @@ MultiBot.getBot = function(pName)
 	return MultiBot.frames["MultiBar"].frames["Units"].buttons[pName]
 end
 
-local function getInventoryUnitButton(botName)
-	if not botName or botName == "" then
-		return nil
-	end
-
-	local frames = MultiBot.frames
-	local multiBar = frames and frames["MultiBar"] or nil
-	local units = multiBar and multiBar.frames and multiBar.frames["Units"] or nil
-	local buttons = units and units.buttons or nil
-	return buttons and buttons[botName] or nil
-end
-
 local function scheduleInventoryRefresh(delay, callback)
 	if type(delay) == "number" and delay > 0 then
 		if MultiBot.TimerAfter then
@@ -3296,11 +3247,6 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 
 	options = options or {}
 
-	local function clearWaitState(waitButton)
-		if waitButton and (waitButton.waitFor == "INVENTORY" or waitButton.waitFor == "ITEM" or waitButton.waitFor == "LOOT") then
-			waitButton.waitFor = ""
-		end
-	end
 
 	local function neutralizeCurrentInventoryView()
 		local inventory = MultiBot.inventory
@@ -3322,7 +3268,6 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 			return true
 		end
 
-		local waitButton = getInventoryUnitButton(botName)
 		local bridge = MultiBot.bridge or nil
 		local comm = MultiBot.Comm or nil
 		local bridgeConnected = bridge and bridge.connected == true
@@ -3344,7 +3289,6 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 					neutralizeCurrentInventoryView()
 				end
 
-				clearWaitState(waitButton)
 				return true
 			end
 
@@ -3352,38 +3296,14 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 				bridge.lastError = "INVENTORY_SEND_FAILED"
 			end
 			neutralizeCurrentInventoryView()
-			clearWaitState(waitButton)
 			return false
 		end
 
-		if options.bridgeOnly or MultiBot.allowLegacyChatFallback ~= true then
-			if bridge then
-				bridge.lastError = "INVENTORY_CAPABILITY_UNAVAILABLE"
-			end
-			neutralizeCurrentInventoryView()
-			clearWaitState(waitButton)
-			return false
-		end
-
-		if not waitButton then
-			if bridge then
-				bridge.lastError = "INVENTORY_LEGACY_NO_BUTTON"
-			end
-			neutralizeCurrentInventoryView()
-			return false
-		end
-
-		local inventory = MultiBot.inventory
-		if inventory and inventory.beginPayload then
-			inventory:beginPayload(botName)
-		end
-
-		waitButton.waitFor = "INVENTORY"
-		SendChatMessage("items", "WHISPER", nil, botName)
 		if bridge then
-			bridge.lastError = nil
+			bridge.lastError = "INVENTORY_CAPABILITY_UNAVAILABLE"
 		end
-		return true
+		neutralizeCurrentInventoryView()
+		return false
 	end
 
 	if inventoryViewChanged() then

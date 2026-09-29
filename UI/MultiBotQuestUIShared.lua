@@ -87,22 +87,49 @@ function Shared.GetQuestDropButtonText()
     return MultiBot.L("tips.quests.drop", ABANDON_QUEST or "Abandon")
 end
 
-function Shared.SendDropQuest(botName, entry)
+function Shared.ShowQuestDropFailure(result)
+    result = type(result) == "table" and result or {}
+    local reason = tostring(result.reason or "FAILED")
+    local label = MultiBot.L
+        and MultiBot.L("tips.quests.drop", ABANDON_QUEST or "Abandon")
+        or (ABANDON_QUEST or "Abandon")
+    local message = tostring(label) .. ": " .. reason
+
+    if UIErrorsFrame and UIErrorsFrame.AddMessage then
+        UIErrorsFrame:AddMessage(message, 1, 0.2, 0.2, 1)
+    end
+end
+
+function Shared.SendDropQuest(botName, entry, callback)
     if type(botName) ~= "string" or botName == "" or type(entry) ~= "table" then
+        Shared.ShowQuestDropFailure({ reason = "BAD_REQUEST" })
         return false
     end
 
-    local command = "drop " .. Shared.BuildQuestLink(entry.id, entry.originalName or entry.name)
-    if MultiBot.ActionToTarget then
-        return MultiBot.ActionToTarget(command, botName)
+    local questID = tonumber(entry.id or 0) or 0
+    if questID <= 0 or questID > 4294967295 or math.floor(questID) ~= questID then
+        Shared.ShowQuestDropFailure({ reason = "BAD_QUEST" })
+        return false
     end
 
-    if SendChatMessage then
-        SendChatMessage(command, "WHISPER", nil, botName)
-        return true
+    local comm = MultiBot.Comm
+    if not comm
+        or not comm.IsQuestAbandonTargetCapable
+        or not comm.IsQuestAbandonTargetCapable()
+        or not comm.RunQuestAbandonTarget then
+        Shared.ShowQuestDropFailure({ reason = "BRIDGE_UNAVAILABLE" })
+        return false
     end
 
-    return false
+    local token = comm.RunQuestAbandonTarget(botName, questID, callback)
+    if not token then
+        local bridge = MultiBot.bridge or nil
+        local reason = bridge and bridge.lastError or "SEND_FAILED"
+        Shared.ShowQuestDropFailure({ reason = reason })
+        return false
+    end
+
+    return true
 end
 
 function Shared.RemoveQuestEntryFromBucket(bucket, entry)

@@ -973,7 +973,7 @@ function OutfitUI:RequestList(botName)
         and bridgeState.connected == true
         and bridgeState.outfitCapable == true
 
-    if not bridgeOutfitCapable and MultiBot.allowLegacyChatFallback ~= true then
+    if not bridgeOutfitCapable then
         if bridgeState then
             bridgeState.lastError = "OUTFIT_CAPABILITY_UNAVAILABLE"
         end
@@ -1012,7 +1012,6 @@ function OutfitUI:RequestList(botName)
     end
 
     self.requestToken = (self.requestToken or 0) + 1
-    local token = self.requestToken
 
     if bridgeOutfitCapable then
         local bridgeToken = MultiBot.Comm and MultiBot.Comm.RequestOutfits and MultiBot.Comm.RequestOutfits(botName) or false
@@ -1038,20 +1037,7 @@ function OutfitUI:RequestList(botName)
         return false
     end
 
-    if MultiBot.TimerAfter then
-        MultiBot.TimerAfter(0.8, function()
-            if self.pendingBot == botName and token == self.requestToken then
-                self:FinishList(botName)
-                local refreshWaitButton = getUnitWaitButton(botName)
-                if refreshWaitButton and refreshWaitButton.waitFor == "OUTFITS" then
-                    refreshWaitButton.waitFor = ""
-                end
-            end
-        end)
-    end
-
-    SendChatMessage("outfit ?", "WHISPER", nil, botName)
-    return true
+    return false
 end
 
 function OutfitUI:HandleBridgeBegin(botName, token)
@@ -1207,37 +1193,6 @@ function OutfitUI:HandleBridgeCommandResult(botName, token, result, commandSuffi
     end
 
     return true
-end
-
-function MultiBot.HandleOutfitChatLine(tButton, line, botName)
-    if not OutfitUI.pendingBot or OutfitUI.pendingBot ~= botName then
-        return false
-    end
-
-    if type(line) ~= "string" then
-        return false
-    end
-
-    local lowerLine = string.lower(line)
-    if string.find(lowerLine, "outfit <name>", 1, true) then
-        OutfitUI:FinishList(botName)
-        if tButton then
-            tButton.waitFor = ""
-        end
-        return true
-    end
-
-    local entry = parseOutfitLine(line)
-    if entry then
-        table.insert(OutfitUI.entries, entry)
-        return true
-    end
-
-    if line == "" or string.sub(line, 1, 3) == "---" then
-        return true
-    end
-
-    return false
 end
 
 function OutfitUI:RunCommand(commandSuffix, statusText, persist, wasCreate)

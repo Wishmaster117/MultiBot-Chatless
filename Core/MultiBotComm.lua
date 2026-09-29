@@ -63,6 +63,7 @@ local CAPABILITY_STATE_FIELDS = {
   [GROUP_ROLL_CAPABILITY] = "groupRollCapable",
   [ENCHANT_TRADE_CAPABILITY] = "enchantTradeCapable",
   [QUEST_ABANDON_CAPABILITY] = "questAbandonCapable",
+  ["QUEST_ABANDON_TARGET_V1"] = "questAbandonTargetCapable",
   [TALENT_APPLY_CAPABILITY] = "talentApplyCapable",
   [TALENT_SPEC_APPLY_CAPABILITY] = "talentSpecApplyCapable",
   ["GLYPH_EQUIP_V1"] = "glyphEquipCapable",
@@ -387,6 +388,7 @@ local function ensureBridgeState()
   state.groupRollCapable = state.groupRollCapable or false
   state.enchantTradeCapable = state.enchantTradeCapable or false
   state.questAbandonCapable = state.questAbandonCapable or false
+  state.questAbandonTargetCapable = state.questAbandonTargetCapable or false
   state.talentApplyCapable = state.talentApplyCapable or false
   state.talentSpecApplyCapable = state.talentSpecApplyCapable or false
   state.craftRecipeTargetCapable = state.craftRecipeTargetCapable or false
@@ -454,6 +456,8 @@ local function ensureBridgeState()
   state.groupRollCommands = state.groupRollCommands or {}
   state.questAbandonSeq = state.questAbandonSeq or 0
   state.questAbandonCommands = state.questAbandonCommands or {}
+  state.questAbandonTargetSeq = state.questAbandonTargetSeq or 0
+  state.questAbandonTargetCommands = state.questAbandonTargetCommands or {}
   state.talentApplySeq = state.talentApplySeq or 0
   state.talentApplyCommands = state.talentApplyCommands or {}
   state.talentSpecApplySeq = state.talentSpecApplySeq or 0
@@ -8317,6 +8321,155 @@ local function handleQuestAbandonResponse(payload, state)
   return true
 end
 -- MB_QUEST_ABANDON_V1_END
+-- MB_QUEST_ABANDON_TARGET_V1_BEGIN
+function Comm._FinishQuestAbandonTargetCommand(token, result)
+  local state = ensureBridgeState()
+  local pending = state.questAbandonTargetCommands[token]
+  if type(pending) ~= "table" then
+    return false
+  end
+
+  state.questAbandonTargetCommands[token] = nil
+  result = type(result) == "table" and result or {}
+  result.token = token
+  result.botName = result.botName or pending.botName
+  result.questId = result.questId or pending.questId
+
+  if type(pending.callback) == "function" then
+    pending.callback(result)
+  end
+
+  if MultiBot.OnBridgeQuestAbandonTargetResult then
+    MultiBot.OnBridgeQuestAbandonTargetResult(result)
+  end
+
+  return true
+end
+
+function Comm.IsQuestAbandonTargetCapable()
+  local state = ensureBridgeState()
+  return state.connected == true and state.questAbandonTargetCapable == true
+end
+
+function Comm.RunQuestAbandonTarget(botName, questId, callback)
+  local state = ensureBridgeState()
+  botName = trim(tostring(botName or ""))
+  questId = tonumber(questId or 0) or 0
+
+  if not state.connected or state.questAbandonTargetCapable ~= true then
+    state.lastError = "QUEST_ABANDON_TARGET_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+  if botName == "" or #botName > 64 then
+    state.lastError = "QUEST_ABANDON_TARGET_BAD_BOT"
+    return false
+  end
+  if questId <= 0 or questId > 4294967295 or math.floor(questId) ~= questId then
+    state.lastError = "QUEST_ABANDON_TARGET_BAD_QUEST"
+    return false
+  end
+  if countTableEntries(state.questAbandonTargetCommands) >= 8 then
+    state.lastError = "QUEST_ABANDON_TARGET_TOO_MANY_REQUESTS"
+    return false
+  end
+
+  state.questAbandonTargetSeq = (tonumber(state.questAbandonTargetSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000)) .. "-quest-abandon-target-" .. tostring(state.questAbandonTargetSeq)
+  state.questAbandonTargetCommands[token] = {
+    botName = botName,
+    botNameKey = string.lower(botName),
+    questId = questId,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+  }
+
+  local payload = "QUEST_ABANDON_TARGET~" .. token .. "~" .. urlEncodeField(botName) .. "~" .. tostring(questId)
+  if not Comm.Send("RUN", payload) then
+    state.questAbandonTargetCommands[token] = nil
+    state.lastError = "QUEST_ABANDON_TARGET_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(QUEST_ABANDON_TIMEOUT_SECONDS, function()
+    local bridgeState = ensureBridgeState()
+    if not bridgeState.questAbandonTargetCommands[token] then
+      return
+    end
+
+    bridgeState.lastError = "QUEST_ABANDON_TARGET_TIMEOUT"
+    Comm._FinishQuestAbandonTargetCommand(token, {
+      status = "error",
+      reason = "TIMEOUT",
+      abandoned = 0,
+      botName = botName,
+      questId = questId,
+    })
+  end)
+
+  return token
+end
+
+function Comm.HandleQuestAbandonTargetResponse(payload, state)
+  local fields = splitFields(payload or "")
+  local token = trim(fields[1] or "")
+  local pending = isValidStateToken(token) and state.questAbandonTargetCommands[token] or nil
+
+  if #fields ~= 6 then
+    state.lastError = "QUEST_ABANDON_TARGET_BAD_FIELD_COUNT"
+    if type(pending) == "table" then
+      Comm._FinishQuestAbandonTargetCommand(token, {
+        status = "error",
+        reason = "BAD_RESPONSE",
+        abandoned = 0,
+        botName = pending.botName,
+        questId = pending.questId,
+      })
+    end
+    return true
+  end
+
+  local botName = urlDecodeFieldStrict(fields[2], 64, false)
+  local questId = parseBoundedInteger(fields[3], 1, 4294967295)
+  local status = string.upper(trim(fields[4]))
+  local reason = urlDecodeFieldStrict(fields[5], 64, false)
+  local abandoned = parseBoundedInteger(fields[6], 0, 1)
+
+  local valid = botName ~= nil
+      and questId ~= nil
+      and (status == "OK" or status == "ERR")
+      and reason ~= nil
+      and abandoned ~= nil
+      and type(pending) == "table"
+      and pending.botNameKey == string.lower(botName)
+      and pending.questId == questId
+      and ((status == "OK" and abandoned == 1) or (status == "ERR" and abandoned == 0))
+
+  if not valid then
+    state.lastError = "QUEST_ABANDON_TARGET_BAD_RESPONSE"
+    if type(pending) == "table" then
+      Comm._FinishQuestAbandonTargetCommand(token, {
+        status = "error",
+        reason = "BAD_RESPONSE",
+        abandoned = 0,
+        botName = pending.botName,
+        questId = pending.questId,
+      })
+    end
+    return true
+  end
+
+  state.connected = true
+  state.lastError = status == "OK" and nil or ("QUEST_ABANDON_TARGET_" .. reason)
+  Comm._FinishQuestAbandonTargetCommand(token, {
+    status = status == "OK" and "ok" or "error",
+    reason = reason,
+    abandoned = abandoned,
+    botName = botName,
+    questId = questId,
+  })
+  return true
+end
+-- MB_QUEST_ABANDON_TARGET_V1_END
 local function finishGroupRollCommand(token, result)
   local state = ensureBridgeState()
   local pending = state.groupRollCommands[token]
@@ -12037,6 +12190,7 @@ local STRUCTURED_OPCODE_HANDLERS = {
   LOOT_RULE_ITEM_RESULT = handleLootRuleItemResponse,
   INVENTORY_ITEM_TRADE = handleInventoryItemTradeResponse,
   QUEST_ABANDON_RESULT = handleQuestAbandonResponse,
+  QUEST_ABANDON_TARGET_RESULT = Comm.HandleQuestAbandonTargetResponse,
   TALENT_APPLY_RESULT = handleTalentApplyResponse,
   TALENT_SPEC_CURRENT = handleTalentSpecCurrentResponse,
   TALENT_SPEC_APPLY_RESULT = handleTalentSpecApplyResponse,

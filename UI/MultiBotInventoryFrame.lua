@@ -1479,15 +1479,7 @@ local function prepareInventoryForBot(botName)
         sourceButton.setEnable()
     end
 
-    local requested = requestInventoryForBot(botName)
-    if not requested then
-        local waitButton = getInventoryWaitButton(botName)
-        if waitButton and (waitButton.waitFor == "INVENTORY" or waitButton.waitFor == "ITEM" or waitButton.waitFor == "LOOT") then
-            waitButton.waitFor = ""
-        end
-    end
-
-    return requested
+    return requestInventoryForBot(botName)
 end
 
 local function setInventoryActionState(buttonKey, options)
@@ -1628,12 +1620,10 @@ local function runInventoryInstantAction(botName, command, options)
             return false
         end
 
-        if MultiBot.allowLegacyChatFallback ~= true then
-            if bridge then
-                bridge.lastError = "INVENTORY_OPEN_CAPABILITY_UNAVAILABLE"
-            end
-            return false
+        if bridge then
+            bridge.lastError = "INVENTORY_OPEN_CAPABILITY_UNAVAILABLE"
         end
+        return false
     end
 
     SendChatMessage(command, "WHISPER", nil, botName)

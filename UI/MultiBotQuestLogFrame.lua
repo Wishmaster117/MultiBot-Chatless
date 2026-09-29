@@ -107,7 +107,7 @@ local function handleQuestClick(questID, button)
                     bridgeHandled = MultiBot.Comm.RunQuestAbandon(questID, showQuestAbandonFailure) and true or false
                 end
 
-                if not bridgeHandled and MultiBot.allowLegacyChatFallback ~= true then
+                if not bridgeHandled then
                     local failureReason = bridgeAvailable and "SEND_FAILED" or "BRIDGE_UNAVAILABLE"
                     showQuestAbandonFailure({ status = "error", reason = failureReason })
                 end

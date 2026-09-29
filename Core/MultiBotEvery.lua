@@ -664,8 +664,7 @@ local function sendCommonCombatStrategy(pButton, command)
 		return MultiBot.Comm.RunCombatCommand("BOT", botName, command)
 	end
 
-	SendChatMessage(command, "WHISPER", nil, botName)
-	return true
+	return false
 end
 
 local function addCommonCombatStrategyButton(pFrame, pCombat, tFrame, buttonName, y, icon, tipKey, strategyName)

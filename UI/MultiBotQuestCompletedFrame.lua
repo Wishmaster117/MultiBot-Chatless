@@ -54,13 +54,29 @@ local function resolveBotQuestBucket(store, botName)
     return EMPTY_TABLE
 end
 
-local function dropBotQuest(botName, entry)
-    if not Shared.SendDropQuest(botName, entry) then
-        return
+local function dropBotQuest(botName, entry, widget)
+    if widget and widget.SetDisabled then
+        widget:SetDisabled(true)
     end
 
-    Shared.RemoveQuestEntryFromBucket(resolveBotQuestBucket(getBotQuestsCompletedStore(), botName), entry)
-    MultiBot.BuildBotCompletedList(botName)
+    local started = Shared.SendDropQuest(botName, entry, function(result)
+        if type(result) ~= "table" or result.status ~= "ok" then
+            if widget and widget.SetDisabled then
+                widget:SetDisabled(false)
+            end
+            if Shared.ShowQuestDropFailure then
+                Shared.ShowQuestDropFailure(result)
+            end
+            return
+        end
+
+        Shared.RemoveQuestEntryFromBucket(resolveBotQuestBucket(getBotQuestsCompletedStore(), botName), entry)
+        MultiBot.BuildBotCompletedList(botName)
+    end)
+
+    if not started and widget and widget.SetDisabled then
+        widget:SetDisabled(false)
+    end
 end
 
 function MultiBot.BuildBotCompletedList(botName)
@@ -73,8 +89,8 @@ function MultiBot.BuildBotCompletedList(botName)
         summaryText = botName and ((Shared.QUEST_SUMMARY_PREFIX or "   ") .. "|cff80ff80" .. botName .. "|r") or (MultiBot.L("tips.quests.complist") or ""),
         rowOptions = botName and {
             leftPadding = Shared.QUEST_ROW_LEFT_PADDING or 12,
-            onDrop = function(entry)
-                dropBotQuest(botName, entry)
+            onDrop = function(entry, widget)
+                dropBotQuest(botName, entry, widget)
             end,
         } or nil,
     })
