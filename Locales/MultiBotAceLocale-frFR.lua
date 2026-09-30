@@ -649,6 +649,7 @@ local frFRValues = {
   ["pvp.stats.error_select_bot"] = "Sélectionnez d’abord une cible bot.",
   ["pvp.stats.error_not_in_group"] = "Vous n’êtes pas dans un groupe.",
   ["pvp.stats.error_not_in_raid"] = "Vous n’êtes pas dans un raid.",
+  ["pvp.stats.error_bridge_unavailable"] = "Les statistiques JcJ sont indisponibles via le Bridge. Aucun fallback chat n'a été envoyé.",
   ["ui.swap.source_prefix"] = "Source de l’échange : ",
   ["ui.swap.cancelled"] = "Échange annulé.",
   ["ui.swap.preview_prefix"] = "Aperçu de l’échange : ",
@@ -776,6 +777,7 @@ local frFRValues = {
   ["tips.quests.incomplist"] = "Quêtes en cours du/des bot(s)",
   ["tips.quests.complist"] = "Liste des quêtes terminées du/des bot(s)",
   ["tips.quests.alllist"] = "Toutes les quêtes du/des bot(s)",
+  ["info.quests.bridge_unavailable"] = "[MultiBot] Les listes de quêtes sont indisponibles via le Bridge. Aucun fallback chat n'a été envoyé.",
   ["tips.quests.compheader"] = "** Quêtes Terminées **",
   ["tips.quests.incompheader"] = "** Quêtes Incomplètes **",
   ["tips.quests.drop"] = "Abandonner",
@@ -1520,6 +1522,17 @@ local frFRValues = {
   ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "L'état des glyphes du bot est indisponible.",
   ["talent.glyphs.feedback.reason.FAILED"] = "Les glyphes n'ont pas pu être appliqués.",
 -- MB_GLYPH_EQUIP_V1_END
+-- MB_BOT_RESET_FEEDBACK_V1_BEGIN
+  ["reset.feedback.ai.single"] = "[MultiBot] IA réinitialisée pour le bot : %s",
+  ["reset.feedback.ai.multiple"] = "[MultiBot] IA réinitialisées pour les bots : %s",
+  ["reset.feedback.actions.single"] = "[MultiBot] Action réinitialisée pour le bot : %s",
+  ["reset.feedback.actions.multiple"] = "[MultiBot] Actions réinitialisées pour les bots : %s",
+  ["reset.feedback.failed.single"] = "[MultiBot] Échec de la réinitialisation pour le bot : %s",
+  ["reset.feedback.failed.multiple"] = "[MultiBot] Échec de la réinitialisation pour les bots : %s",
+  ["reset.feedback.no_bots"] = "[MultiBot] Aucun bot à réinitialiser.",
+  ["reset.feedback.failed.generic"] = "[MultiBot] La réinitialisation n'a pas pu être effectuée.",
+-- MB_BOT_RESET_FEEDBACK_V1_END
+
 }
 
 register("frFR", frFRValues)

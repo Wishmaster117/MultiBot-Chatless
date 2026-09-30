@@ -649,6 +649,7 @@ local esESValues = {
   ["pvp.stats.error_select_bot"] = "Selecciona primero un bot como objetivo.",
   ["pvp.stats.error_not_in_group"] = "No estás en un grupo.",
   ["pvp.stats.error_not_in_raid"] = "No estás en una banda.",
+  ["pvp.stats.error_bridge_unavailable"] = "Las estadísticas JcJ no están disponibles a través del Bridge. No se envió ningún fallback por chat.",
   ["ui.swap.source_prefix"] = "Origen del intercambio: ",
   ["ui.swap.cancelled"] = "Intercambio cancelado.",
   ["ui.swap.preview_prefix"] = "Vista previa del intercambio: ",
@@ -776,6 +777,7 @@ local esESValues = {
   ["tips.quests.incomplist"] = "Misiones actuales del/de los bot(s)",
   ["tips.quests.complist"] = "Lista de misiones completadas del/de los bot(s)",
   ["tips.quests.alllist"] = "Todas las misiones del/de los bot(s)",
+  ["info.quests.bridge_unavailable"] = "[MultiBot] Las listas de misiones no están disponibles a través del Bridge. No se envió ningún fallback por chat.",
   ["tips.quests.compheader"] = "** Misiones completadas **",
   ["tips.quests.incompheader"] = "** Misiones incompletas **",
   ["tips.quests.drop"] = "Abandonar",
@@ -1521,6 +1523,17 @@ local esESValues = {
   ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "El estado de glifos del bot no está disponible.",
   ["talent.glyphs.feedback.reason.FAILED"] = "No se pudieron aplicar los glifos.",
 -- MB_GLYPH_EQUIP_V1_END
+-- MB_BOT_RESET_FEEDBACK_V1_BEGIN
+  ["reset.feedback.ai.single"] = "[MultiBot] IA reiniciada para el bot: %s",
+  ["reset.feedback.ai.multiple"] = "[MultiBot] IA reiniciada para los bots: %s",
+  ["reset.feedback.actions.single"] = "[MultiBot] Acción reiniciada para el bot: %s",
+  ["reset.feedback.actions.multiple"] = "[MultiBot] Acciones reiniciadas para los bots: %s",
+  ["reset.feedback.failed.single"] = "[MultiBot] Error al reiniciar el bot: %s",
+  ["reset.feedback.failed.multiple"] = "[MultiBot] Error al reiniciar los bots: %s",
+  ["reset.feedback.no_bots"] = "[MultiBot] No se encontraron bots para reiniciar.",
+  ["reset.feedback.failed.generic"] = "[MultiBot] No se pudo completar el reinicio.",
+-- MB_BOT_RESET_FEEDBACK_V1_END
+
 }
 
 register("esES", esESValues)

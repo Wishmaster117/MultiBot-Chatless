@@ -646,6 +646,7 @@ local zhCNValues = {
   ["pvp.stats.error_select_bot"] = "请先选择一个机器人目标。",
   ["pvp.stats.error_not_in_group"] = "你不在队伍中。",
   ["pvp.stats.error_not_in_raid"] = "你不在团队中。",
+  ["pvp.stats.error_bridge_unavailable"] = "无法通过 Bridge 获取 PvP 统计。未通过聊天备用通道发送。",
   ["ui.swap.source_prefix"] = "交换来源：",
   ["ui.swap.cancelled"] = "交换已取消。",
   ["ui.swap.preview_prefix"] = "交换预览：",
@@ -773,6 +774,7 @@ local zhCNValues = {
   ["tips.quests.incomplist"] = "当前机器人任务列表",
   ["tips.quests.complist"] = "机器人已完成任务列表",
   ["tips.quests.alllist"] = "机器人所有任务",
+  ["info.quests.bridge_unavailable"] = "[MultiBot] 无法通过 Bridge 获取任务列表。未通过聊天备用通道发送。",
   ["tips.quests.compheader"] = "** 已完成任务 **",
   ["tips.quests.incompheader"] = "** 未完成任务 **",
   ["tips.quests.drop"] = "放弃",
@@ -1518,6 +1520,17 @@ local zhCNValues = {
   ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "机器人雕文状态不可用。",
   ["talent.glyphs.feedback.reason.FAILED"] = "无法应用雕文。",
 -- MB_GLYPH_EQUIP_V1_END
+-- MB_BOT_RESET_FEEDBACK_V1_BEGIN
+  ["reset.feedback.ai.single"] = "[MultiBot] 已重置机器人的 AI：%s",
+  ["reset.feedback.ai.multiple"] = "[MultiBot] 已重置机器人的 AI：%s",
+  ["reset.feedback.actions.single"] = "[MultiBot] 已重置机器人的动作：%s",
+  ["reset.feedback.actions.multiple"] = "[MultiBot] 已重置机器人的动作：%s",
+  ["reset.feedback.failed.single"] = "[MultiBot] 重置机器人失败：%s",
+  ["reset.feedback.failed.multiple"] = "[MultiBot] 重置机器人失败：%s",
+  ["reset.feedback.no_bots"] = "[MultiBot] 未找到可重置的机器人。",
+  ["reset.feedback.failed.generic"] = "[MultiBot] 无法完成重置。",
+-- MB_BOT_RESET_FEEDBACK_V1_END
+
 }
 
 register("zhCN", zhCNValues)

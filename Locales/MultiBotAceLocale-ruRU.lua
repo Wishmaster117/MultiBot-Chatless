@@ -646,6 +646,7 @@ local ruRUValues = {
   ["pvp.stats.error_select_bot"] = "Сначала выберите цель‑бота.",
   ["pvp.stats.error_not_in_group"] = "Вы не в группе.",
   ["pvp.stats.error_not_in_raid"] = "Вы не в рейде.",
+  ["pvp.stats.error_bridge_unavailable"] = "PvP-статистика недоступна через Bridge. Резервная отправка через чат не выполнялась.",
   ["ui.swap.source_prefix"] = "Источник обмена: ",
   ["ui.swap.cancelled"] = "Обмен отменён.",
   ["ui.swap.preview_prefix"] = "Предпросмотр обмена: ",
@@ -773,6 +774,7 @@ local ruRUValues = {
   ["tips.quests.incomplist"] = "Текущие квесты бота(ов)",
   ["tips.quests.complist"] = "Список выполненных квестов бота(ов)",
   ["tips.quests.alllist"] = "Все квесты бота(ов)",
+  ["info.quests.bridge_unavailable"] = "[MultiBot] Списки заданий недоступны через Bridge. Резервная отправка через чат не выполнялась.",
   ["tips.quests.compheader"] = "** Выполненные квесты **",
   ["tips.quests.incompheader"] = "** Невыполненные квесты **",
   ["tips.quests.drop"] = "Отказаться",
@@ -1518,6 +1520,17 @@ local ruRUValues = {
   ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "Состояние символов бота недоступно.",
   ["talent.glyphs.feedback.reason.FAILED"] = "Не удалось применить символы.",
 -- MB_GLYPH_EQUIP_V1_END
+-- MB_BOT_RESET_FEEDBACK_V1_BEGIN
+  ["reset.feedback.ai.single"] = "[MultiBot] ИИ бота сброшен: %s",
+  ["reset.feedback.ai.multiple"] = "[MultiBot] ИИ ботов сброшен: %s",
+  ["reset.feedback.actions.single"] = "[MultiBot] Действие бота сброшено: %s",
+  ["reset.feedback.actions.multiple"] = "[MultiBot] Действия ботов сброшены: %s",
+  ["reset.feedback.failed.single"] = "[MultiBot] Не удалось сбросить бота: %s",
+  ["reset.feedback.failed.multiple"] = "[MultiBot] Не удалось сбросить ботов: %s",
+  ["reset.feedback.no_bots"] = "[MultiBot] Боты для сброса не найдены.",
+  ["reset.feedback.failed.generic"] = "[MultiBot] Не удалось выполнить сброс.",
+-- MB_BOT_RESET_FEEDBACK_V1_END
+
 }
 
 register("ruRU", ruRUValues)

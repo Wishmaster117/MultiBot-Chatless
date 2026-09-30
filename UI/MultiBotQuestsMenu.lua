@@ -45,6 +45,30 @@ local function resetQuestResultFrame(frame, loadingText)
     end
 end
 
+-- MB_QUEST_LIST_CHATLESS_G1_V1_BEGIN
+local function reportQuestBridgeUnavailable(frame)
+    setRuntimeFlag("_awaitingQuestsAll", false)
+    setRuntimeFlag("_blockOtherQuests", false)
+    clearTableInPlace(ensureRuntimeTable("_awaitingQuestsIncompleted"))
+    clearTableInPlace(ensureRuntimeTable("_awaitingQuestsCompleted"))
+    clearTableInPlace(ensureRuntimeTable("_awaitingQuestsAllBots"))
+
+    local message = MultiBot.L("info.quests.bridge_unavailable") or ""
+    if frame then
+        resetQuestResultFrame(frame, message)
+        if frame.Show then
+            frame:Show()
+        end
+    end
+
+    if MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
+        MultiBot.Comm.ShowSystemMessage(message, "red")
+    elseif UIErrorsFrame and UIErrorsFrame.AddMessage then
+        UIErrorsFrame:AddMessage(message, 1, 0.2, 0.2, 1)
+    end
+end
+-- MB_QUEST_LIST_CHATLESS_G1_V1_END
+
 local function getTargetBotOrError()
     local botName = UnitName("target")
     if botName and UnitIsPlayer("target") then
@@ -121,6 +145,7 @@ end
 
 local function requestBridgeQuestList(mode, method, botName, frame, loadingText)
     if not isBridgeQuestReady() then
+        reportQuestBridgeUnavailable(frame)
         return false
     end
 
@@ -170,6 +195,7 @@ local function requestBridgeQuestList(mode, method, botName, frame, loadingText)
         return true
     end
 
+    reportQuestBridgeUnavailable(frame)
     return false
 end
 
@@ -247,31 +273,11 @@ local function sendIncomplete(method)
         end
 
         MultiBot._lastIncWhisperBot = bot
-        if requestBridgeQuestList("INCOMPLETED", method, bot, frame, MultiBot.L("tips.quests.incomplist") or "") then
-            return
-        end
-
-        ensureRuntimeTable("_awaitingQuestsIncompleted")[bot] = true
-        ensureRuntimeTable("BotQuestsIncompleted")[bot] = {}
-        resetQuestResultFrame(frame, MultiBot.L("tips.quests.incomplist") or "")
-        MultiBot.ActionToTarget("quests incompleted", bot)
-        frame:Show()
-        MultiBot.TimerAfter(0.5, function()
-            if MultiBot.BuildBotQuestList then
-                MultiBot.BuildBotQuestList(bot)
-            end
-        end)
+        requestBridgeQuestList("INCOMPLETED", method, bot, frame, MultiBot.L("tips.quests.incomplist") or "")
         return
     end
 
-    if requestBridgeQuestList("INCOMPLETED", method, nil, frame, MultiBot.L("tips.quests.incomplist") or "") then
-        return
-    end
-
-    clearTableInPlace(ensureRuntimeTable("BotQuestsIncompleted"))
-    resetQuestResultFrame(frame, MultiBot.L("tips.quests.incomplist") or "")
-    MultiBot.ActionToGroup("quests incompleted")
-    frame:Show()
+    requestBridgeQuestList("INCOMPLETED", method, nil, frame, MultiBot.L("tips.quests.incomplist") or "")
 end
 
 local function sendCompleted(method)
@@ -290,31 +296,11 @@ local function sendCompleted(method)
         end
 
         MultiBot._lastCompWhisperBot = bot
-        if requestBridgeQuestList("COMPLETED", method, bot, frame, MultiBot.L("tips.quests.complist") or "") then
-            return
-        end
-
-        ensureRuntimeTable("_awaitingQuestsCompleted")[bot] = true
-        ensureRuntimeTable("BotQuestsCompleted")[bot] = {}
-        resetQuestResultFrame(frame, MultiBot.L("tips.quests.complist") or "")
-        MultiBot.ActionToTarget("quests completed", bot)
-        frame:Show()
-        MultiBot.TimerAfter(0.5, function()
-            if MultiBot.BuildBotCompletedList then
-                MultiBot.BuildBotCompletedList(bot)
-            end
-        end)
+        requestBridgeQuestList("COMPLETED", method, bot, frame, MultiBot.L("tips.quests.complist") or "")
         return
     end
 
-    if requestBridgeQuestList("COMPLETED", method, nil, frame, MultiBot.L("tips.quests.complist") or "") then
-        return
-    end
-
-    clearTableInPlace(ensureRuntimeTable("BotQuestsCompleted"))
-    resetQuestResultFrame(frame, MultiBot.L("tips.quests.complist") or "")
-    MultiBot.ActionToGroup("quests completed")
-    frame:Show()
+    requestBridgeQuestList("COMPLETED", method, nil, frame, MultiBot.L("tips.quests.complist") or "")
 end
 
 local function sendAll(method)
@@ -326,49 +312,18 @@ local function sendAll(method)
     MultiBot._lastAllMode = method
 
     if method == "GROUP" then
-        if requestBridgeQuestList("ALL", method, nil, frame, MultiBot.L("tips.quests.alllist") or "") then
-            return
-        end
-    else
-        local bot = getTargetBotOrError()
-        if not bot then
-            setRuntimeFlag("_awaitingQuestsAll", false)
-            setRuntimeFlag("_blockOtherQuests", false)
-            return
-        end
-
-        if requestBridgeQuestList("ALL", method, bot, frame, MultiBot.L("tips.quests.alllist") or "") then
-            return
-        end
+        requestBridgeQuestList("ALL", method, nil, frame, MultiBot.L("tips.quests.alllist") or "")
+        return
     end
 
-    setRuntimeFlag("_awaitingQuestsAll", true)
-    setRuntimeFlag("_blockOtherQuests", true)
-    clearTableInPlace(ensureRuntimeTable("BotQuestsAll"))
-    local awaitingBots = ensureRuntimeTable("_awaitingQuestsAllBots")
-    clearTableInPlace(awaitingBots)
-
-    if method == "GROUP" then
-        for index = 1, GetNumPartyMembers() do
-            local botName = UnitName("party" .. index)
-            if botName then
-                awaitingBots[botName] = false
-            end
-        end
-        MultiBot.ActionToGroup("quests all")
-    else
-        local bot = getTargetBotOrError()
-        if not bot then
-            setRuntimeFlag("_awaitingQuestsAll", false)
-            setRuntimeFlag("_blockOtherQuests", false)
-            return
-        end
-        awaitingBots[bot] = false
-        MultiBot.ActionToTarget("quests all", bot)
+    local bot = getTargetBotOrError()
+    if not bot then
+        setRuntimeFlag("_awaitingQuestsAll", false)
+        setRuntimeFlag("_blockOtherQuests", false)
+        return
     end
 
-    frame:Show()
-    frame:SetLoading()
+    requestBridgeQuestList("ALL", method, bot, frame, MultiBot.L("tips.quests.alllist") or "")
 end
 
 function MultiBot.InitializeQuestsMenu(tRight)

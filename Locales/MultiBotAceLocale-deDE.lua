@@ -649,6 +649,7 @@ local deDEValues = {
   ["pvp.stats.error_select_bot"] = "Wähle zuerst ein Bot‑Ziel aus.",
   ["pvp.stats.error_not_in_group"] = "Du bist nicht in einer Gruppe.",
   ["pvp.stats.error_not_in_raid"] = "Du bist nicht in einem Schlachtzug.",
+  ["pvp.stats.error_bridge_unavailable"] = "Die PvP-Statistiken sind über die Bridge nicht verfügbar. Es wurde kein Chat-Fallback gesendet.",
   ["ui.swap.source_prefix"] = "Tauschquelle: ",
   ["ui.swap.cancelled"] = "Tausch abgebrochen.",
   ["ui.swap.preview_prefix"] = "Tauschvorschau: ",
@@ -776,6 +777,7 @@ local deDEValues = {
   ["tips.quests.incomplist"] = "Aktuelle Quests vom Bot(s)",
   ["tips.quests.complist"] = "Liste der abgeschlossenen Quests des/der Bot(s)",
   ["tips.quests.alllist"] = "Alle Quests des/der Bot(s)",
+  ["info.quests.bridge_unavailable"] = "[MultiBot] Questlisten sind über die Bridge nicht verfügbar. Es wurde kein Chat-Fallback gesendet.",
   ["tips.quests.compheader"] = "** Abgeschlossene Quests **",
   ["tips.quests.incompheader"] = "** Unvollständige Quests **",
   ["tips.quests.drop"] = "Aufgeben",
@@ -1520,6 +1522,17 @@ local deDEValues = {
   ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "Der Glyphenstatus des Bots ist nicht verfügbar.",
   ["talent.glyphs.feedback.reason.FAILED"] = "Die Glyphen konnten nicht angewendet werden.",
 -- MB_GLYPH_EQUIP_V1_END
+-- MB_BOT_RESET_FEEDBACK_V1_BEGIN
+  ["reset.feedback.ai.single"] = "[MultiBot] KI für Bot zurückgesetzt: %s",
+  ["reset.feedback.ai.multiple"] = "[MultiBot] KI für Bots zurückgesetzt: %s",
+  ["reset.feedback.actions.single"] = "[MultiBot] Aktion für Bot zurückgesetzt: %s",
+  ["reset.feedback.actions.multiple"] = "[MultiBot] Aktionen für Bots zurückgesetzt: %s",
+  ["reset.feedback.failed.single"] = "[MultiBot] Zurücksetzen fehlgeschlagen für Bot: %s",
+  ["reset.feedback.failed.multiple"] = "[MultiBot] Zurücksetzen fehlgeschlagen für Bots: %s",
+  ["reset.feedback.no_bots"] = "[MultiBot] Keine Bots zum Zurücksetzen gefunden.",
+  ["reset.feedback.failed.generic"] = "[MultiBot] Zurücksetzen konnte nicht ausgeführt werden.",
+-- MB_BOT_RESET_FEEDBACK_V1_END
+
 }
 
 register("deDE", deDEValues)

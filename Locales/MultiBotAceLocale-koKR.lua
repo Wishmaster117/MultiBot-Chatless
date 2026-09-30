@@ -645,6 +645,7 @@ local koKRValues = {
   ["pvp.stats.error_select_bot"] = "먼저 봇 대상을 선택하세요.",
   ["pvp.stats.error_not_in_group"] = "파티에 속해 있지 않습니다.",
   ["pvp.stats.error_not_in_raid"] = "공격대에 속해 있지 않습니다.",
+  ["pvp.stats.error_bridge_unavailable"] = "Bridge를 통해 PvP 통계를 사용할 수 없습니다. 채팅 대체 전송을 사용하지 않았습니다.",
   ["ui.swap.source_prefix"] = "교체 소스: ",
   ["ui.swap.cancelled"] = "교체 취소됨.",
   ["ui.swap.preview_prefix"] = "교체 미리보기: ",
@@ -772,6 +773,7 @@ local koKRValues = {
   ["tips.quests.incomplist"] = "현재 봇의 퀘스트 목록",
   ["tips.quests.complist"] = "완료한 봇 퀘스트 목록",
   ["tips.quests.alllist"] = "모든 봇의 퀘스트 목록",
+  ["info.quests.bridge_unavailable"] = "[MultiBot] Bridge를 통해 퀘스트 목록을 사용할 수 없습니다. 채팅 대체 전송을 사용하지 않았습니다.",
   ["tips.quests.compheader"] = "** 완료한 퀘스트 **",
   ["tips.quests.incompheader"] = "** 미완료 퀘스트 **",
   ["tips.quests.drop"] = "포기",
@@ -1509,6 +1511,17 @@ local koKRValues = {
   ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "봇의 문양 상태를 사용할 수 없습니다.",
   ["talent.glyphs.feedback.reason.FAILED"] = "문양을 적용할 수 없습니다.",
 -- MB_GLYPH_EQUIP_V1_END
+-- MB_BOT_RESET_FEEDBACK_V1_BEGIN
+  ["reset.feedback.ai.single"] = "[MultiBot] 봇 AI가 초기화되었습니다: %s",
+  ["reset.feedback.ai.multiple"] = "[MultiBot] 봇 AI가 초기화되었습니다: %s",
+  ["reset.feedback.actions.single"] = "[MultiBot] 봇의 동작이 초기화되었습니다: %s",
+  ["reset.feedback.actions.multiple"] = "[MultiBot] 봇들의 동작이 초기화되었습니다: %s",
+  ["reset.feedback.failed.single"] = "[MultiBot] 봇 초기화 실패: %s",
+  ["reset.feedback.failed.multiple"] = "[MultiBot] 봇 초기화 실패: %s",
+  ["reset.feedback.no_bots"] = "[MultiBot] 초기화할 봇을 찾을 수 없습니다.",
+  ["reset.feedback.failed.generic"] = "[MultiBot] 초기화를 완료할 수 없습니다.",
+-- MB_BOT_RESET_FEEDBACK_V1_END
+
 }
 
 register("koKR", koKRValues)

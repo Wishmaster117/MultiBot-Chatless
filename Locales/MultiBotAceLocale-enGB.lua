@@ -651,6 +651,7 @@ local enGBValues = {
   ["pvp.stats.error_select_bot"] = "Select a bot target first.",
   ["pvp.stats.error_not_in_group"] = "You are not in a group.",
   ["pvp.stats.error_not_in_raid"] = "You are not in a raid.",
+  ["pvp.stats.error_bridge_unavailable"] = "PvP stats are unavailable through the Bridge. No chat fallback was sent.",
   ["ui.swap.source_prefix"] = "Swap source: ",
   ["ui.swap.cancelled"] = "Swap cancelled.",
   ["ui.swap.preview_prefix"] = "Swap preview: ",
@@ -778,6 +779,7 @@ local enGBValues = {
   ["tips.quests.incomplist"] = "Current Quests from Bot(s)",
   ["tips.quests.complist"] = "List of completed Quests for the Bot(s)",
   ["tips.quests.alllist"] = "All Quests for Bot(s)",
+  ["info.quests.bridge_unavailable"] = "[MultiBot] Quest lists are unavailable through the Bridge. No chat fallback was sent.",
   ["tips.quests.compheader"] = "** Complete Quests **",
   ["tips.quests.incompheader"] = "** Incomplete Quests **",
   ["tips.quests.drop"] = "Abandon",
@@ -1523,6 +1525,17 @@ local enGBValues = {
   ["talent.glyphs.feedback.reason.NO_CONTEXT"] = "The bot glyph state is unavailable.",
   ["talent.glyphs.feedback.reason.FAILED"] = "The glyphs could not be applied.",
 -- MB_GLYPH_EQUIP_V1_END
+-- MB_BOT_RESET_FEEDBACK_V1_BEGIN
+  ["reset.feedback.ai.single"] = "[MultiBot] AI reset for bot: %s",
+  ["reset.feedback.ai.multiple"] = "[MultiBot] AI reset for bots: %s",
+  ["reset.feedback.actions.single"] = "[MultiBot] Action reset for bot: %s",
+  ["reset.feedback.actions.multiple"] = "[MultiBot] Actions reset for bots: %s",
+  ["reset.feedback.failed.single"] = "[MultiBot] Reset failed for bot: %s",
+  ["reset.feedback.failed.multiple"] = "[MultiBot] Reset failed for bots: %s",
+  ["reset.feedback.no_bots"] = "[MultiBot] No bots found to reset.",
+  ["reset.feedback.failed.generic"] = "[MultiBot] The reset could not be completed.",
+-- MB_BOT_RESET_FEEDBACK_V1_END
+
 }
 
 register("enGB", enGBValues)

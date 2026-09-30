@@ -804,6 +804,30 @@ local function sendMainCombatStrategy(scope, strategyName, enabled)
 	return false
 end
 
+local function runMainResetCommand(operation)
+    local targetName = UnitName("target")
+    local scope = nil
+    local target = ""
+
+    if targetName ~= nil and targetName ~= "Unknown Entity" then
+        scope = "TARGET"
+        target = targetName
+    elseif GetNumRaidMembers() > 5 or GetNumPartyMembers() > 0 then
+        scope = "GROUP"
+    else
+        if UIErrorsFrame then
+            UIErrorsFrame:AddMessage(MultiBot.L("info.neither"), 1, 0.25, 0.25, 1)
+        end
+        return false
+    end
+
+    if MultiBot.Comm and type(MultiBot.Comm.RunBotResetCommand) == "function" then
+        return MultiBot.Comm.RunBotResetCommand(scope, operation, target)
+    end
+
+    return false
+end
+
 local function showMainCombatStrategyTooltip(owner)
 	if not owner or not GameTooltip then
 		return
@@ -1516,7 +1540,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
         icon = "inv_misc_tournaments_symbol_gnome",
         tip = "tips.main.reset",
         doLeft = function()
-            MultiBot.ActionToTargetOrGroup("reset botAI")
+            runMainResetCommand("AI")
         end,
     })
     wireShiftRightSwap(mainFrame.buttons["Reset"], "Reset")
@@ -1527,7 +1551,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
         icon = "inv_helmet_02",
         tip = "tips.main.action",
         doLeft = function()
-            MultiBot.ActionToTargetOrGroup("reset")
+            runMainResetCommand("ACTIONS")
         end,
     })
     wireShiftRightSwap(mainFrame.buttons["Actions"], "Actions")

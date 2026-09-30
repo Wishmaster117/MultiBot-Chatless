@@ -76,6 +76,7 @@ local CAPABILITY_STATE_FIELDS = {
   ["CREATOR_ADDCLASS_V1"] = "creatorAddClassCapable",
   ["CREATOR_INIT_AUTO_V1"] = "creatorInitAutoCapable",
   ["FLEE_ORDER_V1"] = "fleeOrderCapable",
+  ["BOT_RESET_V1"] = "botResetCapable",
   ["GROUP_ACTION_V1"] = "groupActionCapable",
   ["FORMATION_V1"] = "formationCapable",
   ["RTSC_ORDER_V1"] = "rtscOrderCapable",
@@ -400,6 +401,7 @@ local function ensureBridgeState()
   state.creatorAddClassCapable = state.creatorAddClassCapable or false
   state.creatorInitAutoCapable = state.creatorInitAutoCapable or false
   state.fleeOrderCapable = state.fleeOrderCapable or false
+  state.botResetCapable = state.botResetCapable or false
   state.groupActionCapable = state.groupActionCapable or false
   state.formationCapable = state.formationCapable or false
   state.rtscOrderCapable = state.rtscOrderCapable or false
@@ -2592,6 +2594,7 @@ state.spellbookIgnoreCapable = false
     state.lootRuleItemCapable = false
     state.groupRollCapable = false
     state.groupActionCapable = false
+    state.botResetCapable = false
     state.formationCapable = false
     state.rtscOrderCapable = false
     state.questAcceptAllCapable = false
@@ -4620,6 +4623,329 @@ function Comm.HandleFleeOrderProtocolError(requestType, token, reason, state)
   return true
 end
 -- MB_FLEE_ORDER_V1_TX_END
+
+-- MB_BOT_RESET_V1_BEGIN
+function Comm.RunBotResetCommand(scope, operation, target, callback)
+  local state = ensureBridgeState()
+  if not state.connected then
+    state.lastError = "BOT_RESET_NOT_CONNECTED"
+    return false
+  end
+  if state.botResetCapable ~= true then
+    state.lastError = "BOT_RESET_CAPABILITY_UNAVAILABLE"
+    return false
+  end
+
+  scope = string.upper(trim(scope or ""))
+  operation = string.upper(trim(operation or ""))
+  target = trim(tostring(target or ""))
+
+  if scope ~= "TARGET" and scope ~= "GROUP" then
+    state.lastError = "BOT_RESET_BAD_SCOPE"
+    return false
+  end
+  if operation ~= "ACTIONS" and operation ~= "AI" then
+    state.lastError = "BOT_RESET_BAD_OPERATION"
+    return false
+  end
+  if scope == "TARGET" then
+    if target == ""
+        or string.len(target) > 64
+        or string.find(target, "~", 1, true)
+        or string.find(target, "\r", 1, true)
+        or string.find(target, "\n", 1, true) then
+      state.lastError = "BOT_RESET_BAD_TARGET"
+      return false
+    end
+  elseif target ~= "" then
+    state.lastError = "BOT_RESET_BAD_TARGET"
+    return false
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local active = 0
+  for _ in pairs(state.groupOrderCommands) do
+    active = active + 1
+  end
+  if active >= Comm._GROUP_ORDER_MAX_ACTIVE then
+    state.lastError = "BOT_RESET_BUSY"
+    return false
+  end
+
+  state.groupOrderSeq = (tonumber(state.groupOrderSeq) or 0) + 1
+  local token = tostring(math.floor(safeNow() * 1000))
+    .. "-bot-reset-" .. tostring(state.groupOrderSeq)
+
+  state.groupOrderCommands[token] = {
+    order = "BOT_RESET",
+    scope = scope,
+    operation = operation,
+    target = target,
+    callback = type(callback) == "function" and callback or nil,
+    startedAt = safeNow(),
+    resultNames = {},
+    failedNames = {},
+    resultSeen = {},
+    resultItemCount = 0,
+    resultFailedCount = 0,
+  }
+
+  if not Comm.Send(
+      "RUN",
+      "BOT_RESET~" .. token .. "~" .. scope .. "~" .. operation .. "~" .. urlEncodeField(target)) then
+    state.groupOrderCommands[token] = nil
+    state.lastError = "BOT_RESET_SEND_FAILED"
+    return false
+  end
+
+  safeDelay(Comm._GROUP_ORDER_TIMEOUT_SECONDS, function()
+    local bridge = ensureBridgeState()
+    bridge.groupOrderCommands = bridge.groupOrderCommands or {}
+    local pending = bridge.groupOrderCommands[token]
+    if type(pending) ~= "table"
+        or pending.order ~= "BOT_RESET"
+        or pending.scope ~= scope
+        or pending.operation ~= operation then
+      return
+    end
+
+    bridge.lastError = "BOT_RESET_TIMEOUT~" .. token
+    Comm._FinishGroupOrderCommand(token, {
+      status = "timeout",
+      scope = pending.scope,
+      operation = pending.operation,
+      target = pending.target,
+      matched = 0,
+      succeeded = 0,
+      failed = 0,
+      reason = "TIMEOUT",
+    })
+  end)
+
+  return token
+end
+
+-- MB_BOT_RESET_FEEDBACK_V1_BEGIN
+function Comm._ShowBotResetFeedback(operation, pending, reason, succeeded, failed)
+  operation = string.upper(trim(operation or ""))
+  reason = trim(reason or "FAILED")
+  succeeded = tonumber(succeeded) or 0
+  failed = tonumber(failed) or 0
+
+  local successNames = type(pending) == "table" and pending.resultNames or nil
+  local failedNames = type(pending) == "table" and pending.failedNames or nil
+  successNames = type(successNames) == "table" and successNames or {}
+  failedNames = type(failedNames) == "table" and failedNames or {}
+
+  if succeeded > 0 and #successNames > 0 then
+    local key
+    if operation == "AI" then
+      key = #successNames == 1
+        and "reset.feedback.ai.single"
+        or "reset.feedback.ai.multiple"
+    else
+      key = #successNames == 1
+        and "reset.feedback.actions.single"
+        or "reset.feedback.actions.multiple"
+    end
+
+    Comm.ShowSystemMessage(string.format(L(key), table.concat(successNames, ", ")), "green")
+  end
+
+  if failed > 0 and #failedNames > 0 then
+    local key = #failedNames == 1
+      and "reset.feedback.failed.single"
+      or "reset.feedback.failed.multiple"
+    Comm.ShowSystemMessage(string.format(L(key), table.concat(failedNames, ", ")), "red")
+  elseif succeeded <= 0 and reason == "NO_BOTS" then
+    Comm.ShowSystemMessage(L("reset.feedback.no_bots"), "red")
+  elseif succeeded <= 0 and reason ~= "OK" then
+    Comm.ShowSystemMessage(L("reset.feedback.failed.generic"), "red")
+  end
+end
+-- MB_BOT_RESET_FEEDBACK_V1_END
+
+-- MB_BOT_RESET_ITEM_V1_BEGIN
+function Comm.HandleBotResetAddonMessage(opcode, payload, state)
+  if opcode ~= "BOT_RESET_ITEM" and opcode ~= "BOT_RESET_ACK" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local fields = splitFields(payload or "")
+
+  if opcode == "BOT_RESET_ITEM" then
+    if #fields ~= 4 then
+      state.lastError = "BOT_RESET_ITEM_BAD_FIELD_COUNT"
+      return true
+    end
+
+    local token = trim(fields[1])
+    local operation = string.upper(trim(fields[2]))
+    local botName = urlDecodeFieldStrict(fields[3], 64, false)
+    local itemStatus = string.upper(trim(fields[4]))
+    local pending = state.groupOrderCommands[token]
+
+    if not isValidStateToken(token)
+        or (operation ~= "ACTIONS" and operation ~= "AI")
+        or botName == nil
+        or (itemStatus ~= "OK" and itemStatus ~= "ERR")
+        or type(pending) ~= "table"
+        or pending.order ~= "BOT_RESET"
+        or pending.operation ~= operation then
+      state.lastError = "BOT_RESET_ITEM_INVALID"
+      return true
+    end
+
+    pending.resultNames = type(pending.resultNames) == "table" and pending.resultNames or {}
+    pending.failedNames = type(pending.failedNames) == "table" and pending.failedNames or {}
+    pending.resultSeen = type(pending.resultSeen) == "table" and pending.resultSeen or {}
+    pending.resultItemCount = tonumber(pending.resultItemCount) or 0
+    pending.resultFailedCount = tonumber(pending.resultFailedCount) or 0
+
+    local botKey = string.lower(trim(botName))
+    if botKey == ""
+        or pending.resultSeen[botKey]
+        or pending.resultItemCount >= 40 then
+      state.lastError = "BOT_RESET_ITEM_INVALID"
+      return true
+    end
+
+    pending.resultSeen[botKey] = true
+    pending.resultItemCount = pending.resultItemCount + 1
+    if itemStatus == "OK" then
+      table.insert(pending.resultNames, botName)
+    else
+      table.insert(pending.failedNames, botName)
+      pending.resultFailedCount = pending.resultFailedCount + 1
+    end
+
+    state.connected = true
+    state.lastError = nil
+    debugPrint("ADDON:RX", opcode, payload or "")
+    return true
+  end
+
+  if #fields ~= 7 then
+    state.lastError = "BOT_RESET_ACK_BAD_FIELD_COUNT"
+    return true
+  end
+
+  local token = trim(fields[1])
+  local scope = string.upper(trim(fields[2]))
+  local operation = string.upper(trim(fields[3]))
+  local matched = parseBoundedInteger(fields[4], 0, 40)
+  local succeeded = parseBoundedInteger(fields[5], 0, 40)
+  local failed = parseBoundedInteger(fields[6], 0, 40)
+  local reason = urlDecodeFieldStrict(fields[7], 64, false)
+  local pending = state.groupOrderCommands[token]
+
+  local scopeValid = scope == "TARGET" or scope == "GROUP"
+  local operationValid = operation == "ACTIONS" or operation == "AI"
+  local countsValid = matched ~= nil
+    and succeeded ~= nil
+    and failed ~= nil
+    and succeeded <= matched
+    and failed <= matched
+    and succeeded + failed == matched
+    and (scope ~= "TARGET" or matched <= 1)
+  local reasonValid = reason == "OK"
+    or reason == "BAD_SCOPE"
+    or reason == "BAD_OPERATION"
+    or reason == "BAD_TARGET"
+    or reason == "RATE_LIMIT"
+    or reason == "REPLAY"
+    or reason == "NO_GROUP"
+    or reason == "NO_BOTS"
+    or reason == "NOT_ALLOWED"
+    or reason == "NOT_CONTROLLED"
+    or reason == "BOT_LIMIT"
+    or reason == "PARTIAL"
+    or reason == "FAILED"
+
+  if not isValidStateToken(token)
+      or not scopeValid
+      or not operationValid
+      or not countsValid
+      or not reasonValid
+      or type(pending) ~= "table"
+      or pending.order ~= "BOT_RESET"
+      or pending.scope ~= scope
+      or pending.operation ~= operation then
+    state.lastError = "BOT_RESET_ACK_INVALID"
+    return true
+  end
+
+  local itemCount = tonumber(pending.resultItemCount) or 0
+  local itemFailedCount = tonumber(pending.resultFailedCount) or 0
+  if itemCount > matched or itemFailedCount > failed then
+    state.lastError = "BOT_RESET_ACK_ITEM_MISMATCH"
+    return true
+  end
+
+  state.connected = true
+  state.lastError = reason == "OK" and nil or ("BOT_RESET_" .. reason)
+  debugPrint("ADDON:RX", opcode, payload or "")
+
+  local status = "failed"
+  if reason == "OK" and matched > 0 and failed == 0 and succeeded == matched then
+    status = "ok"
+  elseif reason == "NO_BOTS" and matched == 0 then
+    status = "empty"
+  elseif succeeded > 0 then
+    status = "partial"
+  end
+
+  Comm._ShowBotResetFeedback(operation, pending, reason, succeeded, failed)
+
+  Comm._FinishGroupOrderCommand(token, {
+    status = status,
+    scope = scope,
+    operation = operation,
+    target = pending.target,
+    matched = matched,
+    succeeded = succeeded,
+    failed = failed,
+    reason = reason,
+    names = pending.resultNames,
+    failedNames = pending.failedNames,
+  })
+  return true
+end
+-- MB_BOT_RESET_ITEM_V1_END
+function Comm.HandleBotResetProtocolError(requestType, token, reason, state)
+  if requestType ~= "BOT_RESET" then
+    return false
+  end
+
+  state = type(state) == "table" and state or ensureBridgeState()
+  token = trim(token or "")
+  reason = trim(reason or "PROTOCOL_ERROR")
+  if reason == "" then
+    reason = "PROTOCOL_ERROR"
+  end
+
+  state.groupOrderCommands = state.groupOrderCommands or {}
+  local pending = state.groupOrderCommands[token]
+  if type(pending) ~= "table" or pending.order ~= "BOT_RESET" then
+    return true
+  end
+
+  state.lastError = "BOT_RESET_" .. reason
+  Comm._FinishGroupOrderCommand(token, {
+    status = "error",
+    scope = pending.scope,
+    operation = pending.operation,
+    target = pending.target,
+    matched = 0,
+    succeeded = 0,
+    failed = 0,
+    reason = reason,
+  })
+  return true
+end
+-- MB_BOT_RESET_V1_END
 
 local function finishStrategyMutationCommand(token, result)
   local state = ensureBridgeState()
@@ -12643,6 +12969,12 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   end
   -- MB_FLEE_ORDER_V1_RX_END
 
+  -- MB_BOT_RESET_V1_RX_BEGIN
+  if Comm.HandleBotResetAddonMessage(opcode, payload, state) then
+    return true
+  end
+  -- MB_BOT_RESET_V1_RX_END
+
   -- MB_ADDON_ALT_ROSTER_LIFECYCLE_V1_RX_BEGIN
   if Comm.HandleAltBotLifecycleAddonMessage(opcode, payload, state) then
     return true
@@ -15304,6 +15636,8 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
         elseif Comm.HandleSelfStrategyProtocolError(requestType, token, reason, state) then
           return true
         elseif Comm.HandleFleeOrderProtocolError(requestType, token, reason, state) then
+          return true
+        elseif Comm.HandleBotResetProtocolError(requestType, token, reason, state) then
           return true
         elseif Comm.HandleAltBotLifecycleProtocolError(requestType, token, reason, state) then
           return true
