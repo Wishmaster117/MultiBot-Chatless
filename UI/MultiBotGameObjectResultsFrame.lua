@@ -28,9 +28,24 @@ local function clearResults(frame)
 end
 
 local function addLabel(aceGUI, parent, text)
-    local label = aceGUI:Create("Label")
+    text = text or ""
+    local linkColor, link, linkText = text:match("|c(%x%x%x%x%x%x%x%x)|H([^|]+)|h(.-)|h|r")
+    local label = aceGUI:Create(link and "InteractiveLabel" or "Label")
     label:SetFullWidth(true)
-    label:SetText(text or "")
+    label:SetText(text)
+    if link then
+        label:SetCallback("OnClick", function(_, _, button)
+            if button ~= "LeftButton" or not IsShiftKeyDown or not IsShiftKeyDown() then
+                return
+            end
+            local fullLink = ("|c%s|H%s|h%s|h|r"):format(linkColor, link, linkText)
+            if ChatFrame_OnHyperlinkShow then
+                ChatFrame_OnHyperlinkShow(DEFAULT_CHAT_FRAME, link, fullLink, button)
+            elseif ChatEdit_InsertLink then
+                ChatEdit_InsertLink(fullLink)
+            end
+        end)
+    end
     parent:AddChild(label)
     return label
 end
