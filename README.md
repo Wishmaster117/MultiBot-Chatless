@@ -534,7 +534,7 @@ Unitary roster lifecycle, AutoInvite and Raidus remain structured-first or expli
 
 Creator `addclass` is bridge-first through `CREATOR_ADDCLASS_V1` and runtime validated, including Random/Male/Female/DK and existing auto-group behavior. Creator `init=auto` is also structured through `CREATOR_INIT_AUTO_V1` for bounded target/group initialization. Deferred Units/lifecycle legacy cleanup remains reserved for the final global fallback/parser cleanup.
 
-The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is present through the five `QUEST_*` capabilities, **Autogear** is completed through `AUTOGEAR_OPTIONS_V1`, **Maintenance M1/M2** is completed through `BOT_MAINTENANCE_V1`, **Hunter Pet H1/H2/H3** is completed through `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` and `HUNTER_PET_LIFECYCLE_V1`, and **Spellbook Cast / Ignore** is completed through `SPELLBOOK_CAST_V1` and `SPELLBOOK_IGNORE_V1`. Trainer lifecycle, Outfit lifecycle, Rogue strategy-name compatibility, Formation F1–F6 and normal Craft C1 hardening are also closed. Warlock Firestone/Spellstone is finalized through `WARLOCK_STONE_STATE_V1`, including authoritative physical enchant state, silent application and physical OFF. The remaining active work is the explicitly deferred technical residuals followed by the final global legacy parser/fallback and chat-path cleanup.
+The bounded **Group Actions** set (`drink`, `release`, `revive`, `summon`) is bridge-first through `GROUP_ACTION_V1`. **RTSC** is bridge-first and runtime validated through `RTSC_ORDER_V1`; AEDM itself intentionally remains on the native WoW/Playerbots spell path. The structured Quest interaction family is present through the five `QUEST_*` capabilities, **Autogear** is completed through `AUTOGEAR_OPTIONS_V1`, **Maintenance M1/M2** is completed through `BOT_MAINTENANCE_V1`, **Hunter Pet H1/H2/H3** is completed through `HUNTER_PET_CONTROL_V1`, `HUNTER_PET_MANAGE_V1` and `HUNTER_PET_LIFECYCLE_V1`, and **Spellbook Cast / Ignore** is completed through `SPELLBOOK_CAST_V1` and `SPELLBOOK_IGNORE_V1`. Trainer lifecycle, Outfit lifecycle, Rogue strategy-name compatibility, Formation F1–F6 and normal Craft C1 hardening are also closed. Warlock Firestone/Spellstone is finalized through `WARLOCK_STONE_STATE_V1`, including authoritative physical enchant state, silent application and physical OFF. The current active work is the evidence-based removal of remaining automatic chat dependencies and dead legacy plumbing, while preserving deliberate manual Playerbots commands and the compatibility shims that runtime testing still proves necessary.
 
 The project therefore remains intentionally **mostly chatless**, not fully chatless.
 
@@ -606,4 +606,46 @@ Quest feedback produced by controlled Playerbots is now converted to localized l
 
 P1-C1 also removed proven obsolete chat fallbacks from Quest Abandon, Talent Apply, Outfit execution and Inventory bulk sell.
 
-Warlock Firestone/Spellstone is already closed through `WARLOCK_STONE_STATE_V1` and is not active backlog. The next project milestone is the read-only `audit-multibot-global-remaining-chat-paths-v2`, followed by evidence-based legacy parser/fallback cleanup.
+Warlock Firestone/Spellstone is already closed through `WARLOCK_STONE_STATE_V1` and is not active backlog. The global remaining-chat audit has since progressed through the technical `co ?` / `nc ?` / `ss ?`, Quest-list, PvP Stats, legacy Stats and Inventory instant-action cleanup described below.
+
+
+<!-- DOC_SYNC_2026_10_03_GLOBAL_CHAT_CLEANUP_G4 -->
+# Recent Milestone — Global Chat Cleanup through G4f2
+
+The addon has continued the migration away from automatic chat-driven technical refreshes while intentionally preserving useful manual Playerbots commands.
+
+The manual commands `who`, `co ?`, `nc ?` and `ss ?` remain supported and are not cleanup targets. Their former automatic/internal equivalents are treated separately.
+
+Recent cleanup completed:
+
+- automatic `co ?`, `nc ?` and `ss ?` technical refreshes removed or replaced where structured state is authoritative;
+- Quest-list and PvP Stats automatic chat dependencies migrated;
+- obsolete peer-whisper Stats protocol removed;
+- the generic Inventory instant-action WHISPER fallback removed after all remaining callers were proven structured.
+
+## Native Trade inventory-dump compatibility
+
+Playerbots' native Trade start path emits an `=== Inventory ===` whisper dump. MultiBot currently suppresses that feedback with a narrowly scoped client-side filter.
+
+G4f2 fixed an important arming defect by removing the `MultiBot.bridge.connected` early return from `suppressNextTradeInventoryDump()`. Runtime validation confirmed the Trade dump disappeared again.
+
+The current compatibility filter still contains the `tradePartner` / `autoDetected` fallback. A targeted static audit showed all three Addon `InitiateTrade()` callsites have explicit arming, but a subsequent runtime removal test proved that this static coverage is not sufficient: removing the fallback made the spam return, and rolling back restored the no-spam behavior.
+
+**Do not remove or alter this fallback again without runtime instrumentation that demonstrates precisely why the explicitly armed state is insufficient.**
+
+This is intentionally distinct from the generic legacy command fallback:
+
+```lua
+MultiBot.allowLegacyChatFallback = false
+```
+
+The Trade filter remains a compatibility shim for native Playerbots feedback, not a transport path for automatic Playerbots commands.
+
+Current audited G4f2 source state:
+
+```text
+UI/MultiBotInventoryFrame.lua
+SHA-256 E6878BEF7F3CBD31EC6D78BDDBC73C3AA059DE4DD2A5B0486DE96970D514F80C
+```
+
+The main cleanup now resumes with the remaining automatic chat-path inventory. The external Beast Master module migration remains deferred until the end of the main cleanup.

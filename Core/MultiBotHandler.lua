@@ -1864,24 +1864,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 		end
 
 
-		if(MultiBot.isInside(arg1, "StatsOfPlayer")) then
-			local statsFrame = MultiBot.EnsureStatsUI and MultiBot.EnsureStatsUI() or MultiBot.stats
-			if not statsFrame then
-				return
-			end
 
-			local tUnit = MultiBot.toUnit(arg2)
-			local unitStats = statsFrame.frames[tUnit]
-			if unitStats and unitStats.setStats then
-				unitStats.setStats(arg2, UnitLevel(tUnit), arg1, true)
-			end
-		end
-
-		if(arg1 == "stats" and arg2 ~= UnitName("player")) then
-			local tXP = math.floor(100.0 / UnitXPMax("player") * UnitXP("player"))
-			local tMana = math.floor(100.0 / UnitManaMax("player") * UnitMana("player"))
-			SendChatMessage("StatsOfPlayer " .. tXP .. " " .. tMana, "WHISPER", nil, arg2)
-		end
 
 		-- REQUIREMENT --
 

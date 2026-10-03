@@ -239,10 +239,6 @@ local function suppressNextTradeInventoryDump(botName)
         return
     end
 
-    if not (MultiBot.bridge and MultiBot.bridge.connected) then
-        return
-    end
-
     if not ensureTradeInventoryDumpFilter() then
         return
     end
@@ -1626,15 +1622,6 @@ local function runInventoryInstantAction(botName, command, options)
         return false
     end
 
-    SendChatMessage(command, "WHISPER", nil, botName)
-
-    if options.refreshDelay ~= nil and MultiBot.RefreshInventory then
-        MultiBot.RefreshInventory(options.refreshDelay)
-    elseif options.refresh and MultiBot.RefreshInventory then
-        MultiBot.RefreshInventory()
-    end
-
-    return true
 end
 
 -- MB_VENDOR_BUYBACK_V1_UI_BEGIN
@@ -2982,7 +2969,6 @@ function MultiBot.InitializeInventoryFrame()
         runInventoryInstantAction(pButton.getName(), "s *", {
             requiresTarget = true,
             clearActionState = true,
-            refreshDelay = 0.5,
         })
     end
 
@@ -2990,7 +2976,6 @@ function MultiBot.InitializeInventoryFrame()
         runInventoryInstantAction(pButton.getName(), "s vendor", {
             requiresTarget = true,
             clearActionState = true,
-            refresh = true,
         })
     end
 
