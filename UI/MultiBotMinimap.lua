@@ -1,119 +1,18 @@
 if not MultiBot then return end
 
--- Minimap config is resolved through MultiBot.GetMinimapConfig().
+-- ============================================================
+--  MultiBotMinimap.lua  |  Minimap button via LibDBIcon-1.0
+-- ============================================================
 
 do
-  local BTN_NAME = "MultiBot_MinimapButton"
-  local RADIUS = 80 -- rayon d’ancrage au bord de la minimap
+  local dbicon = LibStub("LibDBIcon-1.0", true)
 
-  local function deg2rad(degrees)
-    return degrees * math.pi / 180
-  end
+  local miniButton = LibStub("LibDataBroker-1.1"):NewDataObject("MultiBot", {
+    type = "launcher",
+    text = "MultiBot",
+    icon = "Interface\\AddOns\\MultiBot\\Icons\\browse.blp",
 
-  local function updatePosition(button, angle)
-    local minimapConfig = MultiBot.GetMinimapConfig and MultiBot.GetMinimapConfig() or nil
-    local resolvedAngle = angle or (minimapConfig and minimapConfig.angle) or 220
-
-    if not Minimap or not Minimap:GetCenter() then
-      return
-    end
-
-    local minimapX, minimapY = Minimap:GetCenter()
-    local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
-    if not minimapX or not minimapY or not screenWidth or not screenHeight then
-      return
-    end
-
-    local radius = RADIUS * (Minimap:GetEffectiveScale() / UIParent:GetEffectiveScale())
-    local xOffset = math.cos(deg2rad(resolvedAngle)) * radius
-    local yOffset = math.sin(deg2rad(resolvedAngle)) * radius
-
-    button:ClearAllPoints()
-    button:SetPoint("CENTER", Minimap, "CENTER", xOffset, yOffset)
-  end
-
-  local function saveAngleFromCursor(button)
-    local minimapX, minimapY = Minimap:GetCenter()
-    local cursorX, cursorY = GetCursorPosition()
-    local scale = UIParent:GetEffectiveScale()
-
-    cursorX, cursorY = cursorX / scale, cursorY / scale
-
-    local deltaX, deltaY = cursorX - minimapX, cursorY - minimapY
-    local angle = math.deg(math.atan2(deltaY, deltaX))
-    if angle < 0 then
-      angle = angle + 360
-    end
-
-    if MultiBot.SetMinimapConfig then
-      MultiBot.SetMinimapConfig("angle", angle)
-    end
-
-    updatePosition(button, angle)
-  end
-
-  function MultiBot.Minimap_Create()
-    if _G[BTN_NAME] then
-      MultiBot.Minimap_Refresh()
-      return _G[BTN_NAME]
-    end
-
-    local minimapConfig = MultiBot.GetMinimapConfig and MultiBot.GetMinimapConfig() or nil
-    if minimapConfig and minimapConfig.hide then
-      return nil
-    end
-
-    local button = CreateFrame("Button", BTN_NAME, Minimap)
-    button:SetSize(31, 31)
-    button:SetFrameStrata("MEDIUM")
-    button:SetFrameLevel(8)
-    button:SetMovable(true)
-    button:SetClampedToScreen(true)
-    button:RegisterForDrag("LeftButton")
-    button:RegisterForClicks("AnyUp")
-
-    local overlay = button:CreateTexture(nil, "OVERLAY")
-    overlay:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    overlay:SetSize(56, 56)
-    overlay:SetPoint("TOPLEFT")
-
-    local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetTexture("Interface\\AddOns\\MultiBot\\Icons\\browse.blp")
-    icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    icon:SetSize(20, 20)
-    icon:SetPoint("CENTER", 0, 0)
-    button.icon = icon
-
-    local highlight = button:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-    highlight:SetBlendMode("ADD")
-    highlight:SetAllPoints(button)
-
-    button:SetScript("OnDragStart", function(self)
-      -- M11 ownership: keep this OnUpdate local.
-      -- Reason: angle update must follow cursor every frame while dragging.
-      self:SetScript("OnUpdate", saveAngleFromCursor)
-    end)
-
-    button:SetScript("OnDragStop", function(self)
-      self:SetScript("OnUpdate", nil)
-      saveAngleFromCursor(self)
-    end)
-
-    button:SetScript("OnEnter", function(self)
-      GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-      GameTooltip:ClearLines()
-      GameTooltip:AddLine(MultiBot.L("info.butttitle"), 1, 1, 1)
-      GameTooltip:AddLine(MultiBot.L("info.buttontoggle"), 0.9, 0.9, 0.9)
-      GameTooltip:AddLine(MultiBot.L("info.buttonoptions"), 0.9, 0.9, 0.9)
-      GameTooltip:Show()
-    end)
-
-    button:SetScript("OnLeave", function()
-      GameTooltip:Hide()
-    end)
-
-    button:SetScript("OnClick", function(_, mouseButton)
+    OnClick = function(self, mouseButton)
       if mouseButton == "RightButton" then
         if MultiBot.ToggleOptionsPanel then
           MultiBot.ToggleOptionsPanel()
@@ -130,33 +29,56 @@ do
       elseif MultiBot.ToggleMainUIVisibility then
         MultiBot.ToggleMainUIVisibility()
       end
-    end)
+    end,
 
-    updatePosition(button)
-    button:Show()
+    OnTooltipShow = function(tooltip)
+      if not tooltip or not tooltip.AddLine then return end
+      tooltip:AddLine(MultiBot.L and MultiBot.L("info.butttitle") or "MultiBot", 1, 1, 1)
+      tooltip:AddLine(MultiBot.L and MultiBot.L("info.buttontoggle") or "Left-click: Toggle MultiBot", 0.9, 0.9, 0.9)
+      tooltip:AddLine(MultiBot.L and MultiBot.L("info.buttonoptions") or "Right-click: Options", 0.9, 0.9, 0.9)
+    end,
+  })
 
-    MultiBot.MinimapButton = button
-    return button
+  local _minimapFrame = CreateFrame("Frame")
+  _minimapFrame:RegisterEvent("PLAYER_LOGIN")
+  _minimapFrame:SetScript("OnEvent", function()
+    -- luacheck: globals MultiBotMinimapIconDB
+    -- Initialise the saved variable for the icon position/visibility.
+    MultiBotMinimapIconDB = MultiBotMinimapIconDB or {}
+    if MultiBotMinimapIconDB.hide == nil then
+      MultiBotMinimapIconDB.hide = false
+    end
+
+    -- Honour any existing hide setting coming from the old minimap config.
+    local minimapConfig = MultiBot.GetMinimapConfig and MultiBot.GetMinimapConfig() or nil
+    if minimapConfig and minimapConfig.hide ~= nil then
+      MultiBotMinimapIconDB.hide = minimapConfig.hide
+    end
+
+    if dbicon then
+      dbicon:Register("MultiBot", miniButton, MultiBotMinimapIconDB)
+    end
+  end)
+
+  -- Public helpers so the rest of the addon can show/hide/refresh the icon
+  -- the same way it did before, without breaking existing call-sites.
+
+  function MultiBot.Minimap_Create()
+    -- With LibDBIcon the icon is registered on PLAYER_LOGIN; nothing to do here.
+    -- Kept for backwards-compatibility with any code that calls this function.
+    MultiBot.Minimap_Refresh()
   end
 
   function MultiBot.Minimap_Refresh()
+    if not dbicon then return end
+
     local minimapConfig = MultiBot.GetMinimapConfig and MultiBot.GetMinimapConfig() or nil
-    local button = _G[BTN_NAME] or MultiBot.MinimapButton
+    local shouldHide = minimapConfig and minimapConfig.hide
 
-    if minimapConfig and minimapConfig.hide then
-      if button then
-        button:Hide()
-      end
-      return
-    end
-
-    if not button then
-      button = MultiBot.Minimap_Create()
-    end
-
-    if button then
-      updatePosition(button)
-      button:Show()
+    if shouldHide then
+      dbicon:Hide("MultiBot")
+    else
+      dbicon:Show("MultiBot")
     end
   end
 end
