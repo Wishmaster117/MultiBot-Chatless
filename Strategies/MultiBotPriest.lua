@@ -134,7 +134,7 @@ MultiBot.addPriest = function(pFrame, pCombat, pNormal)
 
 	-- STRATEGIES --
 
-	if(MultiBot.hasStrategy(pCombat, "heal")) then pFrame.getButton("Heal").setEnable() end
+	if(MultiBot.hasStrategy(pCombat, "heal", "disc")) then pFrame.getButton("Heal").setEnable() end
 	if(MultiBot.hasStrategy(pNormal, "buff")) then pFrame.getButton("Buff").setEnable() end
 	if(MultiBot.hasStrategy(pCombat, "shadow debuff")) then pFrame.getButton("ShadowDebuff").setEnable() end
 	if(MultiBot.hasStrategy(pCombat, "shadow aoe")) then pFrame.getButton("ShadowAoe").setEnable() end
