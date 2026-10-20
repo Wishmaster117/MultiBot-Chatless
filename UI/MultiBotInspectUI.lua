@@ -202,10 +202,6 @@ local function onInspectSlotClick(self, mouseButton)
         return
     end
 
-    if MultiBot.allowLegacyChatFallback == true then
-        SendChatMessage("ue " .. itemLink, "WHISPER", nil, botName)
-        requestInventorySync(botName)
-    end
 end
 
 MultiBot.OnBridgeInventoryItemUnequipResult = function(botName, status, reason)

@@ -60,6 +60,7 @@ Strategies\MultiBotRogue.lua
 Strategies\MultiBotShaman.lua
 Strategies\MultiBotWarlock.lua
 Strategies\MultiBotWarrior.lua
+Features\MultiBotAutogear.lua
 Core\MultiBotEvery.lua
 UI\MultiBotStats.lua
 UI\MultiBotSpell.lua

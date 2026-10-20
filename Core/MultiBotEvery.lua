@@ -40,7 +40,7 @@ if not StaticPopupDialogs["MULTIBOT_AUTOGEAR_CONFIRM"] then
         if data.selfAction == true then
           runEverySelfAction("AUTOGEAR", "")
         else
-          SendChatMessage("autogear", "WHISPER", nil, data.target)
+          if MultiBot.Autogear then MultiBot.Autogear.Open(data.target) end
         end
       end
     end,
@@ -308,11 +308,21 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
     -- Buttons inside the "Misc" sub-frame
 	for _, data in ipairs{
 		{ "Wipe", "Achievement_Halloween_Ghost_01", MultiBot.L("tips.every.wipe"), function(b)
-		    MultiBot.ActionToTarget("wipe", b.getName())
+            local comm = MultiBot and MultiBot.Comm
+            local token = comm and type(comm.RunBotWipe) == "function"
+                and comm.RunBotWipe(b.getName())
+            if not token and showEveryMessage then
+                local reason = MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE"
+                showEveryMessage("Wipe: " .. tostring(reason))
+            end
           end
 		},
-		{ "Autogear", "inv_misc_enggizmos_30", MultiBot.L("tips.every.autogear"), function(b)
-            StaticPopup_Show("MULTIBOT_AUTOGEAR_CONFIRM", b.getName(), nil, { target = b.getName(), selfAction = isSelfBot })
+		{ "Autogear", "inv_misc_enggizmos_30", isSelfBot and MultiBot.L("tips.every.autogear") or (MultiBot.Autogear and MultiBot.Autogear.Text("button_tip") or "Autogear"), function(b)
+            if isSelfBot then
+              StaticPopup_Show("MULTIBOT_AUTOGEAR_CONFIRM", b.getName(), nil, { target = b.getName(), selfAction = true })
+            elseif MultiBot.Autogear then
+              MultiBot.Autogear.Open(b.getName())
+            end
           end
         },
         -- NEW: Favorite toggle (per-character)
@@ -351,7 +361,24 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
             if isSelfBot then
                 runEverySelfAction("MAINTENANCE", "")
             else
-                SendChatMessage("maintenance", "WHISPER", nil, b.getName())
+                local comm = MultiBot and MultiBot.Comm or nil
+                local botName = b.getName and b.getName() or ""
+                if not (comm and type(comm.RunBotMaintenance) == "function") then
+                    if showEveryMessage then
+                        showEveryMessage(MultiBot.L("selfaction.bridge_unavailable"))
+                    end
+                else
+                    local token = comm.RunBotMaintenance(botName, function(result)
+                        if type(result) == "table" and result.status ~= "ok" and showEveryMessage then
+                            local reasonText = selfActionReasonText(result.reason)
+                            showEveryMessage(string.format(MultiBot.L("selfaction.failed"), reasonText))
+                        end
+                    end)
+                    if not token and showEveryMessage then
+                        local reason = MultiBot and MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE"
+                        showEveryMessage(string.format(MultiBot.L("selfaction.send_failed"), selfActionReasonText(reason)))
+                    end
+                end
             end
         end
         },
@@ -387,7 +414,30 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 	if not isSelfBot then
 		pFrame.addButton("Summon", 94, 0, "ability_hunter_beastcall", MultiBot.L("tips.every.summon"))
 		.doLeft = function(pButton)
-			MultiBot.ActionToTarget("summon", pButton.getName())
+			local botName = pButton.getName()
+			local comm = MultiBot and MultiBot.Comm or nil
+			local function reportSummonFailure(key, reason)
+				local message = string.format(MultiBot.L(key), tostring(botName or ""), tostring(reason or "UNKNOWN"))
+				if comm and type(comm.ShowSystemMessage) == "function" then
+					comm.ShowSystemMessage(message)
+				elseif UIErrorsFrame and UIErrorsFrame.AddMessage then
+					UIErrorsFrame:AddMessage(message, 1, 0.3, 0.3, 1)
+				end
+			end
+
+			if not (comm and type(comm.RunBotSummon) == "function") then
+				reportSummonFailure("info.every.summon.send_failed", "UNAVAILABLE")
+				return
+			end
+			local token = comm.RunBotSummon(botName, function(result)
+				if type(result) == "table" and result.status ~= "ok" then
+					reportSummonFailure("info.every.summon.failed", result.reason)
+				end
+			end)
+			if not token then
+				local reason = MultiBot and MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE"
+				reportSummonFailure("info.every.summon.send_failed", reason)
+			end
 		end
 
 		pFrame.addButton("Uninvite", 124, 0, "inv_misc_grouplooking", MultiBot.L("tips.every.uninvite")).doShow()
@@ -552,8 +602,13 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 		else
 			local tUnits = MultiBot.frames["MultiBar"].frames["Units"]
 			for key, value in pairs(MultiBot.index.actives) do
-				if(tUnits.buttons[value].name ~= UnitName("player")) then
-					tUnits.frames[value].getButton("Spellbook").setDisable()
+				local activeButton = tUnits.buttons[value]
+				if(activeButton and activeButton.name ~= UnitName("player")) then
+					local activeFrame = tUnits.frames[value]
+					local actionButton = activeFrame and activeFrame.getButton and activeFrame.getButton("Spellbook") or nil
+					if(actionButton and actionButton.setDisable) then
+						actionButton.setDisable()
+					end
 				end
 			end
 
@@ -567,11 +622,13 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 				return
 			end
 
-			if(MultiBot.allowLegacyChatFallback == true) then
-				tUnits.buttons[MultiBot.spellbook.name].waitFor = "SPELLBOOK"
-				SendChatMessage("spells", "WHISPER", nil, pButton.getName())
-			else
-				tUnits.buttons[MultiBot.spellbook.name].waitFor = ""
+			tUnits.buttons[MultiBot.spellbook.name].waitFor = ""
+			pButton.setDisable()
+			if MultiBot.spellbook and MultiBot.spellbook.Hide then
+				MultiBot.spellbook:Hide()
+			end
+			if tComm and type(tComm.ShowSystemMessage) == "function" then
+				tComm.ShowSystemMessage("[MultiBot] Spellbook: " .. tostring(pButton.getName() or "") .. " [BRIDGE_REQUIRED]")
 			end
 		end
 	end
@@ -591,8 +648,13 @@ MultiBot.addEvery = function(pFrame, pCombat, pNormal)
 
 			local tUnits = MultiBot.frames["MultiBar"].frames["Units"]
 			for key, value in pairs(MultiBot.index.actives) do
-				if(tUnits.buttons[value].name ~= UnitName("player")) then
-					tUnits.frames[value].getButton("Talent").setDisable()
+				local activeButton = tUnits.buttons[value]
+				if(activeButton and activeButton.name ~= UnitName("player")) then
+					local activeFrame = tUnits.frames[value]
+					local actionButton = activeFrame and activeFrame.getButton and activeFrame.getButton("Talent") or nil
+					if(actionButton and actionButton.setDisable) then
+						actionButton.setDisable()
+					end
 				end
 			end
 
@@ -639,8 +701,7 @@ local function sendCommonCombatStrategy(pButton, command)
 		return MultiBot.Comm.RunCombatCommand("BOT", botName, command)
 	end
 
-	SendChatMessage(command, "WHISPER", nil, botName)
-	return true
+	return false
 end
 
 local function addCommonCombatStrategyButton(pFrame, pCombat, tFrame, buttonName, y, icon, tipKey, strategyName)
@@ -667,10 +728,9 @@ local function addCommonCombatStrategyButton(pFrame, pCombat, tFrame, buttonName
 			return
 		end
 
-		if MultiBot.OnOffSwitch(self) then
-			sendCommonCombatStrategy(self, plusCommand)
-		else
-			sendCommonCombatStrategy(self, minusCommand)
+		local command = self.state and minusCommand or plusCommand
+		if sendCommonCombatStrategy(self, command) then
+			MultiBot.OnOffSwitch(self)
 		end
 	end
 

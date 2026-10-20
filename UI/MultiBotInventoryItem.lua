@@ -166,35 +166,6 @@ local function getInventoryItemDisplayCount(item)
     return count
 end
 
-local function registerInventoryPendingConsume(botName, item, amount)
-    local key = getInventoryConsumeKey(item)
-    local store = getInventoryPendingConsumeStore(botName, true)
-    if not key or not store then
-        return false
-    end
-
-    amount = tonumber(amount or 1) or 1
-    if amount < 1 then
-        amount = 1
-    end
-
-    local baseline = tonumber(item and item._serverCount or item and item.count or 1) or 1
-    if baseline < 1 then
-        baseline = 1
-    end
-
-    local pending = store[key]
-    if type(pending) ~= "table" then
-        pending = { amount = 0, baseline = baseline }
-        store[key] = pending
-    end
-
-    pending.amount = (tonumber(pending.amount or 0) or 0) + amount
-    pending.baseline = math.max(tonumber(pending.baseline or 0) or 0, baseline)
-    pending.expiresAt = getNow() + 60
-    return true
-end
-
 local function applyInventoryPendingConsume(botName, item)
     local key = getInventoryConsumeKey(item)
     local store = getInventoryPendingConsumeStore(botName, false)
@@ -229,31 +200,6 @@ local function applyInventoryPendingConsume(botName, item)
     return item
 end
 
-local function optimisticallyConsumeInventoryButton(button)
-    if not button or not button.item then
-        return
-    end
-
-    local count = getInventoryItemDisplayCount(button.item)
-    if count <= 1 then
-        if button.Hide then
-            button:Hide()
-        end
-        return
-    end
-
-    count = count - 1
-    button.item.count = count > 1 and count or nil
-
-    if button.setAmount then
-        if count > 1 then
-            button.setAmount(count)
-        elseif button.amount and button.amount.Hide then
-            button.amount:Hide()
-        end
-    end
-end
-
 local function requestInventoryRefresh(delay, botName)
     local targetBotName = botName or (MultiBot.inventory and MultiBot.inventory.name) or ""
 
@@ -278,6 +224,7 @@ local function requestInventoryPostActionRefresh(botName, firstDelay, secondDela
 end
 
 local runBridgeInventoryItemDestroy
+local reportInventoryDestroySendFailure
 
 local function buildInventoryDestroyRequest(button, botName)
     if not button or not button.item or not botName or botName == "" then
@@ -304,29 +251,7 @@ local function buildInventoryDestroyRequest(button, botName)
     return request
 end
 
-local function isInventoryItemHyperlink(value)
-    return type(value) == "string"
-        and string.sub(value, 1, 1) == "|"
-        and string.find(value, "|Hitem:", 1, true) ~= nil
-end
 
-local function runLegacyInventoryItemDestroy(request)
-    if MultiBot.allowLegacyChatFallback ~= true or type(request) ~= "table" then
-        return false
-    end
-
-    if not request.botName or request.botName == "" or not request.tip or request.tip == "" then
-        return false
-    end
-
-    if request.exactLocation == true and not isInventoryItemHyperlink(request.tip) then
-        return false
-    end
-
-    SendChatMessage("destroy " .. request.tip, "WHISPER", nil, request.botName)
-    requestInventoryPostActionRefresh(request.botName, 0.45, 1.20)
-    return true
-end
 
 local function bindInventoryDestroyConfirm(button, botName)
     local request = buildInventoryDestroyRequest(button, botName)
@@ -346,11 +271,11 @@ local function bindInventoryDestroyConfirm(button, botName)
                 local acceptedRequest = data and data.request or nil
                 if not acceptedRequest then return end
 
-                if runBridgeInventoryItemDestroy and runBridgeInventoryItemDestroy(acceptedRequest) then
-                    return
+                if not runBridgeInventoryItemDestroy or not runBridgeInventoryItemDestroy(acceptedRequest) then
+                    if reportInventoryDestroySendFailure then
+                        reportInventoryDestroySendFailure()
+                    end
                 end
-
-                runLegacyInventoryItemDestroy(acceptedRequest)
             end,
         }
     end
@@ -365,17 +290,56 @@ local function sendInventoryFeedback(key, fallback)
     SendChatMessage(inventoryItemL(key, fallback), "SAY")
 end
 
-local function addInventorySystemMessage(message)
+-- Inventory H1a: localized structured results are displayed as local SYSTEM
+-- messages. The Bridge action/ACK/refresh paths remain unchanged.
+local function addInventorySystemMessage(message, severity)
     message = tostring(message or "")
     if message == "" then
         return
     end
 
-    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
-        DEFAULT_CHAT_FRAME:AddMessage(message)
-    elseif print then
-        print(message)
+    -- Avoid a double prefix when a locale already includes [MultiBot].
+    if string.sub(message, 1, 10) == "[MultiBot]" then
+        message = string.gsub(string.sub(message, 11), "^%s+", "")
     end
+
+    local bodyColor = "ffffffff"
+    if severity == "success" then
+        bodyColor = "ff33ff33"
+    elseif severity == "warning" then
+        bodyColor = "ffffff00"
+    elseif severity == "error" then
+        bodyColor = "ffff4040"
+    end
+
+    -- Embedded native item links retain their own link-color sequences.
+    local display = "|cffffff00[MultiBot]|r |c" .. bodyColor .. message .. "|r"
+    if MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
+        MultiBot.Comm.ShowSystemMessage(display)
+    elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+        DEFAULT_CHAT_FRAME:AddMessage(display)
+    elseif type(print) == "function" then
+        print(display)
+    end
+end
+
+local function addInventorySuccessMessage(message)
+    addInventorySystemMessage(message, "success")
+end
+
+local function addInventoryWarningMessage(message)
+    addInventorySystemMessage(message, "warning")
+end
+
+local function addInventoryErrorMessage(message)
+    addInventorySystemMessage(message, "error")
+end
+
+reportInventoryDestroySendFailure = function()
+    local reason = MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE"
+    addInventoryErrorMessage(inventoryItemL(
+        "inventory.item_destroy.unavailable", "Item destruction was not submitted."
+    ) .. " (" .. tostring(reason) .. ")")
 end
 
 local function isInventoryProtectedKey(item)
@@ -414,41 +378,6 @@ local function needsInventoryDestroyConfirmation(item)
         or ((item and item.rare or 0) > 3)
 end
 
-local function sendInventoryItemCommand(command, button, botName, options)
-    options = options or {}
-
-    if not command or command == "" or not button or not botName or botName == "" then
-        return false
-    end
-
-    if button.item and button.item.exactLocation == true and not isInventoryItemHyperlink(button.tip) then
-        return false
-    end
-
-    SendChatMessage(command .. " " .. button.tip, "WHISPER", nil, botName)
-
-    if options.hideButton and button.Hide then
-        button:Hide()
-    end
-
-    if options.optimisticConsume then
-        optimisticallyConsumeInventoryButton(button)
-    end
-
-    if options.postActionRefresh then
-        requestInventoryPostActionRefresh(botName, options.refreshDelay, options.followupRefreshDelay)
-    elseif options.refreshDelay ~= nil then
-        requestInventoryRefresh(options.refreshDelay, botName)
-    elseif options.refresh then
-        requestInventoryRefresh(nil, botName)
-    end
-
-    if options.followupRefreshDelay ~= nil and not options.postActionRefresh then
-        requestInventoryRefresh(options.followupRefreshDelay, botName)
-    end
-
-    return true
-end
 
 local function runBridgeInventoryItemAction(action, button, botName, options)
     options = options or {}
@@ -652,7 +581,7 @@ MultiBot.OnBridgeInventoryItemTradeResult = function(botName, status, reason)
     end
 
     if status ~= "OK" then
-        addInventorySystemMessage(
+        addInventoryErrorMessage(
             inventoryItemL("inventory.item_trade.failed", "The item could not be added to the trade.")
                 .. " [" .. tostring(reason or "FAILED") .. "]"
         )
@@ -704,29 +633,17 @@ local function handleInventoryItemClick(button)
                 return
             end
 
-            addInventorySystemMessage(inventoryItemL(
+            addInventoryErrorMessage(inventoryItemL(
                 "inventory.item_sell.send_failed",
                 "The item-sale request could not be sent."
             ))
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            if not MultiBot.isTarget() then
-                sendInventoryFeedback("inventoryvendortarget", "Target a vendor first")
-                return
-            end
-
-            sendInventoryItemCommand(action, button, botName, {
-                hideButton = true,
-                refreshDelay = 0.3,
-            })
-        else
-            addInventorySystemMessage(inventoryItemL(
-                "inventory.item_sell.unavailable",
-                "Item selling via the bridge is unavailable."
-            ))
-        end
+        addInventoryWarningMessage(inventoryItemL(
+            "inventory.item_sell.unavailable",
+            "Item selling via the bridge is unavailable."
+        ))
         return
     end
     -- MB_ITEM_SELL_SINGLE_V1_ACTION_END
@@ -736,9 +653,6 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand(action, button, botName)
-        end
         return
     end
 
@@ -752,21 +666,17 @@ local function handleInventoryItemClick(button)
                 return
             end
 
-            addInventorySystemMessage(inventoryItemL(
+            addInventoryErrorMessage(inventoryItemL(
                 "inventory.item_trade.send_failed",
                 "The item-trade request could not be sent."
             ))
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand(action, button, botName)
-        else
-            addInventorySystemMessage(inventoryItemL(
-                "inventory.item_trade.unavailable",
-                "Item trading via the bridge is unavailable."
-            ))
-        end
+        addInventoryWarningMessage(inventoryItemL(
+            "inventory.item_trade.unavailable",
+            "Item trading via the bridge is unavailable."
+        ))
         return
     end
 
@@ -781,7 +691,7 @@ local function handleInventoryItemClick(button)
                 return
             end
 
-            addInventorySystemMessage(inventoryItemL(
+            addInventoryErrorMessage(inventoryItemL(
                 "inventory.item_deposit_exact.send_failed",
                 "The exact deposit request could not be sent."
             ))
@@ -792,13 +702,6 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand("bank", button, botName, {
-                postActionRefresh = true,
-                refreshDelay = 0.45,
-                followupRefreshDelay = 1.20,
-            })
-        end
         return
     end
 
@@ -813,7 +716,7 @@ local function handleInventoryItemClick(button)
                 return
             end
 
-            addInventorySystemMessage(inventoryItemL(
+            addInventoryErrorMessage(inventoryItemL(
                 "inventory.item_deposit_exact.send_failed",
                 "The exact deposit request could not be sent."
             ))
@@ -824,13 +727,6 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand("gb", button, botName, {
-                postActionRefresh = true,
-                refreshDelay = 0.45,
-                followupRefreshDelay = 1.20,
-            })
-        end
         return
     end
 
@@ -839,13 +735,6 @@ local function handleInventoryItemClick(button)
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            sendInventoryItemCommand("b", button, botName, {
-                postActionRefresh = true,
-                refreshDelay = 0.45,
-                followupRefreshDelay = 1.20,
-            })
-        end
         return
     end
 
@@ -859,27 +748,17 @@ local function handleInventoryItemClick(button)
                 return
             end
 
-            addInventorySystemMessage(MultiBot.L(
+            addInventoryErrorMessage(MultiBot.L(
                 "inventory.item_use.send_failed",
                 "The item-use request could not be sent."
             ))
             return
         end
 
-        if MultiBot.allowLegacyChatFallback == true then
-            registerInventoryPendingConsume(botName, item, 1)
-            sendInventoryItemCommand(action, button, botName, {
-                optimisticConsume = true,
-                postActionRefresh = true,
-                refreshDelay = 0.45,
-                followupRefreshDelay = 1.20,
-            })
-        else
-            addInventorySystemMessage(MultiBot.L(
-                "inventory.item_use.unavailable",
-                "Item use via the bridge is unavailable."
-            ))
-        end
+        addInventoryWarningMessage(MultiBot.L(
+            "inventory.item_use.unavailable",
+            "Item use via the bridge is unavailable."
+        ))
         return
     end
 
@@ -897,11 +776,9 @@ local function handleInventoryItemClick(button)
         return
     end
 
-    if runBridgeInventoryItemDestroy(destroyRequest) then
-        return
+    if not runBridgeInventoryItemDestroy(destroyRequest) then
+        reportInventoryDestroySendFailure()
     end
-
-    runLegacyInventoryItemDestroy(destroyRequest)
 end
 
 local function getInventoryItemActionLabel(action)
@@ -946,7 +823,7 @@ function MultiBot.OnBridgeInventoryItemSellResult(botName, result, reason)
         return
     end
 
-    addInventorySystemMessage(string.format(
+    addInventoryErrorMessage(string.format(
         inventoryItemL("inventory.item_sell.err", "Failed to sell item: %s"),
         getInventoryItemSellReason(reason)
     ))
@@ -973,7 +850,7 @@ function MultiBot.OnBridgeInventoryItemUseResult(botName, result, reason)
         return
     end
 
-    addInventorySystemMessage(string.format(
+    addInventoryErrorMessage(string.format(
         MultiBot.L("inventory.item_use.err", "Use failed: %s"),
         getInventoryItemUseReason(reason)
     ))
@@ -983,7 +860,11 @@ function MultiBot.OnBridgeInventoryItemUseResult(botName, result, reason)
     end
 end
 
-function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, result, reason, moved)
+function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, result, reason, moved, command)
+    if type(command) == "table" and command.silentFeedback == true then
+        return
+    end
+
     local actionLabel = getInventoryItemActionLabel(action)
     local itemName = tostring(itemId or "")
     if GetItemInfo then
@@ -992,17 +873,17 @@ function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, res
 
     if result == "OK" then
         if action == "SELL_GREY" then
-            addInventorySystemMessage(string.format(
+            addInventorySuccessMessage(string.format(
                 inventoryItemL("inventory.item_action.sell_grey.ok", "Grey item sale: %d item(s) sold."),
                 tonumber(moved or 0) or 0
             ))
         elseif action == "SELL_VENDOR" then
-            addInventorySystemMessage(string.format(
+            addInventorySuccessMessage(string.format(
                 inventoryItemL("inventory.item_action.sell_vendor.ok", "Vendor item sale: %d item(s) sold."),
                 tonumber(moved or 0) or 0
             ))
         else
-            addInventorySystemMessage(string.format(
+            addInventorySuccessMessage(string.format(
                 inventoryItemL("inventory.item_action.ok", "%s: %s x%d."),
                 actionLabel,
                 itemName,
@@ -1060,13 +941,13 @@ function MultiBot.OnBridgeInventoryItemActionResult(botName, action, itemId, res
     end
 
     if reasonText ~= "" then
-        addInventorySystemMessage(string.format(
+        addInventoryErrorMessage(string.format(
             inventoryItemL("inventory.item_action.err", "%s failed: %s"),
             actionLabel,
             reasonText
         ))
     else
-        addInventorySystemMessage(string.format(
+        addInventoryErrorMessage(string.format(
             inventoryItemL("inventory.item_action.failed", "%s failed."),
             actionLabel
         ))

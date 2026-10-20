@@ -447,15 +447,36 @@ MultiBot.LoadPortal = function(pButton, pValue)
 	end
 end
 
+MultiBot.CastSpellbookSpell = function(pName, pSpell)
+	local tComm = MultiBot and MultiBot.Comm or nil
+	if not tComm or type(tComm.RunSpellbookCast) ~= "function" then
+		if tComm and type(tComm.ShowSystemMessage) == "function" then
+			tComm.ShowSystemMessage("[MultiBot] Spellbook [BRIDGE_REQUIRED]")
+		elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+			DEFAULT_CHAT_FRAME:AddMessage("[MultiBot] Spellbook [BRIDGE_REQUIRED]")
+		end
+		return false
+	end
+
+	return tComm.RunSpellbookCast(pName, pSpell) ~= false
+end
+
 MultiBot.SpellToMacro = function(pName, pSpell, pTexture)
 	--local tGlobal, tAmount = GetNumMacros()
 	local _, tAmount = GetNumMacros()
+	local tComm = MultiBot and MultiBot.Comm or nil
 
 	if(pSpell == nil or pSpell == 0) then
-		return SendChatMessage(MultiBot.L("info.spell"), "SAY")
+		if tComm and type(tComm.ShowSystemMessage) == "function" then
+			tComm.ShowSystemMessage("[MultiBot] Spellbook [BAD_SPELL]")
+		end
+		return
 	end
 	if(tAmount == 18) then
-		return SendChatMessage(MultiBot.L("info.macro"), "SAY")
+		if tComm and type(tComm.ShowSystemMessage) == "function" then
+			tComm.ShowSystemMessage("[MultiBot] Spellbook [MACRO_LIMIT]")
+		end
+		return
 	end
 
 	local tMacro = string.sub(pName, 1, 14) .. tAmount
@@ -469,7 +490,8 @@ MultiBot.SpellToMacro = function(pName, pSpell, pTexture)
 		if MultiBot.spellbook and MultiBot.spellbook.icons then
 			icon = MultiBot.spellbook.icons[pTexture] or 1
 		end
-		CreateMacro(tMacro, icon, "/t " .. pName .. " cast " .. pSpell, true)
+		local tBody = "/run MultiBot.CastSpellbookSpell(" .. string.format("%q", tostring(pName or "")) .. "," .. tostring(tonumber(pSpell) or 0) .. ")"
+		CreateMacro(tMacro, icon, tBody, true)
 	end
 	PickupMacro(tMacro)
 end
@@ -492,7 +514,7 @@ end
 -- MB_P1_STRATEGY_NO_SILENT_CHAT_FALLBACK_V1_START
 local MB_STRATEGY_ROUTE_NOT_STRATEGY = "NOT_STRATEGY"
 local MB_STRATEGY_ROUTE_BRIDGE = "BRIDGE"
-local MB_STRATEGY_ROUTE_LEGACY = "LEGACY"
+
 local MB_STRATEGY_ROUTE_BLOCKED = "BLOCKED"
 
 local function _mbCanUseBridgeStrategyMutation()
@@ -571,7 +593,8 @@ local function _mbRefreshStrategyState(commandScope, target)
 	end
 end
 
-local function _mbRouteStrategyMutation(action, commandScope, target)
+-- MB_STRATEGY_MUTATION_CALLBACK_V1_BEGIN
+local function _mbRouteStrategyMutation(action, commandScope, target, onComplete)
 	local mutationScope, changes = _mbParseStrategyMutation(action)
 	if(not mutationScope) then return MB_STRATEGY_ROUTE_NOT_STRATEGY end
 
@@ -579,10 +602,6 @@ local function _mbRouteStrategyMutation(action, commandScope, target)
 	target = target or ""
 
 	if(not _mbCanUseBridgeStrategyMutation()) then
-		if(MultiBot.allowLegacyChatFallback == true) then
-			return MB_STRATEGY_ROUTE_LEGACY
-		end
-
 		_mbWarnStrategyMutationBlocked(commandScope, target, _mbStrategyBridgeUnavailableReason())
 		_mbRefreshStrategyState(commandScope, target)
 		return MB_STRATEGY_ROUTE_BLOCKED
@@ -593,6 +612,9 @@ local function _mbRouteStrategyMutation(action, commandScope, target)
 		if(type(result) ~= "table") then
 			_mbWarnStrategyMutationBlocked(commandScope, target, "STRATEGY_INVALID_RESULT")
 			_mbRefreshStrategyState(commandScope, target)
+			if(type(onComplete) == "function") then
+				onComplete(result)
+			end
 			return
 		end
 
@@ -605,6 +627,10 @@ local function _mbRouteStrategyMutation(action, commandScope, target)
 		end
 
 		_mbRefreshStrategyState(commandScope, target)
+
+		if(type(onComplete) == "function") then
+			onComplete(result)
+		end
 	end)
 
 	if(token ~= false and token ~= nil) then
@@ -615,6 +641,7 @@ local function _mbRouteStrategyMutation(action, commandScope, target)
 	_mbRefreshStrategyState(commandScope, target)
 	return MB_STRATEGY_ROUTE_BLOCKED
 end
+-- MB_STRATEGY_MUTATION_CALLBACK_V1_END
 
 local function _mbCanUseBridgeSelfStrategyMutation()
 	return MultiBot.bridge
@@ -773,6 +800,26 @@ MultiBot.ActionToTarget = function(pAction, oTarget)
 	local tName = MultiBot.IF(oTarget == nil, UnitName("target"), oTarget)
 
 	if(tName ~= nil and tName ~= "Unknown Entity") then
+		-- MB_FLEE_ORDER_V1_TARGET_ROUTE_BEGIN
+		local normalizedFleeOrder = type(pAction) == "string" and string.lower(pAction) or ""
+		if(normalizedFleeOrder == "flee") then
+			if(MultiBot.bridge
+				and MultiBot.bridge.connected == true
+				and MultiBot.bridge.fleeOrderCapable == true
+				and MultiBot.Comm
+				and type(MultiBot.Comm.RunFleeOrderCommand) == "function") then
+				local token = MultiBot.Comm.RunFleeOrderCommand("TARGET", tName)
+				if(token ~= false and token ~= nil) then
+					return true, "pending", token
+				end
+				return false, "blocked"
+			end
+
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "FLEE_ORDER_UNAVAILABLE" end
+			return false, "blocked"
+		end
+		-- MB_FLEE_ORDER_V1_TARGET_ROUTE_END
+
 		local route = _mbRouteStrategyMutation(pAction, "BOT", tName)
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then
 			return true, "bridge"
@@ -824,9 +871,332 @@ MultiBot.ActionToTargetOrGroup = function(pAction)
 	return false
 end
 
-MultiBot.ActionToGroup = function(pAction)
+MultiBot.ActionToGroup = function(pAction, onComplete)
+	-- MB_FOLLOW_STAY_ORDER_V1_ROUTE_BEGIN
+	local normalizedGroupOrder = type(pAction) == "string" and string.lower(pAction) or ""
+	if(normalizedGroupOrder == "follow" or normalizedGroupOrder == "stay") then
+		if(not MultiBot.bridge
+			or MultiBot.bridge.connected ~= true
+			or not MultiBot.Comm
+			or type(MultiBot.Comm.RunGroupOrderCommand) ~= "function") then
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "GROUP_ORDER_UNAVAILABLE" end
+			return false, "blocked"
+		end
+
+		local token = MultiBot.Comm.RunGroupOrderCommand(string.upper(normalizedGroupOrder), onComplete)
+		if(token ~= false and token ~= nil) then
+			return true, "pending", token
+		end
+
+		return false, "blocked"
+	end
+	-- MB_FOLLOW_STAY_ORDER_V1_ROUTE_END
+
+	-- MB_GRIND_ORDER_V1_ROUTE_BEGIN
+	if(normalizedGroupOrder == "grind") then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.grindOrderCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunGroupOrderCommand) == "function") then
+			local token = MultiBot.Comm.RunGroupOrderCommand("GRIND", onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "GRIND_ORDER_UNAVAILABLE" end
+		return false, "blocked"
+	end
+	-- MB_GRIND_ORDER_V1_ROUTE_END
+
+	-- MB_ATTACK_ORDER_V1_ROUTE_BEGIN
+	local attackAudience = nil
+	if(normalizedGroupOrder == "do attack my target") then
+		attackAudience = "ALL"
+	elseif(normalizedGroupOrder == "@tank do attack my target") then
+		attackAudience = "TANK"
+	elseif(normalizedGroupOrder == "@healer do attack my target") then
+		attackAudience = "HEALER"
+	elseif(normalizedGroupOrder == "@dps do attack my target") then
+		attackAudience = "DPS"
+	elseif(normalizedGroupOrder == "@melee do attack my target") then
+		attackAudience = "MELEE"
+	elseif(normalizedGroupOrder == "@ranged do attack my target") then
+		attackAudience = "RANGED"
+	end
+
+	if(attackAudience ~= nil) then
+		if(not MultiBot.bridge
+			or MultiBot.bridge.connected ~= true
+			or not MultiBot.Comm
+			or type(MultiBot.Comm.RunAttackOrderCommand) ~= "function") then
+			if(MultiBot.bridge) then MultiBot.bridge.lastError = "ATTACK_ORDER_UNAVAILABLE" end
+			return false, "blocked"
+		end
+
+		local token = MultiBot.Comm.RunAttackOrderCommand(attackAudience, onComplete)
+		if(token ~= false and token ~= nil) then
+			return true, "pending", token
+		end
+
+		return false, "blocked"
+	end
+	-- MB_ATTACK_ORDER_V1_ROUTE_END
+
+	-- MB_FLEE_ORDER_V1_GROUP_ROUTE_BEGIN
+	local fleeAudience = nil
+	if(normalizedGroupOrder == "flee") then
+		fleeAudience = "ALL"
+	elseif(normalizedGroupOrder == "@tank flee") then
+		fleeAudience = "TANK"
+	elseif(normalizedGroupOrder == "@healer flee") then
+		fleeAudience = "HEALER"
+	elseif(normalizedGroupOrder == "@dps flee") then
+		fleeAudience = "DPS"
+	elseif(normalizedGroupOrder == "@melee flee") then
+		fleeAudience = "MELEE"
+	elseif(normalizedGroupOrder == "@ranged flee") then
+		fleeAudience = "RANGED"
+	end
+
+	if(fleeAudience ~= nil) then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.fleeOrderCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunFleeOrderCommand) == "function") then
+			local token = MultiBot.Comm.RunFleeOrderCommand(fleeAudience, "", onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "FLEE_ORDER_UNAVAILABLE" end
+		return false, "blocked"
+	end
+	-- MB_FLEE_ORDER_V1_GROUP_ROUTE_END
+
+	-- MB_GROUP_ACTION_V1_ROUTE_BEGIN
+	local groupAction = nil
+	if(normalizedGroupOrder == "drink") then
+		groupAction = "DRINK"
+	elseif(normalizedGroupOrder == "release") then
+		groupAction = "RELEASE"
+	elseif(normalizedGroupOrder == "revive") then
+		groupAction = "REVIVE"
+	elseif(normalizedGroupOrder == "summon") then
+		groupAction = "SUMMON"
+	end
+
+	if(groupAction ~= nil) then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.groupActionCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunGroupActionCommand) == "function") then
+			local token = MultiBot.Comm.RunGroupActionCommand(groupAction, onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "GROUP_ACTION_UNAVAILABLE" end
+		return false, "blocked"
+	end
+	-- MB_GROUP_ACTION_V1_ROUTE_END
+	-- MB_QUEST_ACCEPT_ALL_V1_ROUTE_BEGIN
+	if(normalizedGroupOrder == "accept *") then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.questAcceptAllCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunQuestAcceptAllCommand) == "function") then
+			local token = MultiBot.Comm.RunQuestAcceptAllCommand(onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.bridge) then
+			MultiBot.bridge.lastError = "QUEST_ACCEPT_ALL_UNAVAILABLE"
+		end
+		return false, "blocked"
+	end
+	-- MB_QUEST_ACCEPT_ALL_V1_ROUTE_END
+	-- MB_QUEST_TALK_V1_ROUTE_BEGIN
+	if(normalizedGroupOrder == "talk") then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.questTalkCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RunQuestTalkCommand) == "function") then
+			local token = MultiBot.Comm.RunQuestTalkCommand(onComplete)
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+			return false, "blocked"
+		end
+
+		if(MultiBot.bridge) then
+			MultiBot.bridge.lastError = "QUEST_TALK_UNAVAILABLE"
+		end
+		return false, "blocked"
+	end
+	-- MB_QUEST_TALK_V1_ROUTE_END
+	-- MB_RTSC_ORDER_V1_ROUTE_BEGIN
+	local rtscOperation = nil
+	local rtscAudience = "ALL"
+	local rtscGroupMask = 0
+	local rtscSlot = 0
+	local rtscLike = normalizedGroupOrder == "rtsc"
+		or string.sub(normalizedGroupOrder, 1, 5) == "rtsc "
+		or string.find(normalizedGroupOrder, " rtsc ", 1, true) ~= nil
+
+	if(normalizedGroupOrder == "rtsc") then
+		rtscOperation = "ENABLE"
+	elseif(normalizedGroupOrder == "rtsc reset") then
+		rtscOperation = "RESET"
+	elseif(normalizedGroupOrder == "rtsc select") then
+		rtscOperation = "SELECT"
+	elseif(normalizedGroupOrder == "rtsc cancel") then
+		rtscOperation = "CANCEL"
+	else
+		local directSaveSlot = string.match(normalizedGroupOrder, "^rtsc save ([1-9])$")
+		local directUnsaveSlot = string.match(normalizedGroupOrder, "^rtsc unsave ([1-9])$")
+		local directGoSlot = string.match(normalizedGroupOrder, "^rtsc go ([1-9])$")
+
+		if(directSaveSlot) then
+			rtscOperation = "SAVE"
+			rtscSlot = tonumber(directSaveSlot) or 0
+		elseif(directUnsaveSlot) then
+			rtscOperation = "UNSAVE"
+			rtscSlot = tonumber(directUnsaveSlot) or 0
+		elseif(directGoSlot) then
+			rtscOperation = "GO"
+			rtscSlot = tonumber(directGoSlot) or 0
+		else
+			local role = string.match(normalizedGroupOrder, "^@([%a]+) rtsc select$")
+			local roleGo, roleGoSlot = string.match(normalizedGroupOrder, "^@([%a]+) rtsc go ([1-9])$")
+
+			if(not role and roleGo) then
+				role = roleGo
+				rtscSlot = tonumber(roleGoSlot) or 0
+			end
+
+			if(role) then
+				if(role == "tank") then
+					rtscAudience = "TANK"
+				elseif(role == "healer") then
+					rtscAudience = "HEALER"
+				elseif(role == "dps") then
+					rtscAudience = "DPS"
+				elseif(role == "melee") then
+					rtscAudience = "MELEE"
+				elseif(role == "ranged") then
+					rtscAudience = "RANGED"
+				elseif(role == "meleedps") then
+					rtscAudience = "MELEE_DPS"
+				elseif(role == "rangeddps") then
+					rtscAudience = "RANGED_DPS"
+				else
+					rtscAudience = nil
+				end
+
+				if(rtscAudience) then
+					rtscOperation = roleGo and "GO" or "SELECT"
+				end
+			else
+				local groupSpec = string.match(normalizedGroupOrder, "^@group([%d,%-]+) rtsc select$")
+				local groupGoSpec, groupGoSlot = string.match(normalizedGroupOrder, "^@group([%d,%-]+) rtsc go ([1-9])$")
+
+				if(not groupSpec and groupGoSpec) then
+					groupSpec = groupGoSpec
+					rtscSlot = tonumber(groupGoSlot) or 0
+				end
+
+				if(groupSpec) then
+					local seenGroups = {}
+					local groupMaskValid = true
+
+					for part in string.gmatch(groupSpec, "[^,]+") do
+						local rangeStart, rangeEnd = string.match(part, "^(%d+)%-(%d+)$")
+						if(rangeStart and rangeEnd) then
+							rangeStart = tonumber(rangeStart)
+							rangeEnd = tonumber(rangeEnd)
+							if(not rangeStart or not rangeEnd
+								or rangeStart < 1 or rangeEnd > 5 or rangeStart > rangeEnd) then
+								groupMaskValid = false
+								break
+							end
+
+							for groupIndex = rangeStart, rangeEnd do
+								seenGroups[groupIndex] = true
+							end
+						else
+							local groupIndex = tonumber(part)
+							if(not groupIndex or groupIndex < 1 or groupIndex > 5) then
+								groupMaskValid = false
+								break
+							end
+							seenGroups[groupIndex] = true
+						end
+					end
+
+					if(groupMaskValid) then
+						for groupIndex = 1, 5 do
+							if(seenGroups[groupIndex]) then
+								rtscGroupMask = rtscGroupMask + (2 ^ (groupIndex - 1))
+							end
+						end
+					end
+
+					if(groupMaskValid and rtscGroupMask > 0) then
+						rtscAudience = "GROUPS"
+						rtscOperation = groupGoSpec and "GO" or "SELECT"
+					end
+				end
+			end
+		end
+	end
+
+	if(rtscOperation ~= nil) then
+		if(MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.rtscOrderCapable == true) then
+			if(not MultiBot.Comm or type(MultiBot.Comm.RunRtscOrderCommand) ~= "function") then
+				MultiBot.bridge.lastError = "RTSC_ORDER_CLIENT_UNAVAILABLE"
+				return false, "blocked"
+			end
+
+			local token = MultiBot.Comm.RunRtscOrderCommand(
+				rtscOperation,
+				rtscAudience,
+				rtscGroupMask,
+				rtscSlot,
+				onComplete)
+
+			if(token ~= false and token ~= nil) then
+				return true, "pending", token
+			end
+
+			return false, "blocked"
+		end
+
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "RTSC_ORDER_UNAVAILABLE" end
+		return false, "blocked"
+	elseif(rtscLike) then
+		if(MultiBot.bridge) then MultiBot.bridge.lastError = "RTSC_ORDER_INVALID" end
+		return false, "blocked"
+	end
+	-- MB_RTSC_ORDER_V1_ROUTE_END
+
 	if(GetNumRaidMembers() > 5) then
-		local route = _mbRouteStrategyMutation(pAction, "RAID", "")
+		local route = _mbRouteStrategyMutation(pAction, "RAID", "", onComplete)
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then
 			return true
 		end
@@ -838,7 +1208,7 @@ MultiBot.ActionToGroup = function(pAction)
 	end
 
 	if(GetNumPartyMembers() > 0) then
-		local route = _mbRouteStrategyMutation(pAction, "PARTY", "")
+		local route = _mbRouteStrategyMutation(pAction, "PARTY", "", onComplete)
 		if(route == MB_STRATEGY_ROUTE_BRIDGE) then
 			return true
 		end
@@ -1227,15 +1597,6 @@ MultiBot.CollapseOtherUnitBarsForDropdown = function(targetFrame)
 	targetFrame._mbCollapsedBars = collapsedBars
 end
 
-local function _mbGetStrategyUnitButton(target)
-	if(type(target) ~= "string" or target == "") then return nil end
-	local units = MultiBot.frames
-		and MultiBot.frames["MultiBar"]
-		and MultiBot.frames["MultiBar"].frames
-		and MultiBot.frames["MultiBar"].frames["Units"]
-	if(not units or not units.buttons) then return nil end
-	return units.buttons[target]
-end
 
 MultiBot.OnOffActionToTarget = function(pButton, pOn, pOff, pTarget)
 	local wasEnabled = pButton.state == true
@@ -1248,23 +1609,9 @@ MultiBot.OnOffActionToTarget = function(pButton, pOn, pOff, pTarget)
 			-- L'etat visuel definitif reste reconstruit depuis l'ACK puis STATE.
 			return not wasEnabled
 		end
-		if(route == MB_STRATEGY_ROUTE_BLOCKED) then
-			-- Aucun changement optimiste si le bridge refuse ou ne peut pas envoyer.
-			return wasEnabled
-		end
 
-		local unitButton = _mbGetStrategyUnitButton(pTarget)
-		if(unitButton) then unitButton.waitFor = string.upper(mutationScope) end
-
-		-- Seul le mode legacy explicitement autorise atteint ce transport chat.
-		SendChatMessage(action, "WHISPER", nil, pTarget)
-		if(wasEnabled) then
-			pButton.setDisable()
-			return false
-		else
-			pButton.setEnable()
-			return true
-		end
+		-- Aucun changement optimiste si le bridge refuse ou ne peut pas envoyer.
+		return wasEnabled
 	end
 
 	if(wasEnabled) then
@@ -2408,13 +2755,30 @@ MultiBot.addFrame = function(pName, pX, pY, pSize)
 end
 
 -- MULTIBOT: SELL ALL BOTS --
--- Envoie une commande de vente à tous les bots listés dans l’onglet "Units".
--- pCommand : "s *" (tout le gris) ou "s vendor" (tout ce qui est vendable).
+-- MB_SELL_ALL_BOTS_CHATLESS_V1_BEGIN
+-- Vend les objets gris de tous les bots actuellement listés dans l'onglet Units.
+-- Le transport est exclusivement structuré via INVENTORY_ITEM_ACTION/SELL_GREY.
 MultiBot.SellAllBots = function(pCommand)
-	-- Par défaut : vendre tous les objets gris (safe)
+	-- Le bouton historique passe encore "s *". Toute autre variante reste refusée
+	-- ici afin de ne pas transformer silencieusement une ancienne commande chat.
 	pCommand = pCommand or "s *"
+	if pCommand ~= "s *" then
+		return 0
+	end
 
-	if not MultiBot.isTarget or not MultiBot.isTarget() then
+	local comm = MultiBot and MultiBot.Comm or nil
+	local function showFeedback(key, color, ...)
+		local message = string.format(MultiBot.L(key), ...)
+		if comm and type(comm.ShowSystemMessage) == "function" then
+			comm.ShowSystemMessage(message, color)
+		elseif DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+			DEFAULT_CHAT_FRAME:AddMessage(message)
+		end
+	end
+
+	if not comm or type(comm.RunInventoryItemAction) ~= "function"
+		or type(MultiBot.TimerAfter) ~= "function" then
+		showFeedback("sell.all.failed", "red", 0, 0)
 		return 0
 	end
 
@@ -2431,30 +2795,147 @@ MultiBot.SellAllBots = function(pCommand)
 		return 0
 	end
 
+	if type(MultiBot._sellAllBotsQueue) == "table" and MultiBot._sellAllBotsQueue.active then
+		showFeedback("sell.all.busy", "yellow")
+		return 0
+	end
+
 	CancelTrade()
 
-	local count = 0
-
+	local targets = {}
+	local unitsButton = multiBar.buttons and multiBar.buttons["Units"] or nil
+	local currentRoster = unitsButton and unitsButton.roster or nil
 	for key, btn in pairs(units.buttons) do
 		if type(btn) == "table" then
 			local botName = btn.name or (btn.getName and btn.getName()) or key
+			local isOnline = false
 			if botName and botName ~= "" then
-				SendChatMessage(pCommand, "WHISPER", nil, botName)
-				count = count + 1
+				if currentRoster == "players" and MultiBot.IsBridgePlayerRosterBotOnline then
+					isOnline = MultiBot.IsBridgePlayerRosterBotOnline(btn, botName)
+				elseif currentRoster == "members" and MultiBot.IsGuildRosterBotOnline then
+					isOnline = MultiBot.IsGuildRosterBotOnline(btn, botName)
+				elseif currentRoster == "friends" and MultiBot.IsFriendRosterBotOnline then
+					isOnline = MultiBot.IsFriendRosterBotOnline(btn, botName)
+				elseif currentRoster == "favorites" and MultiBot.IsFavoriteRosterBotOnline then
+					isOnline = MultiBot.IsFavoriteRosterBotOnline(btn, botName)
+				else
+					isOnline = ((MultiBot.IsUnitBotOnline and MultiBot.IsUnitBotOnline(btn, botName)) or (not MultiBot.IsUnitBotOnline and btn.state == true))
+				end
 			end
+			if isOnline then targets[#targets + 1] = botName end
+		end
+	end
+	table.sort(targets)
+
+	local total = #targets
+	if total == 0 then
+		return 0
+	end
+
+	local queue = {
+		active = true,
+		targets = targets,
+		index = 1,
+		total = total,
+		sent = 0,
+		completed = 0,
+		succeeded = 0,
+		empty = 0,
+		failed = 0,
+		sold = 0,
+	}
+	MultiBot._sellAllBotsQueue = queue
+
+	local function finishQueue()
+		if MultiBot._sellAllBotsQueue ~= queue or not queue.active then
+			return
+		end
+		queue.active = false
+
+		if queue.completed < queue.total then
+			queue.failed = queue.failed + (queue.total - queue.completed)
+			queue.completed = queue.total
+		end
+
+		if queue.failed == 0 and queue.empty == 0 then
+			showFeedback("sell.all.success", "green", queue.succeeded, queue.total, queue.sold)
+		elseif queue.failed == 0 and queue.empty == queue.total then
+			showFeedback("sell.all.none", "yellow", queue.total)
+		elseif queue.succeeded > 0 or queue.empty > 0 then
+			showFeedback("sell.all.partial", "yellow", queue.succeeded, queue.total, queue.sold, queue.empty, queue.failed)
+		else
+			showFeedback("sell.all.failed", "red", queue.failed, queue.total)
+		end
+
+		if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
+			MultiBot.RefreshInventory(0.5)
 		end
 	end
 
-	-- Si une fenêtre d’inventaire est ouverte, on la rafraîchit pour le bot affiché
-	if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
-		MultiBot.RefreshInventory(0.5)
+	local function completeOne(botName, action, itemId, result, reason, moved)
+		if MultiBot._sellAllBotsQueue ~= queue or not queue.active then
+			return
+		end
+
+		queue.completed = queue.completed + 1
+		moved = tonumber(moved or 0) or 0
+		if result == "OK" then
+			queue.succeeded = queue.succeeded + 1
+			queue.sold = queue.sold + moved
+		elseif reason == "ITEM_NOT_FOUND" then
+			queue.empty = queue.empty + 1
+		else
+			queue.failed = queue.failed + 1
+		end
+
+		if queue.sent >= queue.total and queue.completed >= queue.total then
+			finishQueue()
+		end
 	end
 
-	return count
+	local runNext
+	runNext = function()
+		if MultiBot._sellAllBotsQueue ~= queue or not queue.active then
+			return
+		end
+
+		local botName = queue.targets[queue.index]
+		if not botName then
+			if queue.completed >= queue.total then
+				finishQueue()
+			else
+				MultiBot.TimerAfter(5.0, finishQueue)
+			end
+			return
+		end
+
+		queue.index = queue.index + 1
+		queue.sent = queue.sent + 1
+		local token = comm.RunInventoryItemAction(botName, "SELL_GREY", 0, 0, completeOne, { silentFeedback = true })
+		if token == false then
+			queue.completed = queue.completed + 1
+			queue.failed = queue.failed + 1
+		end
+
+		if queue.index <= queue.total then
+			MultiBot.TimerAfter(0.10, runNext)
+		elseif queue.completed >= queue.total then
+			finishQueue()
+		else
+			MultiBot.TimerAfter(5.0, finishQueue)
+		end
+	end
+
+	runNext()
+	return total
 end
+-- MB_SELL_ALL_BOTS_CHATLESS_V1_END
 
 -- MULTIBOT: MAINTENANCE ALL BOTS --
--- Envoie la commande "maintenance" à tous les bots listés dans l’onglet "Units".
+-- MB_MAINTENANCE_ALL_CHATLESS_V1_BEGIN
+-- Exécute Maintenance sur le snapshot exact des boutons de l’onglet Units.
+-- Une seule requête est active à la fois et les bots sont espacés afin de
+-- respecter la limite serveur BOT_MAINTENANCE_V1 (4 requêtes / 10 secondes).
 MultiBot.MaintenanceAllBots = function()
 	local frames = MultiBot.frames
 	if not frames then return 0 end
@@ -2469,27 +2950,124 @@ MultiBot.MaintenanceAllBots = function()
 		return 0
 	end
 
+	if type(MultiBot._maintenanceAllQueue) == "table"
+		and MultiBot._maintenanceAllQueue.active then
+		return 0
+	end
+
+	if type(MultiBot.TimerAfter) ~= "function" then
+		return 0
+	end
+
 	CancelTrade()
 
-	local count = 0
-
+	local targets = {}
 	for key, btn in pairs(units.buttons) do
 		if type(btn) == "table" then
 			local botName = btn.name or (btn.getName and btn.getName()) or key
 			if botName and botName ~= "" then
-				SendChatMessage("maintenance", "WHISPER", nil, botName)
-				count = count + 1
+				targets[#targets + 1] = botName
 			end
 		end
 	end
 
-	-- Si une fenêtre d’inventaire est ouverte, on peut la rafraîchir pour refléter d’éventuels changements
-	if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
-		MultiBot.RefreshInventory(0.5)
+	local count = #targets
+	if count == 0 then
+		if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
+			MultiBot.RefreshInventory(0.5)
+		end
+		return 0
 	end
 
+	local queue = {
+		active = true,
+		targets = targets,
+		index = 1,
+		total = count,
+		completed = 0,
+		succeeded = 0,
+		failed = 0,
+	}
+	MultiBot._maintenanceAllQueue = queue
+
+	local function finishQueue()
+		if MultiBot._maintenanceAllQueue ~= queue then
+			return
+		end
+
+		queue.active = false
+
+		if MultiBot.inventory and MultiBot.inventory:IsVisible() and MultiBot.RefreshInventory then
+			MultiBot.RefreshInventory(0.5)
+		end
+	end
+
+	local runNext
+
+	local function scheduleNext()
+		MultiBot.TimerAfter(3.0, function()
+			if MultiBot._maintenanceAllQueue == queue and queue.active then
+				runNext()
+			end
+		end)
+	end
+
+	local function completeOne(result)
+		if MultiBot._maintenanceAllQueue ~= queue or not queue.active then
+			return
+		end
+
+		queue.completed = queue.completed + 1
+		if type(result) == "table" and result.status == "ok" then
+			queue.succeeded = queue.succeeded + 1
+		else
+			queue.failed = queue.failed + 1
+		end
+
+		queue.index = queue.index + 1
+		if queue.index > queue.total then
+			finishQueue()
+		else
+			scheduleNext()
+		end
+	end
+
+	runNext = function()
+		if MultiBot._maintenanceAllQueue ~= queue or not queue.active then
+			return
+		end
+
+		if queue.index > queue.total then
+			finishQueue()
+			return
+		end
+
+		local botName = queue.targets[queue.index]
+		local comm = MultiBot and MultiBot.Comm or nil
+		local playerName = type(UnitName) == "function" and UnitName("player") or nil
+		local token = false
+
+		if playerName and botName == playerName then
+			if comm and type(comm.RunSelfAction) == "function" then
+				token = comm.RunSelfAction("MAINTENANCE", "", completeOne)
+			end
+		elseif comm and type(comm.RunBotMaintenance) == "function" then
+			token = comm.RunBotMaintenance(botName, completeOne)
+		end
+
+		if not token then
+			completeOne({
+				status = "error",
+				botName = botName,
+				reason = MultiBot and MultiBot.bridge and MultiBot.bridge.lastError or "UNAVAILABLE",
+			})
+		end
+	end
+
+	runNext()
 	return count
 end
+-- MB_MAINTENANCE_ALL_CHATLESS_V1_END
 
 MultiBot.addSelf = function(pClass, pName)
   local units = MultiBot.frames["MultiBar"].frames["Units"]
@@ -2667,18 +3245,6 @@ MultiBot.getBot = function(pName)
 	return MultiBot.frames["MultiBar"].frames["Units"].buttons[pName]
 end
 
-local function getInventoryUnitButton(botName)
-	if not botName or botName == "" then
-		return nil
-	end
-
-	local frames = MultiBot.frames
-	local multiBar = frames and frames["MultiBar"] or nil
-	local units = multiBar and multiBar.frames and multiBar.frames["Units"] or nil
-	local buttons = units and units.buttons or nil
-	return buttons and buttons[botName] or nil
-end
-
 local function scheduleInventoryRefresh(delay, callback)
 	if type(delay) == "number" and delay > 0 then
 		if MultiBot.TimerAfter then
@@ -2707,13 +3273,7 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 		return false
 	end
 
-	options = options or {}
 
-	local function clearWaitState(waitButton)
-		if waitButton and (waitButton.waitFor == "INVENTORY" or waitButton.waitFor == "ITEM" or waitButton.waitFor == "LOOT") then
-			waitButton.waitFor = ""
-		end
-	end
 
 	local function neutralizeCurrentInventoryView()
 		local inventory = MultiBot.inventory
@@ -2735,7 +3295,6 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 			return true
 		end
 
-		local waitButton = getInventoryUnitButton(botName)
 		local bridge = MultiBot.bridge or nil
 		local comm = MultiBot.Comm or nil
 		local bridgeConnected = bridge and bridge.connected == true
@@ -2757,7 +3316,6 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 					neutralizeCurrentInventoryView()
 				end
 
-				clearWaitState(waitButton)
 				return true
 			end
 
@@ -2765,38 +3323,14 @@ MultiBot.RequestInventoryRefresh = function(botName, delay, options)
 				bridge.lastError = "INVENTORY_SEND_FAILED"
 			end
 			neutralizeCurrentInventoryView()
-			clearWaitState(waitButton)
 			return false
 		end
 
-		if options.bridgeOnly or MultiBot.allowLegacyChatFallback ~= true then
-			if bridge then
-				bridge.lastError = "INVENTORY_CAPABILITY_UNAVAILABLE"
-			end
-			neutralizeCurrentInventoryView()
-			clearWaitState(waitButton)
-			return false
-		end
-
-		if not waitButton then
-			if bridge then
-				bridge.lastError = "INVENTORY_LEGACY_NO_BUTTON"
-			end
-			neutralizeCurrentInventoryView()
-			return false
-		end
-
-		local inventory = MultiBot.inventory
-		if inventory and inventory.beginPayload then
-			inventory:beginPayload(botName)
-		end
-
-		waitButton.waitFor = "INVENTORY"
-		SendChatMessage("items", "WHISPER", nil, botName)
 		if bridge then
-			bridge.lastError = nil
+			bridge.lastError = "INVENTORY_CAPABILITY_UNAVAILABLE"
 		end
-		return true
+		neutralizeCurrentInventoryView()
+		return false
 	end
 
 	if inventoryViewChanged() then

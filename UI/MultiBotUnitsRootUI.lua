@@ -1852,13 +1852,6 @@ local function isSharedRosterButtonOnline(button)
     return button.state == true
 end
 
-local function hideSharedRosterUnitFrame(button)
-    local frames = button and button.parent and button.parent.frames
-    local unitFrame = frames and frames[button.name]
-    if unitFrame and unitFrame.Hide then
-        unitFrame:Hide()
-    end
-end
 
 local function addRosterMemberButton(member, socialRoster)
     -- Guild/Friends rebuilds run in the background and reuse the same button
@@ -1892,17 +1885,6 @@ local function addRosterMemberButton(member, socialRoster)
                 return
             end
 
-            -- Preserve the pre-existing fallback only when structured
-            -- lifecycle capabilities are unavailable.
-            SendChatMessage(".playerbot bot remove " .. button.name, "SAY")
-            if MultiBot.SetBridgeBotOnlineState and button.bridge ~= nil then
-                MultiBot.SetBridgeBotOnlineState(button, false)
-            else
-                hideSharedRosterUnitFrame(button)
-                if button.setDisable then
-                    button.setDisable()
-                end
-            end
             return
         end
 
@@ -1927,12 +1909,7 @@ local function addRosterMemberButton(member, socialRoster)
         if button.state == false then
             return
         end
-        button._mbSocialForceCollapsed = true
-        SendChatMessage(".playerbot bot remove " .. button.name, "SAY")
-        if button.parent.frames[button.name] ~= nil then
-            button.parent.frames[button.name]:Hide()
-        end
-        button.setDisable()
+        return
     end
 
     member.doLeft = function(button)
@@ -1962,10 +1939,6 @@ local function addRosterMemberButton(member, socialRoster)
                 return
             end
 
-            SendChatMessage(".playerbot bot add " .. button.name, "SAY")
-            if button.setEnable then
-                button.setEnable()
-            end
             return
         end
 
@@ -1993,8 +1966,8 @@ local function addRosterMemberButton(member, socialRoster)
             return
         end
 
-        button._mbSocialForceCollapsed = false
         if button.state then
+            button._mbSocialForceCollapsed = false
             if button.parent.frames[button.name] ~= nil then
                 if button._mbGroupRejoinCollapsed == true then
                     button._mbGroupRejoinCollapsed = false
@@ -2004,8 +1977,7 @@ local function addRosterMemberButton(member, socialRoster)
             return
         end
 
-        SendChatMessage(".playerbot bot add " .. button.name, "SAY")
-        button.setEnable()
+        return
     end
 end
 
@@ -2215,68 +2187,6 @@ refreshStrategiesForActiveBots = function(unitsButton)
         return
     end
 
-    if MultiBot.allowLegacyChatFallback ~= true then
-        return
-    end
-
-    local function refreshStrategiesFor(name)
-        if not name or name == UnitName("player") then
-            return
-        end
-
-        local rosters = { "actives", "players", "members", "friends", "favorites" }
-        local isBot = false
-        local hasAnyRoster = false
-
-        if MultiBot.isRoster and MultiBot.index then
-            for index = 1, #rosters do
-                local rosterName = rosters[index]
-                local list = MultiBot.index[rosterName]
-                if list and next(list) ~= nil then
-                    hasAnyRoster = true
-                end
-                if list and MultiBot.isRoster(rosterName, name) then
-                    isBot = true
-                    break
-                end
-            end
-        end
-
-        if not isBot and hasAnyRoster then
-            return
-        end
-
-        local button = unitsFrame and unitsFrame.buttons and unitsFrame.buttons[name]
-
-        if button then
-            button.waitFor = "CO"
-        end
-
-        SendChatMessage("co ?", "WHISPER", nil, name)
-    end
-
-    if scopedToDisplayedUnits then
-        if targetNames and #targetNames > 0 then
-            for index = 1, #targetNames do
-                refreshStrategiesFor(targetNames[index])
-            end
-        end
-
-        return
-    end
-
-    if IsInRaid() then
-        for index = 1, GetNumGroupMembers() do
-            refreshStrategiesFor(UnitName("raid" .. index))
-        end
-        return
-    end
-
-    if IsInGroup() then
-        for index = 1, GetNumSubgroupMembers() do
-            refreshStrategiesFor(UnitName("party" .. index))
-        end
-    end
 end
 
 local function requestRosterBootstrap(button)
@@ -2368,12 +2278,30 @@ local function createFactionBanner(unitsFrame)
 
     local button = allianceFrame.addButton("FactionBanner", 0, 0, bannerIcon, MultiBot.L("tips.units.alliance"))
     button:doShow()
+    -- MB_BOT_GROUP_LIFECYCLE_V1_BEGIN
     button.doRight = function()
-        SendChatMessage(".playerbot bot remove *", "SAY")
+        local bridge = MultiBot.bridge
+        if bridge and bridge.connected == true
+            and bridge.botGroupLifecycleCapable == true
+            and MultiBot.Comm
+            and type(MultiBot.Comm.RunBotGroupLifecycle) == "function" then
+            MultiBot.Comm.RunBotGroupLifecycle("DISCONNECT")
+            return
+        end
+
     end
     button.doLeft = function()
-        SendChatMessage(".playerbot bot add *", "SAY")
+        local bridge = MultiBot.bridge
+        if bridge and bridge.connected == true
+            and bridge.botGroupLifecycleCapable == true
+            and MultiBot.Comm
+            and type(MultiBot.Comm.RunBotGroupLifecycle) == "function" then
+            MultiBot.Comm.RunBotGroupLifecycle("CONNECT")
+            return
+        end
+
     end
+    -- MB_BOT_GROUP_LIFECYCLE_V1_END
 
     return allianceFrame, button
 end
@@ -2394,96 +2322,22 @@ local function createPvpStatsControls(controlFrame)
         end
     end
 
-    local PVP_STATS_LEGACY_FILTER_TTL = 8
-
-    local function pvpStatsNow()
-        if GetTime then
-            return GetTime()
-        end
-
-        return time and time() or 0
-    end
-
-    local function normalizePvpStatsAuthorName(author)
-        if type(author) ~= "string" then
-            return ""
-        end
-
-        local name = author
-        if Ambiguate then
-            name = Ambiguate(author, "none") or author
-        end
-
-        name = string.match(name, "^[^-]+") or name
-        return string.lower(name or "")
-    end
-
-    local function isPvpStatsLegacyLine(message)
-        return type(message) == "string" and string.find(message, "%[PVP%]") ~= nil
-    end
-
-    local function ensurePvpStatsLegacyFilter()
-        if MultiBot._pvpStatsLegacyFilterInstalled then
-            return true
-        end
-
-        if type(ChatFrame_AddMessageEventFilter) ~= "function" then
-            return false
-        end
-
-        MultiBot._pvpStatsLegacyFilterInstalled = true
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", function(_, _, message, author, ...)
-            local state = MultiBot and MultiBot._pvpStatsLegacyFilter or nil
-            if type(state) ~= "table" then
-                return false
-            end
-
-            if state.expiresAt and pvpStatsNow() > state.expiresAt then
-                MultiBot._pvpStatsLegacyFilter = nil
-                return false
-            end
-
-            if state.botKey and normalizePvpStatsAuthorName(author) ~= state.botKey then
-                return false
-            end
-
-            if isPvpStatsLegacyLine(message) then
-                return true
-            end
-
-            return false
-        end)
-
-        return true
-    end
-
-    local function suppressNextPvpStatsLegacyWhisper(botName)
-        if not ensurePvpStatsLegacyFilter() then
-            return
-        end
-
-        local botKey = nil
-        if botName and botName ~= "" then
-            botKey = normalizePvpStatsAuthorName(botName)
-        end
-
-        MultiBot._pvpStatsLegacyFilter = {
-            botKey = botKey ~= "" and botKey or nil,
-            expiresAt = pvpStatsNow() + PVP_STATS_LEGACY_FILTER_TTL,
-        }
+    -- MB_PVP_STATS_CHATLESS_G2_V1_BEGIN
+    local function showPvpBridgeUnavailable()
+        UIErrorsFrame:AddMessage(MultiBot.L("pvp.stats.error_bridge_unavailable"), 1, 0.2, 0.2, 1)
     end
 
     local function requestBridgePvpStats(botName)
         local comm = MultiBot.Comm or nil
 
         if comm and comm.RequestPvpStats and comm.RequestPvpStats(botName) then
-            suppressNextPvpStatsLegacyWhisper(botName)
             showPvpFrame()
             return true
         end
 
         return false
     end
+    -- MB_PVP_STATS_CHATLESS_G2_V1_END
 
     mainButton.doLeft = function()
         if whisperButton:IsShown() then
@@ -2509,8 +2363,7 @@ local function createPvpStatsControls(controlFrame)
             return
         end
 
-        SendChatMessage("pvp stats", "WHISPER", nil, bot)
-        showPvpFrame()
+        showPvpBridgeUnavailable()
     end
 
     partyButton.doLeft = function()
@@ -2523,8 +2376,7 @@ local function createPvpStatsControls(controlFrame)
             return
         end
 
-        SendChatMessage("pvp stats", "PARTY")
-        showPvpFrame()
+        showPvpBridgeUnavailable()
     end
 
     raidButton.doLeft = function()
@@ -2537,8 +2389,7 @@ local function createPvpStatsControls(controlFrame)
             return
         end
 
-        SendChatMessage("pvp stats", "RAID")
-        showPvpFrame()
+        showPvpBridgeUnavailable()
     end
 end
 
@@ -2585,6 +2436,10 @@ local function createInviteControls(controlFrame)
         MultiBot.timer.invite.roster = MultiBot.frames["MultiBar"].buttons[UNITS_BUTTON_NAME].roster
         MultiBot.timer.invite.needs = #MultiBot.index[MultiBot.timer.invite.roster]
         MultiBot.timer.invite.index = 1
+        MultiBot.timer.invite.source = "BAR"
+        MultiBot.timer.invite.runId = (tonumber(MultiBot.timer.invite.runId) or 0) + 1
+        MultiBot.timer.invite.pending = false
+        MultiBot.timer.invite.pendingName = nil
         MultiBot.auto.invite = true
         SendChatMessage(MultiBot.L("info.starting"), "SAY")
     end
@@ -2612,6 +2467,10 @@ local function createInviteControls(controlFrame)
                 MultiBot.timer.invite.roster = MultiBot.frames["MultiBar"].buttons[UNITS_BUTTON_NAME].roster
                 MultiBot.timer.invite.needs = definition.needs(raidCount, partyCount)
                 MultiBot.timer.invite.index = 1
+                MultiBot.timer.invite.source = "BAR"
+                MultiBot.timer.invite.runId = (tonumber(MultiBot.timer.invite.runId) or 0) + 1
+                MultiBot.timer.invite.pending = false
+                MultiBot.timer.invite.pendingName = nil
                 MultiBot.auto.invite = true
                 button.parent:Hide()
                 SendChatMessage(MultiBot.L("info.starting"), "SAY")

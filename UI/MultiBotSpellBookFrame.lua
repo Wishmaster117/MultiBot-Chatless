@@ -34,6 +34,12 @@ local SPELLBOOK_UI_DEFAULTS = {
 	NAV_BUTTON_WIDTH = 18,
 	NAV_BUTTON_HEIGHT = 18,
 
+	-- Filtre des sorts ignorés intégré au footer.
+	FILTER_BUTTON_WIDTH = 125,
+	FILTER_BUTTON_HEIGHT = 18,
+	FILTER_BUTTON_X = 12,
+	FILTER_BUTTON_Y = -270,
+
 	-- Positions X des colonnes (icône, titre, rang) en layout 3 colonnes.
 	LEFT_ICON_X = 2,
 	MIDDLE_ICON_X = 112,
@@ -226,6 +232,139 @@ local function createSpellIgnoreCheck(parent, x, y)
 	return check
 end
 
+-- MB_SPELLBOOK_IGNORED_FILTER_BEGIN
+local function getSpellbookIgnoredCount(pSpellbook)
+	if(type(pSpellbook) ~= "table") then
+		return 0
+	end
+
+	local tStates = MultiBot.spells and MultiBot.spells[pSpellbook.name or ""]
+	if(type(tStates) ~= "table") then
+		return 0
+	end
+
+	local tCount = 0
+	for _, tSpell in ipairs(pSpellbook.spells or {}) do
+		local tSpellId = tonumber(tSpell and tSpell[1] or 0) or 0
+		if(tSpellId > 0 and tStates[tSpellId] == false) then
+			tCount = tCount + 1
+		end
+	end
+
+	return tCount
+end
+
+local function getSpellbookVisibleSpells(pSpellbook)
+	local tSource = type(pSpellbook) == "table" and pSpellbook.spells or {}
+	if(type(tSource) ~= "table") then
+		tSource = {}
+	end
+
+	if(not pSpellbook or pSpellbook.filterIgnored ~= true) then
+		return tSource
+	end
+
+	local tVisible = {}
+	local tStates = MultiBot.spells and MultiBot.spells[pSpellbook.name or ""]
+	if(type(tStates) ~= "table") then
+		return tVisible
+	end
+
+	for _, tSpell in ipairs(tSource) do
+		local tSpellId = tonumber(tSpell and tSpell[1] or 0) or 0
+		if(tSpellId > 0 and tStates[tSpellId] == false) then
+			table.insert(tVisible, tSpell)
+		end
+	end
+
+	return tVisible
+end
+
+local function updateSpellbookFilterButton(pSpellbook)
+	local tOverlay = pSpellbook and pSpellbook.frames and pSpellbook.frames["Overlay"]
+	local tButton = tOverlay and tOverlay.buttons and tOverlay.buttons["IgnoredFilter"]
+	if(not tButton) then
+		return
+	end
+
+	local tIgnoredCount = getSpellbookIgnoredCount(pSpellbook)
+	if(pSpellbook.filterIgnored == true) then
+		tButton:SetText(MultiBot.L("spellbook.ignore.filter.all") or "")
+		tButton.tooltipKey = "spellbook.ignore.filter.all.tooltip"
+		tButton:Enable()
+		return
+	end
+
+	local tLabel = MultiBot.L("spellbook.ignore.filter.ignored") or ""
+	local tOk, tText = pcall(string.format, tLabel, tIgnoredCount)
+	if(tOk) then
+		tButton:SetText(tText)
+	else
+		tButton:SetText(tLabel)
+	end
+
+	tButton.tooltipKey = "spellbook.ignore.filter.ignored.tooltip"
+	if(tIgnoredCount > 0) then
+		tButton:Enable()
+	else
+		tButton:Disable()
+	end
+end
+
+local function refreshSpellbookView(pResetPage)
+	local tSpellbook = MultiBot.spellbook
+	local tOverlay = tSpellbook and tSpellbook.frames and tSpellbook.frames["Overlay"]
+	if(not tSpellbook or not tOverlay or type(MultiBot.setSpell) ~= "function") then
+		return
+	end
+
+	local tVisible = getSpellbookVisibleSpells(tSpellbook)
+	local tTotal = #tVisible
+
+	if(pResetPage == true) then
+		tSpellbook.now = 1
+	else
+		tSpellbook.now = tonumber(tSpellbook.now or 1) or 1
+	end
+
+	tSpellbook.max = math.max(1, math.ceil(tTotal / SPELLBOOK_PAGE_SIZE))
+	if(tSpellbook.now < 1) then tSpellbook.now = 1 end
+	if(tSpellbook.now > tSpellbook.max) then tSpellbook.now = tSpellbook.max end
+
+	tSpellbook.from = ((tSpellbook.now - 1) * SPELLBOOK_PAGE_SIZE) + 1
+	tSpellbook.to = math.min(tSpellbook.from + SPELLBOOK_PAGE_SIZE - 1, tTotal)
+
+	for tSlot = 1, SPELLBOOK_PAGE_SIZE do
+		local tSourceIndex = tSpellbook.from + tSlot - 1
+		MultiBot.setSpell(tSlot, tVisible[tSourceIndex], tSpellbook.name)
+	end
+
+	tOverlay.setText(
+		"Pages",
+		"|cff" .. (getSpellBookUI().PAGE_TEXT_COLOR_HEX or "ffffff") ..
+		tSpellbook.now .. "/" .. tSpellbook.max .. "|r")
+
+	if(tSpellbook.now > 1) then
+		tOverlay.buttons["<"].doShow()
+	else
+		tOverlay.buttons["<"].doHide()
+	end
+
+	if(tSpellbook.now < tSpellbook.max) then
+		tOverlay.buttons[">"].doShow()
+	else
+		tOverlay.buttons[">"].doHide()
+	end
+
+	updateSpellbookFilterButton(tSpellbook)
+end
+
+MultiBot.refreshSpellbookView = refreshSpellbookView
+MultiBot.refreshSpellbookFilterButton = function()
+	updateSpellbookFilterButton(MultiBot.spellbook)
+end
+-- MB_SPELLBOOK_IGNORED_FILTER_END
+
 local function getUnitsRootFrame()
 	local frames = MultiBot.frames
 	local multiBar = frames and frames["MultiBar"]
@@ -345,8 +484,46 @@ local function createSpellbookContent(window)
 	nextButton.getName = function(_) return MultiBot.spellbook and MultiBot.spellbook.name or "" end
 	tOverlay.buttons[">"] = nextButton
 
+	local filterButton = CreateFrame("Button", nil, tOverlay, "UIPanelButtonTemplate")
+	filterButton:SetPoint(
+		"TOPRIGHT",
+		tOverlay,
+		"TOPRIGHT",
+		getSpellBookUI().FILTER_BUTTON_X or 0,
+		getSpellBookUI().FILTER_BUTTON_Y or -270)
+	filterButton:SetWidth(getSpellBookUI().FILTER_BUTTON_WIDTH or 125)
+	filterButton:SetHeight(getSpellBookUI().FILTER_BUTTON_HEIGHT or 18)
+	filterButton.tooltipKey = "spellbook.ignore.filter.ignored.tooltip"
+	filterButton:SetText("")
+	filterButton:Disable()
+	filterButton:SetScript("OnEnter", function(self)
+		if(not GameTooltip or type(self.tooltipKey) ~= "string") then return end
+		local tTooltip = MultiBot.L(self.tooltipKey) or ""
+		if(type(tTooltip) ~= "string" or tTooltip == "") then return end
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(tTooltip, 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	filterButton:SetScript("OnLeave", function(_)
+		if(GameTooltip and GameTooltip.Hide) then
+			GameTooltip:Hide()
+		end
+	end)
+	filterButton:SetScript("OnClick", function(_)
+		local tSpellbook = MultiBot.spellbook
+		if(not tSpellbook) then return end
+		if(tSpellbook.filterIgnored ~= true and getSpellbookIgnoredCount(tSpellbook) == 0) then
+			return
+		end
+		tSpellbook.filterIgnored = tSpellbook.filterIgnored ~= true
+		refreshSpellbookView(true)
+	end)
+	tOverlay.buttons["IgnoredFilter"] = filterButton
+
 	local function onSpellSlotLeftClick(pButton)
-		SendChatMessage("cast " .. pButton.spell, "WHISPER", nil, MultiBot.spellbook.name)
+		if MultiBot.CastSpellbookSpell then
+			MultiBot.CastSpellbookSpell(MultiBot.spellbook.name, pButton.spell)
+		end
 	end
 
 	local function onSpellSlotRightClick(pButton)
@@ -427,7 +604,10 @@ function MultiBot.InitializeSpellBookFrame()
 		to = SPELLBOOK_PAGE_SIZE,
 		name = "",
 		index = 0,
+		filterIgnored = false,
 	}
+
+	updateSpellbookFilterButton(MultiBot.spellbook)
 
 	MultiBot.spellbook.setTitle = function(self, pTitle)
 		if(self.window and self.window.SetTitle) then
@@ -472,9 +652,9 @@ function MultiBot.InitializeSpellBookFrame()
 		return self
 	end
 
-	MultiBot.spellbook.appendSpellId = function(self, spellId, botName)
+	MultiBot.spellbook.appendSpellId = function(self, spellId, botName, ignored)
 		if(MultiBot.addSpellById) then
-			return MultiBot.addSpellById(spellId, botName or self.name or "")
+			return MultiBot.addSpellById(spellId, botName or self.name or "", ignored == true)
 		end
 
 		return false
@@ -492,40 +672,24 @@ function MultiBot.InitializeSpellBookFrame()
 	-- Default baseline position (legacy parity), can be overridden by saved layout restore.
 	MultiBot.spellbook.setPoint(-802, 302)
 
-	overlay.buttons["<"].doLeft = function(pButton)
+	overlay.buttons["<"].doLeft = function(_)
 		local tSpellbook = MultiBot.spellbook
-		tSpellbook.to = tSpellbook.to - SPELLBOOK_PAGE_SIZE
-		tSpellbook.now = tSpellbook.now - 1
-		tSpellbook.from = tSpellbook.from - SPELLBOOK_PAGE_SIZE
-		tSpellbook.frames["Overlay"].setText("Pages", tSpellbook.now .. "/" .. tSpellbook.max)
-		tSpellbook.frames["Overlay"].buttons[">"]:doShow()
-
-		if(tSpellbook.now == 1) then pButton:doHide() end
-		local tIndex = 1
-		for i = tSpellbook.from, tSpellbook.to do
-			MultiBot.setSpell(tIndex, tSpellbook.spells[i], pButton:getName())
-			tIndex = tIndex + 1
-		end
+		if(not tSpellbook) then return end
+		tSpellbook.now = math.max(1, (tonumber(tSpellbook.now or 1) or 1) - 1)
+		refreshSpellbookView(false)
 	end
 
 	overlay.buttons["<"]:SetScript("OnClick", function(self)
 		if(self.doLeft) then self.doLeft(self) end
 	end)
 
-	overlay.buttons[">"].doLeft = function(pButton)
+	overlay.buttons[">"].doLeft = function(_)
 		local tSpellbook = MultiBot.spellbook
-		tSpellbook.to = tSpellbook.to + SPELLBOOK_PAGE_SIZE
-		tSpellbook.now = tSpellbook.now + 1
-		tSpellbook.from = tSpellbook.from + SPELLBOOK_PAGE_SIZE
-		tSpellbook.frames["Overlay"].setText("Pages", tSpellbook.now .. "/" .. tSpellbook.max)
-		tSpellbook.frames["Overlay"].buttons["<"]:doShow()
-
-		if(tSpellbook.now == tSpellbook.max) then pButton:doHide() end
-		local tIndex = 1
-		for i = tSpellbook.from, tSpellbook.to do
-			MultiBot.setSpell(tIndex, tSpellbook.spells[i], pButton:getName())
-			tIndex = tIndex + 1
-		end
+		if(not tSpellbook) then return end
+		tSpellbook.now = math.min(
+			tonumber(tSpellbook.max or 1) or 1,
+			(tonumber(tSpellbook.now or 1) or 1) + 1)
+		refreshSpellbookView(false)
 	end
 
 	overlay.buttons[">"]:SetScript("OnClick", function(self)

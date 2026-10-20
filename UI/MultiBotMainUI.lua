@@ -278,14 +278,22 @@ end
 
 local function toggleRaidus(button)
     if MultiBot.OnOffSwitch(button) then
-        MultiBot.raidus.setRaidus()
+        if not MultiBot.raidus._sessionLayoutInitialized then
+          MultiBot.raidus.setRaidus()
+          if type(MultiBot.raidus.restoreWorkingLayout) == "function" then
+            MultiBot.raidus.restoreWorkingLayout()
+          end
+          if type(MultiBot.raidus.persistWorkingLayout) == "function" then
+            MultiBot.raidus.persistWorkingLayout()
+          end
+          MultiBot.raidus._sessionLayoutInitialized = true
+        end
         MultiBot.raidus:Show()
         return
     end
 
     MultiBot.raidus:Hide()
-end
-
+    end
 local function toggleLeftControl(button, controlName)
     withLeftRoot(function(leftRoot)
         local frameName = LEFT_LAYOUT_FRAME_NAMES[controlName] or controlName
@@ -793,13 +801,31 @@ local function sendMainCombatStrategy(scope, strategyName, enabled)
 		return MultiBot.Comm.RunCombatCommand(scope, "", command)
 	end
 
-	if scope == "ALL" then
-		SendChatMessage(command, GetNumRaidMembers() > 0 and "RAID" or "PARTY")
-	else
-		SendChatMessage(command, "PARTY")
-	end
+	return false
+end
 
-	return true
+local function runMainResetCommand(operation)
+    local targetName = UnitName("target")
+    local scope
+    local target = ""
+
+    if targetName ~= nil and targetName ~= "Unknown Entity" then
+        scope = "TARGET"
+        target = targetName
+    elseif GetNumRaidMembers() > 0 or GetNumPartyMembers() > 0 then
+        scope = "GROUP"
+    else
+        if UIErrorsFrame then
+            UIErrorsFrame:AddMessage(MultiBot.L("info.neither"), 1, 0.25, 0.25, 1)
+        end
+        return false
+    end
+
+    if MultiBot.Comm and type(MultiBot.Comm.RunBotResetCommand) == "function" then
+        return MultiBot.Comm.RunBotResetCommand(scope, operation, target)
+    end
+
+    return false
 end
 
 local function showMainCombatStrategyTooltip(owner)
@@ -1514,7 +1540,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
         icon = "inv_misc_tournaments_symbol_gnome",
         tip = "tips.main.reset",
         doLeft = function()
-            MultiBot.ActionToTargetOrGroup("reset botAI")
+            runMainResetCommand("AI")
         end,
     })
     wireShiftRightSwap(mainFrame.buttons["Reset"], "Reset")
@@ -1525,7 +1551,7 @@ function MultiBot.InitializeMainUI(tMultiBar)
         icon = "inv_helmet_02",
         tip = "tips.main.action",
         doLeft = function()
-            MultiBot.ActionToTargetOrGroup("reset")
+            runMainResetCommand("ACTIONS")
         end,
     })
     wireShiftRightSwap(mainFrame.buttons["Actions"], "Actions")

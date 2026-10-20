@@ -287,6 +287,27 @@ function MultiBot.SetGlobalBotEntry(name, value)
   return value
 end
 
+function MultiBot.RemoveGlobalBotEntry(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+
+  local removed = false
+  local store = MultiBot.Store and MultiBot.Store.GetBotsStore and MultiBot.Store.GetBotsStore()
+  if store and store[name] ~= nil then
+    store[name] = nil
+    removed = true
+  end
+
+  local legacyStore = getLegacyGlobalBotStore()
+  if legacyStore[name] ~= nil and isGlobalBotRosterEntry(legacyStore[name]) then
+    legacyStore[name] = nil
+    removed = true
+  end
+
+  return removed
+end
+
 function MultiBot.ClearGlobalBotStore()
   local store = MultiBot.Store and MultiBot.Store.EnsureBotsStore and MultiBot.Store.EnsureBotsStore()
   if not store then
@@ -2509,13 +2530,6 @@ function MultiBot.BindUnitToggleHandlers(button, options)
       return
     end
 
-    SendChatMessage(".playerbot bot remove " .. unitButton.name, "SAY")
-    if MultiBot.SetBridgeBotOnlineState and unitButton.bridge ~= nil then
-      MultiBot.SetBridgeBotOnlineState(unitButton, false)
-    else
-      HideButtonUnitFrame(unitButton)
-      unitButton.setDisable()
-    end
   end
 
   button.doLeft = function(unitButton)
@@ -2565,14 +2579,7 @@ function MultiBot.BindUnitToggleHandlers(button, options)
       return
     end
 
-    SendChatMessage(".playerbot bot add " .. unitButton.name, "SAY")
-    unitButton.setEnable()
-
-    if (unitButton._mbFavoritePlaceholder
-        or (MultiBot.IsFavorite and MultiBot.IsFavorite(unitButton.name)))
-        and MultiBot.BeginFavoriteRosterRefresh then
-      MultiBot.BeginFavoriteRosterRefresh(unitButton.name)
-    end
+    return
   end
 
   button._mbUnitToggleBound = true
@@ -2640,10 +2647,6 @@ local function BindBridgeSelfBotHandler(button)
       return
     end
 
-    if MultiBot.allowLegacyChatFallback == true then
-      SendChatMessage(".playerbot bot self", "SAY")
-      MultiBot.OnOffSwitch(pButton)
-    end
   end
 
   button._mbSelfBotHandlerBound = true
@@ -3615,8 +3618,8 @@ function MultiBot.ApplyBridgeBotDetail(detail)
     MultiBot.UpdateFavoritesIndex()
   end
 
-  if MultiBot.raidus and MultiBot.raidus.setRaidus and MultiBot.raidus.IsShown and MultiBot.raidus:IsShown() then
-    MultiBot.raidus.setRaidus()
+  if MultiBot.raidus and MultiBot.raidus.refreshPreservingLayout and MultiBot.raidus.IsShown and MultiBot.raidus:IsShown() then
+    MultiBot.raidus.refreshPreservingLayout()
   end
 
   return true
@@ -4336,28 +4339,76 @@ end
 -- Usage : MultiBot.AddClassToTarget("warlock"        ) -- Random
 --         MultiBot.AddClassToTarget("warlock","male" ) -- Male
 --         MultiBot.AddClassToTarget("warlock","female") -- Female
+-- MB_CREATOR_ADDCLASS_V1_BEGIN
 MultiBot.AddClassToTarget = function(classCmd, gender)
-  if not classCmd then return end             -- secure that
-  local msg = ".playerbot bot addclass " .. classCmd
-  if gender then                                 -- male / female / 0 / 1
-	msg = msg .. " " .. gender
-	print("[DBG] Message de sortie :" ,msg)
-  end
-  if MultiBot.BeginAddClassAutoGroup then
-    MultiBot.BeginAddClassAutoGroup(classCmd)
+  if not classCmd then return nil end
+
+  classCmd = string.lower(tostring(classCmd))
+  gender = gender and string.lower(tostring(gender)) or nil
+  if gender == "0" then
+    gender = "male"
+  elseif gender == "1" then
+    gender = "female"
   end
 
-  SendChatMessage(msg, "SAY")
-
-  if MultiBot.RequestBridgeRosterRefresh then
-    MultiBot.RequestBridgeRosterRefresh()
+  local bridge = MultiBot.bridge
+  local comm = MultiBot.Comm
+  local dispatchAvailable = bridge and bridge.connected == true
+      and bridge.creatorAddClassCapable == true
+      and comm and type(comm.RunCreatorAddClass) == "function"
+  if dispatchAvailable then
+    local token = comm.RunCreatorAddClass(classCmd, gender)
+    if token then
+      if MultiBot.BeginAddClassAutoGroup then
+        MultiBot.BeginAddClassAutoGroup(classCmd)
+      end
+      if MultiBot.RequestBridgeRosterRefresh then
+        MultiBot.RequestBridgeRosterRefresh()
+      end
+      return token
+    end
   end
+
+  if bridge and not dispatchAvailable then
+    bridge.lastError = "CREATOR_ADDCLASS_CAPABILITY_UNAVAILABLE"
+  end
+  return nil
 end
-
+-- MB_CREATOR_ADDCLASS_V1_END
 -- Init Wrapper
+-- MB_CREATOR_INIT_AUTO_V1_BEGIN
 function MultiBot.InitAuto(name)
-  SendChatMessage(".playerbot bot init=auto " .. name, "SAY")
+  if type(name) ~= "string" or name == "" then return nil end
+
+  local bridge = MultiBot.bridge
+  local comm = MultiBot.Comm
+  if bridge and bridge.connected == true
+      and bridge.creatorInitAutoCapable == true
+      and comm and type(comm.RunCreatorInitAuto) == "function" then
+    return comm.RunCreatorInitAuto("TARGET", name)
+  end
+
+  if bridge then
+    bridge.lastError = "CREATOR_INIT_AUTO_CAPABILITY_UNAVAILABLE"
+  end
+  return nil
 end
+
+function MultiBot.InitAutoGroup()
+  local bridge = MultiBot.bridge
+  local comm = MultiBot.Comm
+  if bridge and bridge.connected == true
+      and bridge.creatorInitAutoCapable == true
+      and comm and type(comm.RunCreatorInitAuto) == "function" then
+    return comm.RunCreatorInitAuto("GROUP")
+  end
+
+  if bridge then
+    bridge.lastError = "CREATOR_INIT_AUTO_CAPABILITY_UNAVAILABLE"
+  end
+  return nil
+end
+-- MB_CREATOR_INIT_AUTO_V1_END
 
 -- Localization payload moved to AceLocale files.
 -- Keep runtime containers initialized elsewhere; locale files hydrate values.

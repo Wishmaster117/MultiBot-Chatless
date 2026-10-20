@@ -125,13 +125,6 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 		end
 	end
 
-	local function getShamanBridgeStateTimestamp(target)
-		local bridge = MultiBot.bridge
-		local states = bridge and bridge.states
-		local entry = states and states[string.lower(target or "")]
-		return entry and tonumber(entry.lastUpdateAt) or 0
-	end
-
 	local function getShamanSequenceKey(target)
 		if(type(target) ~= "string") then return "" end
 		return string.lower(target)
@@ -148,14 +141,6 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 	local function isShamanPlaybookSequenceCurrent(sequenceKey, sequence)
 		return MultiBot._shamanPlaybookSequences
 			and MultiBot._shamanPlaybookSequences[sequenceKey] == sequence
-	end
-
-	local function getShamanUnitButton(target)
-		local units = MultiBot.frames
-			and MultiBot.frames["MultiBar"]
-			and MultiBot.frames["MultiBar"].frames
-			and MultiBot.frames["MultiBar"].frames["Units"]
-		return units and units.buttons and units.buttons[target]
 	end
 
 	local function requestShamanCombatState(target, bridgeSync, sequenceKey, sequence)
@@ -181,8 +166,6 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 			return
 		end
 
-		local previousUpdateAt = getShamanBridgeStateTimestamp(target)
-
 		local function requestBridgeState()
 			if(not isCurrent()) then return end
 			if(MultiBot.Comm and MultiBot.Comm.RequestState) then
@@ -190,23 +173,9 @@ MultiBot.addShaman = function(pFrame, pCombat, pNormal)
 			end
 		end
 
-		local function requestLegacyState()
-			if(not isCurrent()) then return end
-			local unitButton = getShamanUnitButton(target)
-			if(unitButton) then unitButton.waitFor = "CO" end
-			MultiBot.ActionToTarget("co ?", target)
-		end
-
 		if(bridgeSync) then
 			scheduleShamanTask(shamanStateRefreshDelay, requestBridgeState)
 			scheduleShamanTask(shamanStateRefreshDelay + 0.65, requestBridgeState)
-			scheduleShamanTask(shamanStateRefreshDelay + 1.55, function()
-				if(not isCurrent()) then return end
-				if(getShamanBridgeStateTimestamp(target) > previousUpdateAt) then return end
-				requestLegacyState()
-			end)
-		else
-			scheduleShamanTask(shamanStateRefreshDelay, requestLegacyState)
 		end
 	end
 

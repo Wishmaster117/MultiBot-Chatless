@@ -37,88 +37,10 @@ local function BridgeBootOwnsState()
 	return false
 end
 
-local function RequestBridgeSnapshotAfterGroupReconnect()
-	if not (MultiBot and MultiBot.Comm and MultiBot.bridge and MultiBot.bridge.connected) then
-		return
-	end
-
-	local function refresh()
-		if not (MultiBot and MultiBot.Comm and MultiBot.bridge and MultiBot.bridge.connected) then
-			return
-		end
-
-		if MultiBot.Comm.RequestRoster then
-			MultiBot.Comm.RequestRoster()
-		end
-		if MultiBot.Comm.RequestStates then
-			MultiBot.Comm.RequestStates()
-		end
-		if MultiBot.Comm.RequestBotDetails then
-			MultiBot.Comm.RequestBotDetails()
-		end
-	end
-
-	if MultiBot.TimerAfter then
-		MultiBot.TimerAfter(2.0, refresh)
-	else
-		refresh()
-	end
+local function ReconnectExistingGroupBots(_)
+	return false
 end
 
-local function ReconnectExistingGroupBots(reason)
-	local bridge = MultiBot and MultiBot.bridge
-	if bridge and bridge.connected == true
-		and bridge.botLifecycleCapable == true
-		and bridge.botTargetResolveCapable == true then
-		-- Structured lifecycle mode: group reconnect is explicit from the
-		-- roster row and must never auto-send ".playerbot bot add".
-		return false
-	end
-
-	if MultiBot._groupReconnectDone then
-		return false
-	end
-
-	local now = (type(GetTime) == "function") and GetTime() or 0
-	if MultiBot._lastGroupReconnectAt and (now - MultiBot._lastGroupReconnectAt) < 3.0 then
-		return false
-	end
-
-	local playerName = UnitName("player")
-	local sent = 0
-
-	if GetNumRaidMembers() > 0 then
-		for i = 1, GetNumRaidMembers() do
-			local raidName = UnitName("raid" .. i)
-			if raidName and raidName ~= "" and raidName ~= playerName then
-				SendChatMessage(".playerbot bot add " .. raidName, "SAY")
-				sent = sent + 1
-			end
-		end
-	elseif GetNumPartyMembers() > 0 then
-		for i = 1, GetNumPartyMembers() do
-			local partyName = UnitName("party" .. i)
-			if partyName and partyName ~= "" and partyName ~= playerName then
-				SendChatMessage(".playerbot bot add " .. partyName, "SAY")
-				sent = sent + 1
-			end
-		end
-	end
-
-	if sent <= 0 then
-		return false
-	end
-
-	MultiBot._groupReconnectDone = true
-	MultiBot._lastGroupReconnectAt = now
-	MultiBot.dprint("GROUP_RECONNECT", reason or "?", sent)
-	RequestBridgeSnapshotAfterGroupReconnect()
-	return true
-end
-
-local function LegacyChatFallbackEnabled()
-	return MultiBot and MultiBot.allowLegacyChatFallback == true
-end
 
 function MultiBot.HandleOnUpdate(pElapsed)
 	perfCount("handler.onupdate.calls")
@@ -144,34 +66,166 @@ function MultiBot.HandleOnUpdate(pElapsed)
 		MultiBot.auto.talent = false
 	end
 
+	-- MB_BAR_AUTOINVITE_STRUCTURED_V1_BEGIN
 	if(MultiBot.auto.invite and MultiBot.timer.invite.elapsed >= MultiBot.timer.invite.interval) then
-		local tTable = MultiBot.index[MultiBot.timer.invite.roster]
+		local invite = MultiBot.timer.invite
+		local tTable = MultiBot.index[invite.roster]
+		local inviteSource = (invite.roster == "raidus") and "RAIDUS" or invite.source
+		if inviteSource == nil then inviteSource = "BAR" end
+		invite.source = inviteSource
+		local structuredSource = inviteSource == "BAR" or inviteSource == "RAIDUS"
+		-- MB_RAIDUS_AUTOINVITE_STRUCTURED_V1
 
-		if(MultiBot.timer.invite.needs == 0 or MultiBot.timer.invite.index > #tTable) then
-			if(MultiBot.timer.invite.roster == "raidus") then
+		if structuredSource and invite.pending == true then
+			invite.elapsed = 0
+		elseif(invite.needs == 0 or invite.index > #tTable) then
+			if(inviteSource == "RAIDUS") then
 				MultiBot.timer.sort.elapsed = 0
 				MultiBot.timer.sort.index = 1
 				MultiBot.timer.sort.needs = 0
 				MultiBot.auto.sort = true
 			end
 
-			MultiBot.timer.invite.elapsed = 0
-			MultiBot.timer.invite.roster = ""
-			MultiBot.timer.invite.index = 1
-			MultiBot.timer.invite.needs = 0
+			invite.elapsed = 0
+			invite.roster = ""
+			invite.index = 1
+			invite.needs = 0
+			invite.source = nil
+			invite.pending = false
+			invite.pendingName = nil
 			MultiBot.auto.invite = false
 			return
-		end
+		else
+			local inviteName = tTable[invite.index]
+			if(MultiBot.isMember(inviteName) == false) then
+				if structuredSource then
+					local bridge = MultiBot and MultiBot.bridge
+					local structuredAvailable = bridge and bridge.connected == true
+						and bridge.botLifecycleCapable == true
+						and bridge.botTargetResolveCapable == true
+						and MultiBot.Comm
+						and type(MultiBot.Comm.ResolveBotTarget) == "function"
+						and type(MultiBot.Comm.RunBotLifecycle) == "function"
 
-		if(MultiBot.isMember(tTable[MultiBot.timer.invite.index]) == false) then
-			SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", tTable[MultiBot.timer.invite.index]), "SAY")
-			SendChatMessage(".playerbot bot add " .. tTable[MultiBot.timer.invite.index], "SAY")
-			MultiBot.timer.invite.needs = MultiBot.timer.invite.needs - 1
-		end
+					if structuredAvailable then
+						SendChatMessage(MultiBot.doReplace(MultiBot.L("info.inviting"), "NAME", inviteName), "SAY")
+						local runId = tonumber(invite.runId) or 0
+						local callbackSource = inviteSource
+						invite.pending = true
+						invite.pendingName = inviteName
 
-		MultiBot.timer.invite.index = MultiBot.timer.invite.index + 1
-		MultiBot.timer.invite.elapsed = 0
+						local resolveToken = MultiBot.Comm.ResolveBotTarget(inviteName, function(result)
+							local live = MultiBot.timer.invite
+							if not MultiBot.auto.invite
+								or live.source ~= callbackSource
+								or (tonumber(live.runId) or 0) ~= runId
+								or live.pendingName ~= inviteName then
+								return
+							end
+
+							local function finishPending()
+								live.pending = false
+								live.pendingName = nil
+								live.elapsed = 0
+							end
+
+							if not result or result.status ~= "OK" then
+								finishPending()
+								return
+							end
+
+							local guid = tonumber(result.guid)
+							local lifecycleState = string.upper(tostring(result.lifecycleState or ""))
+							local reason = string.upper(tostring(result.reason or ""))
+
+							if lifecycleState == "ONLINE" or (callbackSource == "BAR" and reason == "IN_USE") then
+								if MultiBot.isMember(inviteName) == false then
+									if GetNumPartyMembers() == 4 then ConvertToRaid() end
+									MultiBot.doSlash("/invite", inviteName)
+									live.needs = math.max(0, (tonumber(live.needs) or 0) - 1)
+								end
+								finishPending()
+								return
+							end
+
+							if callbackSource == "RAIDUS" and reason == "IN_USE" then
+								finishPending()
+								return
+							end
+
+							if not guid or guid <= 0
+								or (lifecycleState ~= "OFFLINE" and lifecycleState ~= "CONNECTING") then
+								finishPending()
+								return
+							end
+
+							local lifecycleToken = MultiBot.Comm.RunBotLifecycle("CONNECT", guid, function(lifecycleResult)
+								local current = MultiBot.timer.invite
+								if not MultiBot.auto.invite
+									or current.source ~= callbackSource
+									or (tonumber(current.runId) or 0) ~= runId
+									or current.pendingName ~= inviteName then
+									return
+								end
+
+								local finalState = lifecycleResult and string.upper(tostring(lifecycleResult.lifecycleState or "")) or ""
+								if lifecycleResult and lifecycleResult.status == "OK"
+									and finalState == "ONLINE"
+									and MultiBot.isMember(inviteName) == false then
+									if GetNumPartyMembers() == 4 then ConvertToRaid() end
+									MultiBot.doSlash("/invite", inviteName)
+									current.needs = math.max(0, (tonumber(current.needs) or 0) - 1)
+								end
+								current.pending = false
+								current.pendingName = nil
+								current.elapsed = 0
+							end)
+
+							if not lifecycleToken then
+								finishPending()
+							end
+						end)
+
+						if resolveToken then
+							invite.index = invite.index + 1
+							invite.elapsed = 0
+						else
+							invite.elapsed = 0
+							invite.roster = ""
+							invite.index = 1
+							invite.needs = 0
+							invite.source = nil
+							invite.pending = false
+							invite.pendingName = nil
+							MultiBot.auto.invite = false
+						end
+					else
+						invite.elapsed = 0
+						invite.roster = ""
+						invite.index = 1
+						invite.needs = 0
+						invite.source = nil
+						invite.pending = false
+						invite.pendingName = nil
+						MultiBot.auto.invite = false
+					end
+				else
+					invite.elapsed = 0
+					invite.roster = ""
+					invite.index = 1
+					invite.needs = 0
+					invite.source = nil
+					invite.pending = false
+					invite.pendingName = nil
+					MultiBot.auto.invite = false
+				end
+			else
+				invite.index = invite.index + 1
+				invite.elapsed = 0
+			end
+		end
 	end
+	-- MB_BAR_AUTOINVITE_STRUCTURED_V1_END
 
 	if(MultiBot.auto.sort and MultiBot.timer.sort.elapsed >= MultiBot.timer.sort.interval) then
 		MultiBot.timer.sort.index = MultiBot.raidus.doRaidSort(MultiBot.timer.sort.index)
@@ -943,43 +997,12 @@ local function restoreMainBarSavedStates()
 	end
 end
 
-local function hideButtonUnitFrame(button)
-	if not button or not button.parent or not button.parent.frames then return end
-	local unitFrame = button.parent.frames[button.name]
-	if unitFrame ~= nil then
-		unitFrame:Hide()
-	end
-end
-
 local function bindUnitToggleHandlers(button, options)
 	if MultiBot.BindUnitToggleHandlers then
 		return MultiBot.BindUnitToggleHandlers(button, options)
 	end
 
-	if not button then return end
-
-	local requireEnabledStateOnRight = options and options.requireEnabledStateOnRight
-
-	button.doRight = function(pButton)
-		if requireEnabledStateOnRight and pButton.state == false then
-			return
-		end
-
-		SendChatMessage(".playerbot bot remove " .. pButton.name, "SAY")
-		hideButtonUnitFrame(pButton)
-		pButton.setDisable()
-	end
-
-	button.doLeft = function(pButton)
-		if pButton.state then
-			if pButton.parent and pButton.parent.frames and pButton.parent.frames[pButton.name] ~= nil then
-				MultiBot.ShowHideSwitch(pButton.parent.frames[pButton.name])
-			end
-		else
-			SendChatMessage(".playerbot bot add " .. pButton.name, "SAY")
-			pButton.setEnable()
-		end
-	end
+	return nil
 end
 
 local function ensureQuestStateTables()
@@ -1450,6 +1473,10 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 
 		if event ~= "PLAYER_ENTERING_WORLD" then
 			if event ~= "UNIT_PET" then
+				if MultiBot.InvalidateFormationUI then
+					MultiBot.InvalidateFormationUI("group-roster")
+				end
+
 				local function refreshGroupRosterIndexes()
 					local bridge = MultiBot and MultiBot.bridge
 					if bridge and bridge.connected == true
@@ -1463,10 +1490,16 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 					MultiBot.TimerAfter(0.8, function()
 						refreshGroupRosterIndexes()
 						ReconnectExistingGroupBots(event)
+						if MultiBot.RefreshFormationAuthoritative then
+							MultiBot.RefreshFormationAuthoritative(0.20)
+						end
 					end)
 				else
 					refreshGroupRosterIndexes()
 					ReconnectExistingGroupBots(event)
+					if MultiBot.RefreshFormationAuthoritative then
+						MultiBot.RefreshFormationAuthoritative(0)
+					end
 				end
 			end
 
@@ -1518,11 +1551,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                     return
                 end
 
-                if not LegacyChatFallbackEnabled() then
-                    return
-                end
-
-                SendChatMessage(".playerbot bot list", "SAY")
+                return
             end)
         end
 
@@ -1562,17 +1591,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			return
 		end
 
-		if(MultiBot.auto.release == true) then
-			if(MultiBot.isInside(arg1, "已经死亡")) then
-				SendChatMessage("release", "WHISPER", nil, MultiBot.doReplace(arg1, "已经死亡。", ""))
-				return
-			end
-
-			if(MultiBot.isInside(arg1, "ist tot", "has dies", "has died")) then
-				SendChatMessage("release", "WHISPER", nil, MultiBot.doSplit(arg1, " ")[1])
-				return
-			end
-		end
 
         -- Anti-dup: ignore the same "Bot roster:" line repeated in a short window
         do
@@ -1624,10 +1642,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			tPlayer.class = tClass
 			tPlayer.name = tName
 
-			tPlayer.doLeft = function(pButton)
-				SendChatMessage(".playerbot bot self", "SAY")
-				MultiBot.OnOffSwitch(pButton)
-			end
 
 			-- PLAYERBOTS --
 
@@ -1733,28 +1747,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				end
 			end
 
-			-- REFRESH:RAID --
-
-			if(GetNumRaidMembers() > 4) then
-				for i = 1, GetNumRaidMembers() do
-					local raidName = UnitName("raid" .. i)
-					SendChatMessage(".playerbot bot add " .. raidName, "SAY")
-				end
-
-				return
-			end
-
-			-- REFRESH:GROUP --
-
-			if(GetNumPartyMembers() > 0) then
-				for i = 1, GetNumPartyMembers() do
-					local partyName = UnitName("party" .. i)
-					SendChatMessage(".playerbot bot add " .. partyName, "SAY")
-				end
-
-				return
-			end
-
 			return
 		end
 
@@ -1776,12 +1768,8 @@ function MultiBot.HandleMultiBotEvent(event, ...)
                   return
                end
 
-               if LegacyChatFallbackEnabled() then
-                  tButton.waitFor = "CO"
-                  SendChatMessage("co ?", "WHISPER", nil, tName)
-               else
-                  tButton.waitFor = ""
-               end
+
+               tButton.waitFor = ""
                tButton.setEnable()
                return
             end
@@ -1791,34 +1779,17 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			return
 		end
 
-		if(MultiBot.isInside(arg1, "remove: ")) then
-			local tName = string.sub(arg1, 9, string.find(arg1, " ", 9) - 1)
-			local tFrame = MultiBot.frames["MultiBar"].frames["Units"].frames[tName]
-			local tButton = MultiBot.frames["MultiBar"].frames["Units"].buttons[tName]
-			if(tButton == nil) then return end
-
-			if(MultiBot.isInside(arg1, "not your bot")) then
-				SendChatMessage("leave", "WHISPER", nil, tName)
-			end
-
-			MultiBot.doRemove(MultiBot.index.classes.actives[tButton.class], tButton.name)
-			MultiBot.doRemove(MultiBot.index.actives, tButton.name)
-
-			if(tFrame ~= nil) then tFrame:Hide() end
-			tButton.setDisable()
-			return
-		end
-
 		if(arg1 == "Enable player botAI") then
 			local tName = UnitName("player")
 			local tButton = MultiBot.frames["MultiBar"].frames["Units"].buttons[tName]
 			if(tButton == nil) then return end
-			if LegacyChatFallbackEnabled() then
-				tButton.waitFor = "CO"
-				SendChatMessage("co ?", "WHISPER", nil, tName)
-			else
-				tButton.waitFor = ""
+			if MultiBot.Comm and type(MultiBot.Comm.IsSelfBotCapable) == "function"
+					and MultiBot.Comm.IsSelfBotCapable()
+					and type(MultiBot.Comm.RequestSelfBotState) == "function" then
+				MultiBot.Comm.RequestSelfBotState()
 			end
+
+			tButton.waitFor = ""
 			tButton.setEnable()
 			return
 		end
@@ -1893,113 +1864,13 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			return
 		end
 
-		if MultiBot.awaitGlyphs and author == MultiBot.awaitGlyphs then
 
-			-- On ne traite que les réponses commençant par "Glyphs:" ou "No glyphs"
-			if not rawMsg:match("^[Gg]lyphs:") and not rawMsg:match("^[Nn]o glyphs") then
-				DEFAULT_CHAT_FRAME:AddMessage("|cff66ccff[ERROR]|r " .. MultiBot.L("talent.glyphs.error_ignored_non_glyph"))
-				return
-			end
 
-			-- On extrait tout ce qui suit "Glyphs:"
-			local rest = rawMsg:match("^[Gg]lyphs:%s*(.*)") or ""
-			local ids = {}
-
-			if rest:lower():match("^no glyphs") then
-				-- pas de glyphe → on met 6 zéros
-				for i = 1, 6 do ids[i] = 0 end
-			else
-				-- on récupère directement chaque ID depuis les liens cliquables
-				for id in rest:gmatch("|Hitem:(%d+):") do
-					table.insert(ids, tonumber(id))
-				end
-				-- on complète si moins de 6
-				for i = #ids + 1, 6 do
-					ids[i] = 0
-				end
-			end
-
-			-- On stocke cette liste pour le rafraîchissement
-			local receivedGlyphs = (MultiBot.Store and MultiBot.Store.EnsureRuntimeTable and MultiBot.Store.EnsureRuntimeTable("receivedGlyphs")) or MultiBot.receivedGlyphs
-			if type(receivedGlyphs) ~= "table" then
-				receivedGlyphs = {}
-				MultiBot.receivedGlyphs = receivedGlyphs
-			end
-			receivedGlyphs[author] = {}
-
-			-- Détermination du type Major/Minor et remplissage
-			local unit = MultiBot.toUnit(author)
-			local _, cf = UnitClass(unit or "player")
-			local classKey = (cf == "DEATHKNIGHT")
-							and "DeathKnight"
-							or cf:sub(1,1)..cf:sub(2):lower()
-			local glyphDB = MultiBot.data.talent.glyphs[classKey] or {}
-
-			-- Mappage des sockets
-			local map = { 1, 2, 5, 6, 4, 3 }
-			for idx, id in ipairs(ids) do
-				local sock = map[idx]                    -- n° de socket cible
-				local typ  = (glyphDB.Major and glyphDB.Major[id]) and "Major" or "Minor"
-				receivedGlyphs[author][sock] = { id = id, type = typ }
-			end
-
-			-- Si l'onglet Glyphes est ouvert, on force son rafraîchissement.
-			local glyphFrameKey = MultiBot.TalentTabGroups and MultiBot.TalentTabGroups.GLYPH
-			local glyphFrame = glyphFrameKey and MultiBot.talent.frames[glyphFrameKey]
-			if glyphFrame and glyphFrame:IsShown() then
-
-				MultiBot.FillDefaultGlyphs()
-			end
-
-			MultiBot.awaitGlyphs = nil
-			return
-		end
-		-- END GLYPHES --
-
-		if(MultiBot.auto.release == true) then
-			-- Graveyard not ready to talk Bot in the chinese Version --
-			if(arg1 == "在墓地见我") then
-				MultiBot.frames["MultiBar"].frames["Units"].buttons[arg2].waitFor = "你好"
-				return
-			end
-
-			if(arg1 == "Meet me at the graveyard") then
-				SendChatMessage("summon", "WHISPER", nil, arg2)
-				return
-			end
-		end
-
-		if(MultiBot.isInside(arg1, "StatsOfPlayer")) then
-			local statsFrame = MultiBot.EnsureStatsUI and MultiBot.EnsureStatsUI() or MultiBot.stats
-			if not statsFrame then
-				return
-			end
-
-			local tUnit = MultiBot.toUnit(arg2)
-			local unitStats = statsFrame.frames[tUnit]
-			if unitStats and unitStats.setStats then
-				unitStats.setStats(arg2, UnitLevel(tUnit), arg1, true)
-			end
-		end
-
-		if(arg1 == "stats" and arg2 ~= UnitName("player")) then
-			local tXP = math.floor(100.0 / UnitXPMax("player") * UnitXP("player"))
-			local tMana = math.floor(100.0 / UnitManaMax("player") * UnitMana("player"))
-			SendChatMessage("StatsOfPlayer " .. tXP .. " " .. tMana, "WHISPER", nil, arg2)
-		end
 
 		-- REQUIREMENT --
 
 		local tButton = MultiBot.frames["MultiBar"].frames["Units"].buttons[arg2]
 
-		if(MultiBot.auto.release == true) then
-			-- Graveyard ready to talk Bot in the chinese Version --
-			if(tButton ~= nil and tButton.waitFor == "你好" and arg1 == "你好") then
-				SendChatMessage("summon", "WHISPER", nil, arg2)
-				tButton.waitFor = ""
-				return
-			end
-		end
 
 		if(MultiBot.isInside(arg1, "Hello", "你好") and tButton == nil) then
             local tUnit = MultiBot.toUnit(arg2)
@@ -2063,12 +1934,8 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				return
 			end
 
-			if LegacyChatFallbackEnabled() then
-				tButton.waitFor = "CO"
-				SendChatMessage("co ?", "WHISPER", nil, arg2)
-			else
-				tButton.waitFor = ""
-			end
+
+			tButton.waitFor = ""
 			return
 		end
 
@@ -2076,92 +1943,7 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			return
 		end
 
-		if(MultiBot.isInside(arg1, "reset to default") and tButton.waitFor == "CO") then
-			SendChatMessage("co ,?", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(MultiBot.isInside(arg1, "reset to default") and tButton.waitFor == "NC") then
-			SendChatMessage("nc ,?", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor == "DETAIL" and MultiBot.isInside(arg1, "playing with")) then
-			tButton.waitFor = ""
-			MultiBot.RaidPool(arg2, arg1)
-			return
-		end
-
-		if(tButton.waitFor == "IGNORE" and MultiBot.isInside(arg1, "Ignored ")) then
-			if(MultiBot.spells[arg2] == nil) then MultiBot.spells[arg2] = {} end
-			tButton.waitFor = "DETAIL"
-
-			local tIgnores = MultiBot.doSplit(arg1, ": ")[2]
-
-			if(tIgnores ~= nil) then
-				local tSpells = MultiBot.doSplit(tIgnores, ", ")
-
-				for k,v in pairs(tSpells) do
-					local tSpell = MultiBot.doSplit(v, "|")[3]
-					if(tSpell ~= nil) then MultiBot.spells[arg2][MultiBot.doSplit(tSpell, ":")[2]] = false end
-				end
-			end
-
-			SendChatMessage("who", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor == "NC" and MultiBot.isInside(arg1, "Strategies: ")) then
-			tButton.waitFor = "IGNORE"
-			tButton.normal = string.sub(arg1, 13)
-
-			local tUnitsFrame = MultiBot.frames["MultiBar"].frames["Units"]
-			local tExistingFrame = tUnitsFrame.frames and tUnitsFrame.frames[arg2] or nil
-			local tCombat = tButton.combat or ""
-			local tNormal = tButton.normal or ""
-
-			if tExistingFrame
-					and tExistingFrame._mbLegacyBuilt == true
-					and tExistingFrame._mbLegacyClass == tButton.class
-					and tExistingFrame._mbLegacyCombat == tCombat
-					and tExistingFrame._mbLegacyNormal == tNormal then
-				tButton.setEnable()
-				SendChatMessage("ss ?", "WHISPER", nil, arg2)
-				return
-			end
-
-			local tWasShown = tExistingFrame and tExistingFrame.IsShown and tExistingFrame:IsShown()
-			local tFrame = tUnitsFrame.addFrame(arg2, tButton.x - tButton.size - 2, tButton.y + 2)
-			tFrame.class = tButton.class
-			tFrame.name = tButton.name
-
-			MultiBot["add" .. tButton.class](tFrame, tButton.combat, tButton.normal)
-			MultiBot.addEvery(tFrame, tButton.combat, tButton.normal)
-			tFrame._mbLegacyBuilt = true
-			tFrame._mbLegacyClass = tButton.class
-			tFrame._mbLegacyCombat = tCombat
-			tFrame._mbLegacyNormal = tNormal
-
-			if(MultiBot.index.classes.actives[tButton.class] == nil) then MultiBot.index.classes.actives[tButton.class] = {} end
-			if(MultiBot.isActive(tButton.name) == false) then
-				table.insert(MultiBot.index.classes.actives[tButton.class], tButton.name)
-				table.insert(MultiBot.index.actives, tButton.name)
-			end
-
-			tButton.setEnable()
-			if tWasShown and tFrame.Show then tFrame:Show() end
-			SendChatMessage("ss ?", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor == "CO" and MultiBot.isInside(arg1, "Strategies: ")) then
-			tButton.waitFor = "NC"
-			tButton.combat = string.sub(arg1, 13)
-			SendChatMessage("nc ?", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor ~= "ITEM" and tButton.waitFor ~= "SPELL" and MultiBot.auto.stats and MultiBot.isInside(arg1, "Bag")) then
+		if(MultiBot.auto.stats and MultiBot.isInside(arg1, "Bag")) then
 			local statsFrame = MultiBot.EnsureStatsUI and MultiBot.EnsureStatsUI() or MultiBot.stats
 			if not statsFrame then
 				return
@@ -2175,58 +1957,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			if statsFrame.frames[tUnit] and statsFrame.frames[tUnit].setStats then
 				statsFrame.frames[tUnit].setStats(arg2, UnitLevel(tUnit), arg1)
 			end
-			return
-		end
-
-		if(tButton.waitFor == "OUTFITS" and MultiBot.HandleOutfitChatLine and MultiBot.HandleOutfitChatLine(tButton, arg1, arg2)) then
-			return
-		end
-
-		-- Inventory --
-
-		if(tButton.waitFor == "INVENTORY" and MultiBot.isInside(arg1, "Inventory", "背包")) then
-			if(MultiBot.inventory and MultiBot.inventory.beginPayload) then
-				MultiBot.inventory:beginPayload(arg2)
-			else
-				local tItems = MultiBot.inventory.frames["Items"]
-				if(tItems.clear) then
-					tItems:clear()
-				else
-					for key, value in pairs(tItems.buttons) do value:Hide() end
-					for key in pairs(tItems.buttons) do tItems.buttons[key] = nil end
-				end
-				MultiBot.inventory.setText("Title", MultiBot.doReplace(MultiBot.L("info.inventory"), "NAME", arg2))
-				MultiBot.inventory.name = arg2
-				tItems.index = 0
-			end
-			tButton.waitFor = "ITEM"
-			SendChatMessage("stats", "WHISPER", nil, arg2)
-			return
-		end
-
-		if(tButton.waitFor == "ITEM" and (MultiBot.beInside(arg1, "Bag,", "Dur") or MultiBot.beInside(arg1, "背包", "耐久度"))) then
-			if MultiBot.inventory and MultiBot.inventory.applySummaryLine then
-				MultiBot.inventory:applySummaryLine(arg1)
-			end
-			MultiBot.inventory:Show()
-			tButton.waitFor = ""
-			InspectUnit(arg2)
-			return
-		end
-
-		if(tButton.waitFor == "ITEM") then
-			if(string.sub(arg1, 1, 3) == "---") then return end
-			if(MultiBot.inventory and MultiBot.inventory.appendItem) then
-				MultiBot.inventory:appendItem(arg1)
-			else
-				MultiBot.addItem(MultiBot.inventory.frames["Items"], arg1)
-			end
-			return
-		end
-
-		-- Spellbook --
-
-		if(MultiBot.handleSpellbookChatLine and MultiBot.handleSpellbookChatLine(tButton, arg1, arg2)) then
 			return
 		end
 
@@ -2262,8 +1992,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 			if(MultiBot.inventory:IsVisible() and MultiBot.isInside(string.lower(arg1), "opened")) then
 				if(MultiBot.inventory and MultiBot.inventory.markLootPending) then
 					MultiBot.inventory:markLootPending(tButton.name)
-				else
-					tButton.waitFor = "LOOT"
 				end
 				return
 			end
@@ -2292,15 +2020,6 @@ function MultiBot.HandleMultiBotEvent(event, ...)
 				return
 			end
 
-			if(tButton ~= nil and tButton.waitFor == "LOOT" and tButton ~= nil) then
-				if(MultiBot.RequestInventoryPostActionRefresh and MultiBot.RequestInventoryPostActionRefresh(tButton.name, 0.25, 0.85)) then
-					tButton.waitFor = ""
-					return
-				end
-
-				tButton.waitFor = ""
-				return
-			end
 		end
 
 		return

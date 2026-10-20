@@ -112,14 +112,19 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 
 	local fStones = pFrame.addFrame("Stones", -122, 30)
 	fStones:Hide()
+	fStones.strategyStone = nil
 	fStones.activeStone = nil
+	fStones.authoritativeStoneState = false
+	fStones.stateRequestToken = nil
+	fStones.refreshAfterPending = false
+	fStones.strategyPending = false
 
 	btnStones.doLeft = function() MultiBot.ShowHideSwitch(fStones) end
 
 	local stoneButtons = {}
 	local stoneList = {
-		{"Spellstone", "spellstone", "inv_misc_gem_amethyst_02"},
-		{"Firestone",  "firestone",  "inv_ammo_firetar"},
+		{"Spellstone", "spellstone", "inv_misc_gem_amethyst_02", 41196},
+		{"Firestone",  "firestone",  "inv_ammo_firetar",          41174},
 	}
 
 	local function UpdateStoneIcons(active)
@@ -128,9 +133,9 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 		end
 		if active and stoneButtons[active] then
 			local icon = nil
-			for _,v in ipairs(stoneList) do if v[1]==active then icon=v[3]; break end end
+			for _,v in ipairs(stoneList) do if v[1]==active then icon=GetItemIcon(v[4]) or MultiBot.SafeTexturePath(v[3]); break end end
 			if icon and btnStones.icon and btnStones.icon.SetTexture then
-				btnStones.icon:SetTexture(MultiBot.SafeTexturePath(icon))
+				btnStones.icon:SetTexture(icon)
 			elseif icon and btnStones.setIcon then
 				btnStones.setIcon(icon)
 			end
@@ -145,35 +150,195 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 		end
 	end
 
-	local function ToggleStone(pButton, label, cmd)
-		local target = pButton.getName()
-		local desired = nil
-		local action
+	MultiBot._warlockStoneMutationWatchers = MultiBot._warlockStoneMutationWatchers or {}
+	if MultiBot._warlockStoneMutationHookInstalled ~= true then
+		MultiBot._warlockStoneMutationHookInstalled = true
+		MultiBot._warlockStonePreviousStrategyMutationApplied = MultiBot.OnStrategyMutationApplied
+		MultiBot.OnStrategyMutationApplied = function(result)
+			local previous = MultiBot._warlockStonePreviousStrategyMutationApplied
+			if type(previous) == "function" then
+				previous(result)
+			end
+			if type(result) ~= "table" or result.scope ~= "BOT" or result.stateScope ~= "N" then
+				return
+			end
 
-		if fStones.activeStone == label then
-			action = "nc -" .. cmd .. ",?"
-		else
-			desired = label
-			if fStones.activeStone then
-				local old = fStones.activeStone
-				local oldCmd = (old=="Spellstone") and "spellstone" or "firestone"
-				action = "nc -" .. oldCmd .. ",+" .. cmd .. ",?"
-			else
-				action = "nc +" .. cmd .. ",?"
+			local targetKey = string.lower(tostring(result.target or ""))
+			local watcher = MultiBot._warlockStoneMutationWatchers[targetKey]
+			if type(watcher) ~= "table" or watcher.changes ~= result.changes then
+				return
+			end
+
+			MultiBot._warlockStoneMutationWatchers[targetKey] = nil
+			if type(watcher.callback) == "function" then
+				watcher.callback(result.status == "ok", result)
 			end
 		end
+	end
 
-		local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
-			if ok == true then
-				fStones:Hide()
+	local function GetStoneTarget()
+		return type(btnStones.getName) == "function" and btnStones.getName() or nil
+	end
+
+	local function HasAuthoritativeStoneState(target)
+		if type(target) ~= "string" or target == "" then return false end
+		if MultiBot.IsSelfBotStrategyTarget and MultiBot.IsSelfBotStrategyTarget(target) then return false end
+		return MultiBot.bridge
+			and MultiBot.bridge.connected == true
+			and MultiBot.bridge.warlockStoneStateCapable == true
+			and MultiBot.Comm
+			and type(MultiBot.Comm.RequestWarlockStoneState) == "function"
+	end
+
+	local function RefreshStoneState(forceAfterPending)
+		local target = GetStoneTarget()
+		if not HasAuthoritativeStoneState(target) then
+			fStones.stateRequestToken = nil
+			fStones.refreshAfterPending = false
+			fStones.authoritativeStoneState = false
+			fStones.activeStone = fStones.strategyStone
+			UpdateStoneIcons(fStones.activeStone)
+			return false
+		end
+
+		if fStones.stateRequestToken then
+			if forceAfterPending then
+				fStones.refreshAfterPending = true
+			end
+			return true
+		end
+
+		if fStones.authoritativeStoneState ~= true then
+			fStones.activeStone = nil
+			UpdateStoneIcons(nil)
+		end
+
+		local requestToken = nil
+		requestToken = MultiBot.Comm.RequestWarlockStoneState(target, function(ok, result)
+			if fStones.stateRequestToken ~= requestToken then
+				return
+			end
+
+			fStones.stateRequestToken = nil
+			local refreshAgain = fStones.refreshAfterPending == true
+			fStones.refreshAfterPending = false
+
+			if ok == true and type(result) == "table" then
+				local active = nil
+				if result.kind == "FIRESTONE" then
+					active = "Firestone"
+				elseif result.kind == "SPELLSTONE" then
+					active = "Spellstone"
+				end
+				fStones.activeStone = active
+				fStones.authoritativeStoneState = true
+				UpdateStoneIcons(active)
+			end
+
+			if refreshAgain then
+				if type(MultiBot.TimerAfter) == "function" then
+					MultiBot.TimerAfter(0.01, function() RefreshStoneState(false) end)
+				else
+					RefreshStoneState(false)
+				end
 			end
 		end)
-		if transport == "pending" then return end
-		if not sent then return end
-		if transport ~= "bridge" then
-			fStones.activeStone = desired
-			UpdateStoneIcons(fStones.activeStone)
+
+		if requestToken == false or requestToken == nil then
+			return false
 		end
+		fStones.stateRequestToken = requestToken
+		return true
+	end
+
+	local function ScheduleStoneStateRefresh()
+		local target = GetStoneTarget()
+		if not HasAuthoritativeStoneState(target) then
+			fStones.authoritativeStoneState = false
+			fStones.activeStone = fStones.strategyStone
+			UpdateStoneIcons(fStones.activeStone)
+			return
+		end
+
+		if type(MultiBot.TimerAfter) == "function" then
+			MultiBot.TimerAfter(0.60, function() RefreshStoneState(true) end)
+		else
+			RefreshStoneState(true)
+		end
+	end
+
+	local function ToggleStone(pButton, label, cmd)
+		if fStones.strategyPending then return end
+
+		local target = pButton.getName()
+		if type(target) ~= "string" or target == "" then return end
+
+		local desired = nil
+		local changes
+
+		if fStones.strategyStone == label then
+			changes = "-" .. cmd
+		else
+			desired = label
+			if fStones.strategyStone then
+				local old = fStones.strategyStone
+				local oldCmd = (old=="Spellstone") and "spellstone" or "firestone"
+				changes = "-" .. oldCmd .. ",+" .. cmd
+			else
+				changes = "+" .. cmd
+			end
+		end
+
+		local action = "nc " .. changes .. ",?"
+		local targetKey = string.lower(target)
+		local selfStrategyTarget = MultiBot.IsSelfBotStrategyTarget
+			and MultiBot.IsSelfBotStrategyTarget(target)
+
+		local function mutationComplete(ok)
+			fStones.strategyPending = false
+			if ok ~= true then return end
+
+			if MultiBot.Comm and type(MultiBot.Comm.ShowSystemMessage) == "function" then
+				MultiBot.Comm.ShowSystemMessage("[MultiBot] " .. target .. ": " .. (desired or "Stones OFF") .. " OK")
+			end
+
+			fStones.strategyStone = desired
+			if HasAuthoritativeStoneState(target) then
+				ScheduleStoneStateRefresh()
+			else
+				fStones.authoritativeStoneState = false
+				fStones.activeStone = desired
+				UpdateStoneIcons(fStones.activeStone)
+			end
+			fStones:Hide()
+		end
+
+		MultiBot._warlockStoneMutationWatchers[targetKey] = nil
+		local sent, transport = MultiBot.ActionToUnitStrategy(action, target, function(ok)
+			mutationComplete(ok)
+		end)
+
+		if transport == "pending" then
+			fStones.strategyPending = true
+			return
+		end
+		if not sent then return end
+
+		if transport == "bridge" then
+			fStones.strategyPending = true
+			if not selfStrategyTarget then
+				MultiBot._warlockStoneMutationWatchers[targetKey] = {
+					changes = changes,
+					callback = mutationComplete,
+				}
+			end
+			return
+		end
+
+		fStones.strategyStone = desired
+		fStones.activeStone = desired
+		fStones.authoritativeStoneState = false
+		UpdateStoneIcons(fStones.activeStone)
 		fStones:Hide()
 	end
 
@@ -181,16 +346,27 @@ MultiBot.addWarlock = function(pFrame, pCombat, pNormal)
 		local label, cmd, icon = unpack(v)
 		local b = fStones.addButton("Stone"..label, 0, (i-1)*26, icon,
 			MultiBot.L("tips.warlock.stones." .. label:lower()))
+		if b.icon and b.icon.SetTexture then
+			b.icon:SetTexture(GetItemIcon(v[4]) or MultiBot.SafeTexturePath(icon))
+		end
 		stoneButtons[label] = b
 		_MB_setDesat(b, true)
 		b.doLeft  = function(pButton) ToggleStone(pButton, label, cmd) end
 	end
 
 	for _,v in ipairs(stoneList) do
-		if MultiBot.hasStrategy(pNormal, v[2]) then fStones.activeStone = v[1]; break end
+		if MultiBot.hasStrategy(pNormal, v[2]) then fStones.strategyStone = v[1]; break end
 	end
-	UpdateStoneIcons(fStones.activeStone)
-	fStones:SetScript("OnShow", function(self) UpdateStoneIcons(self.activeStone) end)
+
+	if HasAuthoritativeStoneState(GetStoneTarget()) then
+		UpdateStoneIcons(nil)
+		RefreshStoneState(false)
+	else
+		fStones.activeStone = fStones.strategyStone
+		UpdateStoneIcons(fStones.activeStone)
+	end
+
+	fStones:SetScript("OnShow", function() RefreshStoneState(false) end)
 	-- FIN STONES --
 
 	-- SOULSTONES (stratégies) --

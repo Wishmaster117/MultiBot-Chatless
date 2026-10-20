@@ -299,7 +299,7 @@ function TrainerUI:Render()
             row.cost:SetText(formatMoney(entry.cost))
             row.learn.spellId = entry.spellId
             row.learn:SetText(L("info.trainer.learn", "Learn"))
-            setButtonEnabled(row.learn, not self.pending and entry.canAfford)
+            setButtonEnabled(row.learn, not self.pending and not self.requestPending and entry.canAfford)
             row:Show()
         else
             row.icon.spellId = nil
@@ -311,12 +311,12 @@ function TrainerUI:Render()
     frame.pageText:SetText(tostring(self.page) .. "/" .. tostring(maxPage))
     setButtonEnabled(frame.prev, self.page > 1)
     setButtonEnabled(frame.next, self.page < maxPage)
-    setButtonEnabled(frame.refresh, not self.pending)
-    setButtonEnabled(frame.learnAll, not self.pending and #entries > 0)
+    setButtonEnabled(frame.refresh, not self.pending and not self.requestPending)
+    setButtonEnabled(frame.learnAll, not self.pending and not self.requestPending and #entries > 0)
 end
 
 function TrainerUI:RequestList()
-    if not self.botName or self.botName == "" then
+    if not self.botName or self.botName == "" or self.pending or self.requestPending then
         return false
     end
 
@@ -325,48 +325,55 @@ function TrainerUI:RequestList()
         return false
     end
 
-    self.pending = nil
     self.entries = {}
     self.page = 1
     self.error = nil
     self.trainerEntry = 0
     self.trainerName = ""
+    self.requestPending = true
     self:SetStatus(L("info.trainer.loading", "Loading trainer spells..."))
     self:Render()
 
-    if not MultiBot.Comm.RequestTrainer(self.botName) then
+    local token = MultiBot.Comm.RequestTrainer(self.botName)
+    if not token then
+        self.requestPending = nil
+        self.requestToken = nil
         self:SetStatus(L("info.trainer.bridge_required", "Bridge support is required for trainer actions."))
         self:Render()
         return false
     end
 
+    self.requestPending = token
+    self.requestToken = token
+    self:Render()
     return true
 end
 
 function TrainerUI:LearnSpell(spellId)
-    if self.pending or not self.trainerEntry or self.trainerEntry <= 0 then
+    if self.pending or self.requestPending or not self.trainerEntry or self.trainerEntry <= 0 then
         return false
     end
 
     if not MultiBot.Comm or not MultiBot.Comm.RunTrainerLearn then
+        return false
+    end
+
+    local token = MultiBot.Comm.RunTrainerLearn(self.botName, self.trainerEntry, spellId)
+    if not token then
+        self:SetStatus(L("info.trainer.failed", "Trainer action failed."))
+        self:Render()
         return false
     end
 
     self.pending = spellId
+    self.pendingToken = token
     self:SetStatus(L("info.trainer.learning", "Learning..."))
     self:Render()
-    if not MultiBot.Comm.RunTrainerLearn(self.botName, self.trainerEntry, spellId) then
-        self.pending = nil
-        self:SetStatus(L("info.trainer.failed", "Trainer action failed."))
-        self:Render()
-        return false
-    end
-
     return true
 end
 
 function TrainerUI:LearnAll()
-    if self.pending or not self.trainerEntry or self.trainerEntry <= 0 then
+    if self.pending or self.requestPending or not self.trainerEntry or self.trainerEntry <= 0 then
         return false
     end
 
@@ -374,25 +381,26 @@ function TrainerUI:LearnAll()
         return false
     end
 
-    self.pending = "ALL"
-    self:SetStatus(L("info.trainer.learning", "Learning..."))
-    self:Render()
-    if not MultiBot.Comm.RunTrainerLearn(self.botName, self.trainerEntry, "ALL") then
-        self.pending = nil
+    local token = MultiBot.Comm.RunTrainerLearn(self.botName, self.trainerEntry, "ALL")
+    if not token then
         self:SetStatus(L("info.trainer.failed", "Trainer action failed."))
         self:Render()
         return false
     end
 
+    self.pending = "ALL"
+    self.pendingToken = token
+    self:SetStatus(L("info.trainer.learning", "Learning..."))
+    self:Render()
     return true
 end
 
 function TrainerUI:HandleBridgeBegin(botName, token, trainerEntry, trainerName)
-    if not sameBotName(botName, self.botName) then
+    if not sameBotName(botName, self.botName) or token ~= self.requestToken then
         return
     end
 
-    self.requestToken = token
+    self.requestPending = token
     self.trainerEntry = tonumber(trainerEntry or 0) or 0
     self.trainerName = trainerName or ""
     self.entries = {}
@@ -403,7 +411,7 @@ function TrainerUI:HandleBridgeBegin(botName, token, trainerEntry, trainerName)
 end
 
 function TrainerUI:HandleBridgeLine(botName, token, entry)
-    if not sameBotName(botName, self.botName) or (self.requestToken and token ~= self.requestToken) then
+    if not sameBotName(botName, self.botName) or token ~= self.requestToken then
         return
     end
 
@@ -413,7 +421,7 @@ function TrainerUI:HandleBridgeLine(botName, token, entry)
 end
 
 function TrainerUI:HandleBridgeError(botName, token, reason, trainerEntry)
-    if not sameBotName(botName, self.botName) or (self.requestToken and token ~= self.requestToken) then
+    if not sameBotName(botName, self.botName) or token ~= self.requestToken then
         return
     end
 
@@ -424,7 +432,7 @@ function TrainerUI:HandleBridgeError(botName, token, reason, trainerEntry)
 end
 
 function TrainerUI:HandleBridgeEnd(botName, token, trainerEntry, trainerName, entries, errorReason)
-    if not sameBotName(botName, self.botName) or (self.requestToken and token ~= self.requestToken) then
+    if not sameBotName(botName, self.botName) or token ~= self.requestToken then
         return
     end
 
@@ -432,7 +440,8 @@ function TrainerUI:HandleBridgeEnd(botName, token, trainerEntry, trainerName, en
     self.trainerName = (type(trainerName) == "string" and trainerName ~= "") and trainerName or self.trainerName
     self.entries = entries or self.entries or {}
     self.error = errorReason
-    self.pending = nil
+    self.requestPending = nil
+    self.requestToken = nil
 
     if self.error and self.error ~= "" then
         self:SetStatus(getReasonText(self.error))
@@ -446,11 +455,12 @@ function TrainerUI:HandleBridgeEnd(botName, token, trainerEntry, trainerName, en
 end
 
 function TrainerUI:HandleBridgeLearnResult(botName, token, trainerEntry, spellId, result, reason, learnedCount, spent)
-    if not sameBotName(botName, self.botName) then
+    if not sameBotName(botName, self.botName) or token ~= self.pendingToken then
         return
     end
 
     self.pending = nil
+    self.pendingToken = nil
     self.trainerEntry = tonumber(trainerEntry or self.trainerEntry or 0) or 0
 
     if result == "OK" then
@@ -478,6 +488,13 @@ function MultiBot.OpenBotTrainer(botName, sourceButton)
 
     if TrainerUI.sourceButton and TrainerUI.sourceButton ~= sourceButton and TrainerUI.sourceButton.setDisable then
         TrainerUI.sourceButton.setDisable()
+    end
+
+    if TrainerUI.botName and TrainerUI.botName ~= "" and not sameBotName(TrainerUI.botName, botName) then
+        TrainerUI.pending = nil
+        TrainerUI.pendingToken = nil
+        TrainerUI.requestPending = nil
+        TrainerUI.requestToken = nil
     end
 
     TrainerUI.botName = botName
