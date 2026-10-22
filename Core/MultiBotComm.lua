@@ -9057,6 +9057,7 @@ function Comm.HandleAddonMessage(prefix, message, distribution, sender)
   if opcode == "SB_ITEM" then
     local botName, rest = splitOnce(payload or "", "~")
     local token, spellId = splitOnce(rest or "", "~")
+    spellId = splitOnce(spellId or "", "~")
 
     state.connected = true
     state.lastError = nil
