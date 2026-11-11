@@ -4297,9 +4297,10 @@ if not IsInGroup then
 end
 
 if not GetNumGroupMembers then
-  -- Wrath : "raid" only
+  -- Wrath : raid members in a raid, party members (without player) in a party
+  -- (this is a global, so other addons such as Skada rely on it too)
   function GetNumGroupMembers()
-    return GetNumRaidMembers()
+    return IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
   end
 end
 
